@@ -54,6 +54,41 @@ export const saveDevice = (d: Device | null): void => setJson(K_DEVICE, d)
 export const lastToken = (): string | null => getJson<string | null>(K_TOKEN, null)
 export const rememberToken = (t: string): void => setJson(K_TOKEN, t)
 
+// ── 最近使った現場（掛け持ちの隊員向け）。QRを読んだ現場を新しい順に最大5件覚える ──
+export interface RecentSite { token: string; name: string; usedAt: string }
+const K_RECENT = 'mamorai.jyoban.recentSites'
+const RECENT_MAX = 5
+export const recentSites = (): RecentSite[] => getJson<RecentSite[]>(K_RECENT, [])
+
+/** 表示できた現場を記録（同じ現場は上書きして先頭へ）。 */
+export function rememberSite(token: string, name: string, usedAt: string = localNow()): void {
+  const list = [{ token, name, usedAt }, ...recentSites().filter((s) => s.token !== token)]
+    .sort((a, b) => b.usedAt.localeCompare(a.usedAt))
+    .slice(0, RECENT_MAX)
+  setJson(K_RECENT, list)
+  rememberToken(token)
+}
+
+/** 使えなくなった現場（QR再発行など）を一覧から外す。 */
+export function forgetSite(token: string): void {
+  setJson(K_RECENT, recentSites().filter((s) => s.token !== token))
+  if (lastToken() === token) setJson(K_TOKEN, null)
+}
+
+/**
+ * 起動時にどの現場を開くか。
+ *  - QRから開いた（パスにトークン）→ その現場
+ *  - ホーム画面から開いた（/app/r/）→ 覚えている現場が2つ以上なら選んでもらう（取り違え防止）、1つならそれ
+ */
+export function resolveStart(pathname: string): { token: string | null; pick: boolean } {
+  const m = /^\/app\/r\/([A-Za-z0-9_-]{6,64})\/?$/.exec(pathname)
+  if (m) return { token: m[1]!, pick: false }
+  const recent = recentSites()
+  if (recent.length > 1) return { token: null, pick: true }
+  if (recent.length === 1) return { token: recent[0]!.token, pick: false }
+  return { token: lastToken(), pick: false }
+}
+
 /** パス /app/r/<トークン> からトークンを取り出す（/app/r/ だけなら前回のトークン＝ホーム画面から起動）。 */
 export function tokenFromPath(pathname: string): string | null {
   const m = /^\/app\/r\/([A-Za-z0-9_-]{6,64})\/?$/.exec(pathname)

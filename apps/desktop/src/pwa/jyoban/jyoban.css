@@ -83,3 +83,10 @@ textarea.jy-input{font-size:16px;resize:none}
 .jy-done-sum dd{margin:0;font-weight:700}
 .jy-done-sum dd.ok{color:#065F46}
 .jy-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1E3A5F;color:#fff;padding:12px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:40;max-width:90vw;text-align:center}
+.jy-site-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.jy-switch-site{flex:none;margin-top:8px;min-height:36px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.12);color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.jy-pick-list{list-style:none;display:flex;flex-direction:column;gap:10px}
+.jy-pick{width:100%;min-height:72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:14px 16px;border-radius:16px;border:1px solid #CBD5E1;background:#fff;font:inherit;color:#111827;cursor:pointer;text-align:left}
+.jy-pick b{font-size:20px}
+.jy-pick span{font-size:13px;color:#4B5563}
+.jy-pick.on{border:3px solid #1E3A5F;background:#EEF3F9}

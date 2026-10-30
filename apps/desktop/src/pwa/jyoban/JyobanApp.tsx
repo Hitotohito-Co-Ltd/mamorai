@@ -6,9 +6,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { reportButtons, JYOBAN_OTHER_KINDS, validateOtherReport, type JyobanOtherKind } from '@mamorai/input-core'
 import {
   fetchContext, registerDevice, submitReport, flushOutbox, voidReport, outbox,
-  saveDevice, rememberToken, localNow, tokenFromPath,
+  saveDevice, localNow, resolveStart, rememberSite, forgetSite, recentSites,
   ReportAuthError, NetworkError,
-  type ReportContext, type CtxSlot, type ReportType, type Device,
+  type ReportContext, type CtxSlot, type ReportType, type Device, type RecentSite,
 } from './reportApi.js'
 import './jyoban.css'
 
@@ -26,7 +26,7 @@ type Screen =
   | { kind: 'other' }
   | { kind: 'done'; type: ReportType; at: string | null; reportId: string | null; queued: boolean; label?: string }
 
-function Header({ ctx, slot, shared, online }: { ctx: ReportContext | null; slot?: CtxSlot; shared: boolean; online: boolean }): JSX.Element {
+function Header({ ctx, slot, shared, online, onSwitch }: { ctx: ReportContext | null; slot?: CtxSlot; shared: boolean; online: boolean; onSwitch?: () => void }): JSX.Element {
   return (
     <header className="jy-head">
       <div className="jy-head-top">
@@ -34,7 +34,10 @@ function Header({ ctx, slot, shared, online }: { ctx: ReportContext | null; slot
         {shared ? <span className="jy-shared-badge">現場スマホ（共用）</span>
           : <span className={online ? 'jy-online' : 'jy-offline'}>{online ? '● オンライン' : '● オフライン'}</span>}
       </div>
-      <h1 className="jy-site">{ctx?.site.name ?? '　'}</h1>
+      <div className="jy-site-row">
+        <h1 className="jy-site">{ctx?.site.name ?? '　'}</h1>
+        {onSwitch && <button type="button" className="jy-switch-site" onClick={onSwitch}>現場を切替</button>}
+      </div>
       {slot && <p className="jy-head-sub">{mdw(slot.workDate)} {slot.name} {hm(slot.workStart)}〜{hm(slot.workEnd)}</p>}
     </header>
   )
@@ -191,8 +194,35 @@ function OtherForm({ ctx, slot, shared, onBack, onSend }: {
   )
 }
 
+/** 掛け持ちの隊員向け: これまでQRを読んだ現場から、今日報告する現場を選ぶ。 */
+function SitePicker({ sites, current, notice, onPick, onCancel }: {
+  sites: RecentSite[]; current: string | null; notice?: string; onPick: (token: string) => void; onCancel?: () => void
+}): JSX.Element {
+  return (
+    <main className="jy-main">
+      <h2 className="jy-h2">どの現場の報告ですか？</h2>
+      {notice && <p className="jy-warn" role="alert">{notice}</p>}
+      <ul className="jy-pick-list">
+        {sites.map((s) => (
+          <li key={s.token}>
+            <button type="button" className={`jy-pick${s.token === current ? ' on' : ''}`} onClick={() => onPick(s.token)}>
+              <b>{s.name}</b>
+              <span>最後に開いた日 {mdw(s.usedAt.slice(0, 10))}{s.token === current ? ' ｜ いま表示中' : ''}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="jy-note">一覧にない現場は、その現場に掲示されたQRコードを読み取ってください。</p>
+      {onCancel && <button type="button" className="jy-btn jy-btn-outline jy-push" onClick={onCancel}>戻る</button>}
+    </main>
+  )
+}
+
 export function JyobanApp({ pathname }: { pathname: string }): JSX.Element {
-  const token = useMemo(() => tokenFromPath(pathname), [pathname])
+  const start = useMemo(() => resolveStart(pathname), [pathname])
+  const [token, setToken] = useState<string | null>(start.token)
+  const [picking, setPicking] = useState(start.pick)
+  const [pickNotice, setPickNotice] = useState<string | undefined>(undefined)
   const [ctx, setCtx] = useState<ReportContext | null>(null)
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [screen, setScreen] = useState<Screen>({ kind: 'home' })
@@ -207,11 +237,27 @@ export function JyobanApp({ pathname }: { pathname: string }): JSX.Element {
     try {
       const c = await fetchContext(token)
       setCtx(c); setLoadErr(null)
+      rememberSite(token, c.site.name)
       setSlotId((cur) => (cur !== null && c.slots.some((s) => s.id === cur) ? cur : c.slots[0]?.id ?? null))
     } catch (e) {
-      setLoadErr(e instanceof NetworkError ? '通信できません。電波の良い場所で開き直してください' : (e as Error).message)
+      const msg = (e as Error).message
+      if (!(e instanceof NetworkError) && msg.startsWith('QRコードが無効')) {
+        // QRが再発行された等で使えない現場は一覧から外し、他に覚えている現場があれば選び直してもらう
+        const name = recentSites().find((x) => x.token === token)?.name ?? '前回の現場'
+        forgetSite(token)
+        if (recentSites().length > 0) { setCtx(null); setToken(null); setPickNotice(`${name}のQRは使えなくなりました（再発行されています）。現場に掲示された新しいQRを読み取るか、下から選んでください。`); setPicking(true); return }
+      }
+      setLoadErr(e instanceof NetworkError ? '通信できません。電波の良い場所で開き直してください' : msg)
     }
   }, [token])
+
+  const switchTo = (t: string): void => {
+    setPicking(false); setPickNotice(undefined)
+    if (t === token) return
+    setCtx(null); setLoadErr(null); setSlotId(null); setConfirm(null); setScreen({ kind: 'home' })
+    setToken(t)
+    try { window.history.replaceState(null, '', `/app/r/${t}`) } catch { /* ignore */ }
+  }
 
   const flush = useCallback(async (): Promise<void> => {
     if (outbox().length === 0) return
@@ -222,7 +268,6 @@ export function JyobanApp({ pathname }: { pathname: string }): JSX.Element {
     if (r.sent > 0 || r.failed.length > 0) void reload()
   }, [reload])
 
-  useEffect(() => { if (token !== null) rememberToken(token) }, [token])
   useEffect(() => { void reload().then(flush) }, [reload, flush])
   useEffect(() => {
     const on = (): void => { setOnline(true); void flush() }
@@ -234,6 +279,14 @@ export function JyobanApp({ pathname }: { pathname: string }): JSX.Element {
   }, [reload, flush])
   useEffect(() => { if (toast === null) return; const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t) }, [toast])
 
+  if (picking) {
+    return (
+      <div className="jy-app"><Header ctx={ctx} shared={false} online={online} />
+        <SitePicker sites={recentSites()} current={token} notice={pickNotice} onPick={switchTo}
+          onCancel={token !== null && ctx !== null ? () => setPicking(false) : undefined} />
+      </div>
+    )
+  }
   if (token === null) {
     return <div className="jy-app"><Header ctx={null} shared={false} online={online} /><main className="jy-main"><p className="jy-lead">現場に掲示されたQRコードをスマホのカメラで読み取ってください。</p></main></div>
   }
@@ -319,7 +372,7 @@ export function JyobanApp({ pathname }: { pathname: string }): JSX.Element {
   const buttons = slot ? reportButtons(slot, slot.workDate, slot.reports) : []
   return (
     <div className="jy-app">
-      <Header ctx={ctx} slot={slot} shared={shared} online={online} />
+      <Header ctx={ctx} slot={slot} shared={shared} online={online} onSwitch={recentSites().length > 1 ? () => setPicking(true) : undefined} />
       <main className="jy-main">
         {personal && (
           <div className="jy-card jy-who">
