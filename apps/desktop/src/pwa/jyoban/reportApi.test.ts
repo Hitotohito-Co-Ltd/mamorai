@@ -94,3 +94,57 @@ describe('報告（デモ動作）', () => {
     expect((await fetchContext('demo-site')).slots.map((s) => [s.name, s.workDate])).toEqual([['日勤1（荷捌）', '2026-10-31']])
   })
 })
+
+describe('最近使った現場（掛け持ち）', () => {
+  it('QRを読んだ現場を新しい順に覚え、同じ現場は重複させない', async () => {
+    const { rememberSite, recentSites } = await import('./reportApi.js')
+    rememberSite('TokA123456', 'A現場', '2026-10-28T07:00')
+    rememberSite('TokB123456', 'B現場', '2026-10-29T07:00')
+    rememberSite('TokA123456', 'A現場', '2026-10-30T07:00')
+    expect(recentSites().map((s) => s.name)).toEqual(['A現場', 'B現場'])
+  })
+  it('最大5件まで（古いものから外す）', async () => {
+    const { rememberSite, recentSites } = await import('./reportApi.js')
+    for (let i = 1; i <= 7; i++) rememberSite(`TokSite00${i}`, `現場${i}`, `2026-10-2${i}T07:00`)
+    expect(recentSites().map((s) => s.name)).toEqual(['現場7', '現場6', '現場5', '現場4', '現場3'])
+  })
+  it('現場名が変わったら新しい名前で上書き', async () => {
+    const { rememberSite, recentSites } = await import('./reportApi.js')
+    rememberSite('TokA123456', '旧名', '2026-10-29T07:00')
+    rememberSite('TokA123456', '新名', '2026-10-30T07:00')
+    expect(recentSites()).toEqual([{ token: 'TokA123456', name: '新名', usedAt: '2026-10-30T07:00' }])
+  })
+  it('使えなくなったQRは一覧から外す', async () => {
+    const { rememberSite, forgetSite, recentSites } = await import('./reportApi.js')
+    rememberSite('TokA123456', 'A現場', '2026-10-29T07:00')
+    rememberSite('TokB123456', 'B現場', '2026-10-30T07:00')
+    forgetSite('TokB123456')
+    expect(recentSites().map((s) => s.token)).toEqual(['TokA123456'])
+  })
+})
+
+describe('起動時の現場の決め方', () => {
+  it('QRから開いたら（パスにトークン）その現場', async () => {
+    const { resolveStart, rememberSite } = await import('./reportApi.js')
+    rememberSite('TokA123456', 'A現場', '2026-10-29T07:00')
+    rememberSite('TokB123456', 'B現場', '2026-10-30T07:00')
+    expect(resolveStart('/app/r/TokC123456')).toEqual({ token: 'TokC123456', pick: false })
+  })
+  it('ホーム画面から開き（トークンなし）覚えている現場が2つ以上なら選んでもらう', async () => {
+    const { resolveStart, rememberSite } = await import('./reportApi.js')
+    rememberSite('TokA123456', 'A現場', '2026-10-29T07:00')
+    rememberSite('TokB123456', 'B現場', '2026-10-30T07:00')
+    expect(resolveStart('/app/r/')).toEqual({ token: null, pick: true })
+  })
+  it('覚えている現場が1つならそのまま開く', async () => {
+    const { resolveStart, rememberSite } = await import('./reportApi.js')
+    rememberSite('TokA123456', 'A現場', '2026-10-29T07:00')
+    expect(resolveStart('/app/r/')).toEqual({ token: 'TokA123456', pick: false })
+  })
+  it('何も覚えていなければ「QRを読んでください」（以前の版で保存したトークンは引き継ぐ）', async () => {
+    const { resolveStart, rememberToken } = await import('./reportApi.js')
+    expect(resolveStart('/app/r/')).toEqual({ token: null, pick: false })
+    rememberToken('LegacyTok1')
+    expect(resolveStart('/app/r/')).toEqual({ token: 'LegacyTok1', pick: false })
+  })
+})
