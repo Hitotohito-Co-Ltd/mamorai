@@ -483,3 +483,50 @@ body {
 /* [Auth] 担当現場スイッチャ */
 .nav-siteswitch{width:100%;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:6px 8px;font-size:12px;min-height:34px;}
 .nav-siteswitch option{color:#0f172a;}
+
+/* ── 上番報告 設定（会社） ── トグルは MAMOR-AI パターンB（ON=緑 / OFF=赤） */
+.jy-layout { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.jy-sites { flex: 1 1 280px; max-width: 340px; margin-bottom: 0; }
+.jy-detail { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.jy-detail-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.jy-site-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.jy-site { width: 100%; min-height: 44px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; font: inherit; color: var(--t1); cursor: pointer; }
+.jy-site:hover { background: #f1f5f9; }
+.jy-site-active { background: #e8eef9; box-shadow: inset 3px 0 0 var(--navy); }
+.jy-site-name { font-weight: 700; font-size: 15px; }
+.jy-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.jy-grid2 > .card { margin-bottom: 0; }
+.jy-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.jy-switch { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; border: 0; background: none; padding: 0;
+  font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.jy-track { width: 48px; height: 28px; border-radius: 999px; padding: 3px; display: flex; transition: background .15s; }
+.jy-knob { width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.jy-on { color: #047857; } .jy-on .jy-track { background: #10B981; } .jy-on .jy-knob { transform: translateX(20px); }
+.jy-off { color: #b91c1c; } .jy-off .jy-track { background: #EF4444; }
+.jy-switch:focus-visible { outline: 2px solid var(--bl); outline-offset: 2px; border-radius: 999px; }
+.jy-qr { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 16px; }
+.jy-qr-img { width: 148px; height: 148px; border: 1px solid var(--bd); border-radius: 8px; }
+.jy-qr-side { display: flex; flex-direction: column; gap: 8px; flex: 1 1 180px; }
+.jy-btn-danger { background: #fff; color: var(--r); border-color: #fecaca; }
+.jy-slot { border: 1px solid var(--bd); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.jy-slot-off { background: #f8fafc; }
+.jy-slot-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.jy-slot-head .fl:first-child { flex: 1 1 200px; }
+.jy-times { display: flex; align-items: center; gap: 6px; color: var(--t1); }
+.jy-days { border: 0; margin: 0; padding: 0; }
+.jy-days legend { padding: 0; margin-bottom: 4px; }
+.jy-days > span { display: flex; gap: 4px; }
+.jy-day { min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--bd);
+  border-radius: 8px; font-size: 13px; color: var(--t3); cursor: pointer; }
+.jy-day input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.jy-day:focus-within { outline: 2px solid var(--bl); outline-offset: 1px; }
+.jy-day-on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.jy-reports { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; }
+.jy-report { padding: 12px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--bd); }
+.jy-report:last-child { border-right: 0; }
+.jy-report-h { display: flex; justify-content: space-between; align-items: center; }
+.jy-hint { font-size: 12px; }
+.jy-errors { margin: 0; padding-left: 18px; color: var(--r); font-size: 14px; }
+.jy-slot-actions { justify-content: flex-end; }
+.jy-slot-actions .btn:disabled, .jy-qr-side .btn:disabled { opacity: .45; cursor: default; }

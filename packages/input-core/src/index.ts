@@ -34,5 +34,7 @@ export * from './haito/tally.js'
 export * from './haito/siteSections.js'
 // Sprint6(う): 出力定義エンジン（PDFレイアウト / Excelセルマッピングをデータ化）
 export * from './output/outputDef.js'
+// Sprint7: 上番報告（出発連絡・上番連絡 / 本社の現場一覧ステータス）
+export * from './jyoban/model.js'
 // Auth: ロール別アクセス制御（3系統ログインの認可の単一の真実）
 export * from './auth/authz.js'
