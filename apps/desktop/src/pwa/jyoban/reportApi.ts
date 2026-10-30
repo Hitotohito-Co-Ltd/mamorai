@@ -54,10 +54,10 @@ export const saveDevice = (d: Device | null): void => setJson(K_DEVICE, d)
 export const lastToken = (): string | null => getJson<string | null>(K_TOKEN, null)
 export const rememberToken = (t: string): void => setJson(K_TOKEN, t)
 
-// ── 最近使った現場（掛け持ちの隊員向け）。QRを読んだ現場を新しい順に最大5件覚える ──
+// ── 登録した現場（掛け持ち・応援の隊員向け）。QRを読んだ現場を新しい順に最大10件覚える ──
 export interface RecentSite { token: string; name: string; usedAt: string }
 const K_RECENT = 'mamorai.jyoban.recentSites'
-const RECENT_MAX = 5
+const RECENT_MAX = 10
 export const recentSites = (): RecentSite[] => getJson<RecentSite[]>(K_RECENT, [])
 
 /** 表示できた現場を記録（同じ現場は上書きして先頭へ）。 */
@@ -87,6 +87,17 @@ export function resolveStart(pathname: string): { token: string | null; pick: bo
   if (recent.length > 1) return { token: null, pick: true }
   if (recent.length === 1) return { token: recent[0]!.token, pick: false }
   return { token: lastToken(), pick: false }
+}
+
+/**
+ * アプリ内のQR読み取り結果から現場トークンを取り出す。報告用URL（…/app/r/<トークン>）か、トークンそのもの。
+ * 報告用でないQRは null（トークンは自社サーバへの照会にしか使わないため、他ドメインのURLでも害はない）。
+ */
+export function tokenFromScan(text: string): string | null {
+  const t = text.trim()
+  if (/^[A-Za-z0-9_-]{6,64}$/.test(t)) return t
+  const m = /\/app\/r\/([A-Za-z0-9_-]{6,64})\/?(?:[?#].*)?$/.exec(t)
+  return m ? m[1]! : null
 }
 
 /** パス /app/r/<トークン> からトークンを取り出す（/app/r/ だけなら前回のトークン＝ホーム画面から起動）。 */
@@ -187,6 +198,33 @@ export async function registerDevice(token: string, staffNo: string, pin: string
   const row = (Array.isArray(data) ? data[0] : data) as { device_secret: string | null; staff_no: string; staff_name: string; pin_must_change: boolean; error: string | null }
   if (row.error !== null || row.device_secret === null) throw new ReportAuthError(row.error ?? '本人登録できませんでした')
   return { secret: row.device_secret, staffNo: row.staff_no, staffName: row.staff_name, pinMustChange: row.pin_must_change }
+}
+
+/**
+ * 勤務員アプリ（/app）のログイン時に、上番報告用の端末登録も済ませる。
+ * 同じ人の端末登録が残っていれば何もしない。別の人なら登録し直す。PIN誤り等は端末登録を変えずに失敗を返す。
+ */
+export async function ensureLoginDevice(companyCode: string, staffNo: string, pin: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const cur = loadDevice()
+  if (cur !== null && cur.staffNo === staffNo.trim()) return { ok: true }
+  try {
+    if (!DB()) {
+      const s = authStaff(staffNo, pin)
+      if (s === null) return { ok: false, message: 'スタッフNoまたはPINが正しくありません' }
+      saveDevice({ secret: `demo-${s.no}-${'x'.repeat(32)}`, staffNo: s.no, staffName: s.name })
+      return { ok: true }
+    }
+    const { data, error } = await getSupabase()!.rpc('jyoban_register_device_login', {
+      p_company_code: companyCode, p_staff_no: staffNo.trim(), p_pin: pin, p_user_agent: globalThis.navigator?.userAgent ?? null,
+    })
+    if (error !== null) raise(error)
+    const row = (Array.isArray(data) ? data[0] : data) as { device_secret: string | null; staff_no: string; staff_name: string; error: string | null }
+    if (row.error !== null || row.device_secret === null) return { ok: false, message: row.error ?? '端末を登録できませんでした' }
+    saveDevice({ secret: row.device_secret, staffNo: row.staff_no, staffName: row.staff_name })
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, message: e instanceof NetworkError ? '通信できないため、上番報告の準備ができませんでした' : (e as Error).message }
+  }
 }
 
 async function submitOnce(token: string, input: SubmitInput, clientId: string, clientAt: string): Promise<SubmitResult> {

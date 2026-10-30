@@ -95,7 +95,7 @@ input,select{font:inherit}
 .pwa-toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 18px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:20}
 
 /* ---- ボトムナビ ---- */
-.pwa-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:10}
+.pwa-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:10}
 .pwa-nav-item{background:none;border:none;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted)}
 .pwa-nav-item.active{color:var(--pri)}
 .pwa-nav-ico{font-size:20px;line-height:1}

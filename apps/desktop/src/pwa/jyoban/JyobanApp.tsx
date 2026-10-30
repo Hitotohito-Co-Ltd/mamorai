@@ -26,7 +26,7 @@ type Screen =
   | { kind: 'other' }
   | { kind: 'done'; type: ReportType; at: string | null; reportId: string | null; queued: boolean; label?: string }
 
-function Header({ ctx, slot, shared, online, onSwitch }: { ctx: ReportContext | null; slot?: CtxSlot; shared: boolean; online: boolean; onSwitch?: () => void }): JSX.Element {
+function Header({ ctx, slot, shared, online, onSwitch, switchLabel = '現場を切替' }: { ctx: ReportContext | null; slot?: CtxSlot; shared: boolean; online: boolean; onSwitch?: () => void; switchLabel?: string }): JSX.Element {
   return (
     <header className="jy-head">
       <div className="jy-head-top">
@@ -36,7 +36,7 @@ function Header({ ctx, slot, shared, online, onSwitch }: { ctx: ReportContext | 
       </div>
       <div className="jy-site-row">
         <h1 className="jy-site">{ctx?.site.name ?? '　'}</h1>
-        {onSwitch && <button type="button" className="jy-switch-site" onClick={onSwitch}>現場を切替</button>}
+        {onSwitch && <button type="button" className="jy-switch-site" onClick={onSwitch}>{switchLabel}</button>}
       </div>
       {slot && <p className="jy-head-sub">{mdw(slot.workDate)} {slot.name} {hm(slot.workStart)}〜{hm(slot.workEnd)}</p>}
     </header>
@@ -218,8 +218,13 @@ function SitePicker({ sites, current, notice, onPick, onCancel }: {
   )
 }
 
-export function JyobanApp({ pathname }: { pathname: string }): JSX.Element {
-  const start = useMemo(() => resolveStart(pathname), [pathname])
+/**
+ * 上番報告画面。
+ *  - 単独起動（/app/r/<QR>）: pathname からトークンを決める
+ *  - 勤務員アプリ内（上番報告タブ）: initialToken で現場を指定し、onExit で現場一覧へ戻る
+ */
+export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { pathname?: string; initialToken?: string; onExit?: () => void }): JSX.Element {
+  const start = useMemo(() => (initialToken ? { token: initialToken, pick: false } : resolveStart(pathname)), [pathname, initialToken])
   const [token, setToken] = useState<string | null>(start.token)
   const [picking, setPicking] = useState(start.pick)
   const [pickNotice, setPickNotice] = useState<string | undefined>(undefined)
@@ -256,7 +261,7 @@ export function JyobanApp({ pathname }: { pathname: string }): JSX.Element {
     if (t === token) return
     setCtx(null); setLoadErr(null); setSlotId(null); setConfirm(null); setScreen({ kind: 'home' })
     setToken(t)
-    try { window.history.replaceState(null, '', `/app/r/${t}`) } catch { /* ignore */ }
+    if (onExit === undefined) { try { window.history.replaceState(null, '', `/app/r/${t}`) } catch { /* ignore */ } }
   }
 
   const flush = useCallback(async (): Promise<void> => {
@@ -372,12 +377,12 @@ export function JyobanApp({ pathname }: { pathname: string }): JSX.Element {
   const buttons = slot ? reportButtons(slot, slot.workDate, slot.reports) : []
   return (
     <div className="jy-app">
-      <Header ctx={ctx} slot={slot} shared={shared} online={online} onSwitch={recentSites().length > 1 ? () => setPicking(true) : undefined} />
+      <Header ctx={ctx} slot={slot} shared={shared} online={online} onSwitch={onExit ?? (recentSites().length > 1 ? () => setPicking(true) : undefined)} switchLabel={onExit ? '現場一覧へ' : undefined} />
       <main className="jy-main">
         {personal && (
           <div className="jy-card jy-who">
             <span><b className="jy-who-name">{ctx.staff!.name} さん</b><br /><span className="jy-muted">スタッフNo {ctx.staff!.no} ｜ 本人登録済み</span></span>
-            <button type="button" className="jy-link" onClick={() => { saveDevice(null); setScreen({ kind: 'register' }) }}>別の人で登録</button>
+            {onExit === undefined && <button type="button" className="jy-link" onClick={() => { saveDevice(null); setScreen({ kind: 'register' }) }}>別の人で登録</button>}
           </div>
         )}
         {shared && <p className="jy-lead">報告するときに、スタッフNoとPINで本人確認します。</p>}
