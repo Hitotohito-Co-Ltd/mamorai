@@ -146,4 +146,20 @@ from (
     ('08:15','15:00','2026-10-30 18:00',null)
   ) v(ws,we,ts,want)
 ) x;
+-- 21〜23 勤務員アプリのログインで端末登録（0408）
+set role anon;
+do $$ declare r record; begin
+  select * into r from jyoban_register_device_login('AAA-0001','20001','0000');
+  insert into t_r values (21,'ログイン端末登録: PIN誤りは error で返る', r.device_secret is null and r.error like 'スタッフNoまたはPIN%', coalesce(r.error,''));
+end $$;
+do $$ declare r record; c jsonb; begin
+  select * into r from jyoban_register_device_login('AAA-0001','20001','5678','pwa');
+  c := jyoban_context('tokenA1xxxxxxxxxxxxxxxxx', r.device_secret);
+  insert into t_r values (22,'ログイン端末登録: 発行した端末で現場の報告画面に本人として入れる', r.error is null and c->'staff'->>'name' = '萩原', coalesce(r.error,'')||' '||coalesce(c->>'staff',''));
+end $$;
+do $$ begin
+  perform jyoban_register_device_login('NOPE-0000','20001','5678');
+  insert into t_r values (23,'ログイン端末登録: 不正な会社コードは拒否', false, 'ok?');
+exception when others then insert into t_r values (23,'ログイン端末登録: 不正な会社コードは拒否', sqlerrm like '会社コード%', sqlerrm); end $$;
+reset role;
 select n||'. '||case when ok then 'PASS' else 'FAIL' end||'  '||name||case when ok then '' else '  ['||left(coalesce(detail,''),120)||']' end from t_r order by n;

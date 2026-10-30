@@ -1,5 +1,5 @@
-// [勤務員PWA] スマホ特化シェル。スタッフログイン→ボトムナビで4機能。
-//   希望(シフト希望提出) / 有給(有給申請) / 研修(講習会申込) / 連絡(お知らせ・業務連絡)
+// [勤務員PWA] スマホ特化シェル。スタッフログイン→ボトムナビで5機能。
+//   上番報告(出発/上番連絡・現場QR登録) / 希望(シフト希望提出) / 有給(有給申請) / 研修(講習会申込) / 連絡(お知らせ・業務連絡)
 import { useState } from 'react'
 import { signInStaff, changeStaffPin, type Staff } from './staff.js'
 import { isSupabaseConfigured } from '../lib/supabaseClient.js'
@@ -8,9 +8,13 @@ import { ShiftHope } from './screens/ShiftHope.js'
 import { LeaveApply } from './screens/LeaveApply.js'
 import { TrainingApplyPwa } from './screens/TrainingApplyPwa.js'
 import { Notices } from './screens/Notices.js'
+import { JyobanTab } from './jyoban/JyobanTab.js'
+import { ensureLoginDevice, saveDevice } from './jyoban/reportApi.js'
+import { siteCodes } from '../shared/runtimeCtx.js'
 
-type PwaTab = 'hope' | 'leave' | 'training' | 'notice'
+type PwaTab = 'jyoban' | 'hope' | 'leave' | 'training' | 'notice'
 const TABS: { key: PwaTab; label: string; icon: string }[] = [
+  { key: 'jyoban', label: '上番報告', icon: '🛡️' },
   { key: 'hope', label: 'シフト希望', icon: '🗓️' },
   { key: 'leave', label: '有給申請', icon: '🌴' },
   { key: 'training', label: '講習会', icon: '🎓' },
@@ -79,10 +83,17 @@ function PinChange({ staff, oldPin, onDone }: { staff: Staff; oldPin: string; on
 export function WorkerApp(): JSX.Element {
   const [staff, setStaff] = useState<Staff | null>(null)
   const [loginPin, setLoginPin] = useState('')
-  const [tab, setTab] = useState<PwaTab>('hope')
+  const [tab, setTab] = useState<PwaTab>('jyoban')
+  // 上番報告用の端末登録（ログイン時に同じスタッフNo＋PINで実施）。null=準備OK
+  const [deviceError, setDeviceError] = useState<string | null>(null)
   const [site, setSite] = useState<string>('')
 
-  if (staff === null) return <StaffLogin onLogin={(s, pin) => { setStaff(s); setLoginPin(pin); setSite(s.sites[0] ?? '') }} />
+  if (staff === null) {
+    return <StaffLogin onLogin={(s, pin) => {
+      setStaff(s); setLoginPin(pin); setSite(s.sites[0] ?? '')
+      void ensureLoginDevice(siteCodes().companyCode, s.no, pin).then((r) => setDeviceError(r.ok ? null : r.message))
+    }} />
+  }
   if (staff.pinMustChange) return <PinChange staff={staff} oldPin={loginPin} onDone={() => setStaff({ ...staff, pinMustChange: false })} />
 
   return (
@@ -90,7 +101,7 @@ export function WorkerApp(): JSX.Element {
       <header className="pwa-head">
         <div className="pwa-head-top">
           <img src="/logo-full.png" alt="MAMOR-AI" className="pwa-head-logo" />
-          <button type="button" className="pwa-logout" onClick={() => setStaff(null)}>ログアウト</button>
+          <button type="button" className="pwa-logout" onClick={() => { saveDevice(null); setDeviceError(null); setStaff(null) }}>ログアウト</button>
         </div>
         <div className="pwa-head-staff">
           <span className="pwa-staff-name">{staff.name}</span>
@@ -104,6 +115,7 @@ export function WorkerApp(): JSX.Element {
       </header>
 
       <main className="pwa-main">
+        {tab === 'jyoban' && <JyobanTab deviceError={deviceError} />}
         {tab === 'hope' && <ShiftHope staff={staff} site={site} />}
         {tab === 'leave' && <LeaveApply staff={staff} site={site} />}
         {tab === 'training' && <TrainingApplyPwa staff={staff} />}

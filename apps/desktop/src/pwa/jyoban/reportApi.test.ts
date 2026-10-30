@@ -103,10 +103,13 @@ describe('最近使った現場（掛け持ち）', () => {
     rememberSite('TokA123456', 'A現場', '2026-10-30T07:00')
     expect(recentSites().map((s) => s.name)).toEqual(['A現場', 'B現場'])
   })
-  it('最大5件まで（古いものから外す）', async () => {
+  it('上限を超えたら古いものから外す', async () => {
     const { rememberSite, recentSites } = await import('./reportApi.js')
-    for (let i = 1; i <= 7; i++) rememberSite(`TokSite00${i}`, `現場${i}`, `2026-10-2${i}T07:00`)
-    expect(recentSites().map((s) => s.name)).toEqual(['現場7', '現場6', '現場5', '現場4', '現場3'])
+    for (let i = 1; i <= 9; i++) rememberSite(`TokSite00${i}`, `現場${i}`, `2026-10-0${i}T07:00`)
+    rememberSite('TokSite010', '現場10', '2026-10-10T07:00')
+    rememberSite('TokSite011', '現場11', '2026-10-11T07:00')
+    expect(recentSites()).toHaveLength(10)
+    expect(recentSites().map((s) => s.name)).not.toContain('現場1')
   })
   it('現場名が変わったら新しい名前で上書き', async () => {
     const { rememberSite, recentSites } = await import('./reportApi.js')
@@ -146,5 +149,59 @@ describe('起動時の現場の決め方', () => {
     expect(resolveStart('/app/r/')).toEqual({ token: null, pick: false })
     rememberToken('LegacyTok1')
     expect(resolveStart('/app/r/')).toEqual({ token: 'LegacyTok1', pick: false })
+  })
+})
+
+describe('QR読み取り結果の解析', () => {
+  it('報告用URLからトークンを取り出す（末尾スラッシュ・クエリも許容）', async () => {
+    const { tokenFromScan } = await import('./reportApi.js')
+    expect(tokenFromScan('https://mamorai.tryangrow.com/app/r/AbC123_x-9')).toBe('AbC123_x-9')
+    expect(tokenFromScan('https://mamorai.tryangrow.com/app/r/AbC123_x-9/?utm=qr')).toBe('AbC123_x-9')
+    expect(tokenFromScan('  AbC123_x-9  ')).toBe('AbC123_x-9')
+  })
+  it('報告用でないQR・不正な文字は null', async () => {
+    const { tokenFromScan } = await import('./reportApi.js')
+    expect(tokenFromScan('https://example.com/menu')).toBeNull()
+    expect(tokenFromScan('https://x.example/app/r/../../etc')).toBeNull()
+    expect(tokenFromScan('こんにちは')).toBeNull()
+    expect(tokenFromScan('')).toBeNull()
+  })
+})
+
+describe('勤務員アプリのログインで端末登録（デモ動作）', () => {
+  it('ログインのスタッフNo＋PINで端末を登録し、上番報告で本人として扱われる', async () => {
+    const { ensureLoginDevice, loadDevice } = await import('./reportApi.js')
+    const r = await ensureLoginDevice('HTH-0001', '783', '0412')
+    expect(r).toEqual({ ok: true })
+    expect(loadDevice()).toMatchObject({ staffNo: '783', staffName: '三角 龍彦' })
+    const c = await fetchContext('demo-site')
+    expect(c.staff).toEqual({ no: '783', name: '三角 龍彦' })
+  })
+  it('同じ人の端末登録が残っていれば登録し直さない', async () => {
+    const { ensureLoginDevice, loadDevice } = await import('./reportApi.js')
+    saveDevice({ secret: 'keep-'.padEnd(40, 'x'), staffNo: '783', staffName: '三角 龍彦' })
+    await ensureLoginDevice('HTH-0001', '783', '0412')
+    expect(loadDevice()!.secret.startsWith('keep-')).toBe(true)
+  })
+  it('別の人がログインしたら、その人で登録し直す', async () => {
+    const { ensureLoginDevice, loadDevice } = await import('./reportApi.js')
+    saveDevice({ secret: 'old-'.padEnd(40, 'x'), staffNo: '783', staffName: '三角 龍彦' })
+    await ensureLoginDevice('HTH-0001', '784', '0903')
+    expect(loadDevice()).toMatchObject({ staffNo: '784' })
+  })
+  it('PIN誤りは失敗を返し、端末登録は変えない', async () => {
+    const { ensureLoginDevice, loadDevice } = await import('./reportApi.js')
+    const r = await ensureLoginDevice('HTH-0001', '783', '0000')
+    expect(r.ok).toBe(false)
+    expect(loadDevice()).toBeNull()
+  })
+})
+
+describe('登録現場の上限', () => {
+  it('10件まで覚える（掛け持ち・応援の多い隊員向け）', async () => {
+    const { rememberSite, recentSites } = await import('./reportApi.js')
+    for (let i = 10; i <= 21; i++) rememberSite(`TokSite0${i}`, `現場${i}`, `2026-10-${i}T07:00`)
+    expect(recentSites()).toHaveLength(10)
+    expect(recentSites()[0]!.name).toBe('現場21')
   })
 })
