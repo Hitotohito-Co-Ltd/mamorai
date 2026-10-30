@@ -37,6 +37,7 @@ export type Capability =
   | 'training_apply'     // 講習会・研修の参加申込（勤務員PWA）
   | 'training_site_approval' // 講習会申込の一次承認（現場）
   | 'training_manage'    // 講習会の登録/カレンダー/案内・受理（会社）
+  | 'jyoban_settings'    // 上番報告の設定（勤務枠・締切・QR発行）— 本社のみ
   | 'company_management' // 会社管理（運営）
   | 'contract_status'    // 契約状況（運営）
   | 'ops_dashboard'      // 運営ダッシュボード（運営）
@@ -54,6 +55,7 @@ const SITE: Capability[] = [
 /** 会社: 管理・設定・確認（日報入力やシフト作成は現場が実施） */
 const COMPANY: Capability[] = [
   'leave_approval', 'training_manage', 'education', 'edu_docs', 'constraint', 'template', 'notify',
+  'jyoban_settings',
 ]
 /** 運営(TRYANGROW): 運営ダッシュボード・会社管理・契約・セキュリティチェック・お知らせ配信のみ（現場業務は持たない） */
 const PLATFORM: Capability[] = [

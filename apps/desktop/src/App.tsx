@@ -27,6 +27,7 @@ import { ContractStatus } from './features/platform/ContractStatus.js'
 import { OpsDashboard } from './features/platform/OpsDashboard.js'
 import { SecurityCheck } from './features/platform/SecurityCheck.js'
 import { PlatformNotice } from './features/platform/PlatformNotice.js'
+import { JyobanSettings } from './features/jyoban/JyobanSettings.js'
 import { demoConstraints } from './features/shift/demoShift.js'
 import { capabilitiesForRole, type Capability, type ConstraintDef } from '@mamorai/input-core'
 import { setSiteCodes } from './shared/runtimeCtx.js'
@@ -41,7 +42,7 @@ import type { Session } from './features/auth/authTypes.js'
 type Tab =
   | 'opsdash' | 'companies' | 'contracts' | 'seccheck' | 'platnotice'
   | 'dashboard' | 'staffreg'
-  | 'leaveapprove' | 'trmanage'
+  | 'leaveapprove' | 'trmanage' | 'jyoban'
   | 'sreport' | 'report' | 'output' | 'month' | 'list' | 'import' | 'risk'
   | 'shift' | 'assign' | 'placement' | 'ai' | 'labor' | 'leave' | 'trapply'
   | 'constraint' | 'template' | 'education' | 'edudocs' | 'notify'
@@ -57,6 +58,7 @@ const TABS: { key: Tab; label: string; cap: Capability }[] = [
   // 会社
   { key: 'leaveapprove', label: '有給確認', cap: 'leave_approval' },
   { key: 'trmanage', label: '講習会管理', cap: 'training_manage' },
+  { key: 'jyoban', label: '上番報告設定', cap: 'jyoban_settings' },
   // 現場
   { key: 'dashboard', label: 'ダッシュボード', cap: 'dashboard' },
   { key: 'staffreg', label: '勤務員登録', cap: 'staff_register' },
@@ -141,6 +143,7 @@ export function App({ session, onLogout }: { session?: Session; onLogout?: () =>
         {tab === 'platnotice' && allow('platnotice') && <PlatformNotice />}
         {tab === 'leaveapprove' && allow('leaveapprove') && <LeaveApproval />}
         {tab === 'trmanage' && allow('trmanage') && <TrainingManage />}
+        {tab === 'jyoban' && allow('jyoban') && <JyobanSettings />}
         {tab === 'dashboard' && allow('dashboard') && <Dashboard onNavigate={setTab} />}
         {tab === 'staffreg' && allow('staffreg') && <StaffRegister />}
         {tab === 'sreport' && allow('sreport') && <StructuredReport />}
