@@ -1,0 +1,96 @@
+// [上番報告・勤務員PWA] データ層（デモ動作）: トークン解決・本人登録・共用端末・二重送信・取消
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import {
+  tokenFromPath, rememberToken, fetchContext, registerDevice, submitReport, voidReport,
+  saveDevice, ReportAuthError,
+} from './reportApi.js'
+
+class MemStorage {
+  private m = new Map<string, string>()
+  getItem(k: string): string | null { return this.m.get(k) ?? null }
+  setItem(k: string, v: string): void { this.m.set(k, v) }
+  removeItem(k: string): void { this.m.delete(k) }
+}
+
+beforeEach(() => {
+  (globalThis as unknown as { localStorage: MemStorage }).localStorage = new MemStorage()
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date(2026, 9, 30, 7, 30)) // 10/30(金) 7:30（端末の現地時刻）
+})
+afterEach(() => { vi.useRealTimers() })
+
+describe('tokenFromPath', () => {
+  it('/app/r/<トークン> からトークンを取り出す', () => {
+    expect(tokenFromPath('/app/r/AbC123_x-9')).toBe('AbC123_x-9')
+    expect(tokenFromPath('/app/r/AbC123_x-9/')).toBe('AbC123_x-9')
+  })
+  it('/app/r/ だけ（ホーム画面から起動）なら前回のトークン、無ければ null', () => {
+    expect(tokenFromPath('/app/r/')).toBeNull()
+    rememberToken('PrevTok123')
+    expect(tokenFromPath('/app/r/')).toBe('PrevTok123')
+  })
+  it('使えない文字を含むパスはトークンとして扱わない', () => {
+    expect(tokenFromPath('/app/r/../../etc')).toBeNull()
+  })
+})
+
+describe('報告（デモ動作）', () => {
+  // デモの 'demo-site' トークン = ららぽーと立川立飛（共用端末ON・日勤1 8:00/上番締切7:45、日勤2 9:30/9:15）
+  it('共用端末の現場: 本人なしで受付中の勤務枠が出る', async () => {
+    const c = await fetchContext('demo-site')
+    expect(c.site).toMatchObject({ name: 'ららぽーと立川立飛', shared: true })
+    expect(c.staff).toBeNull()
+    expect(c.slots.map((s) => s.name)).toEqual(['日勤1（荷捌）', '日勤2（隊長）'])
+    expect(c.slots[0]!.workDate).toBe('2026-10-30')
+  })
+
+  it('無効なQRは分かるメッセージで拒否', async () => {
+    await expect(fetchContext('nosuchtoken')).rejects.toThrow('QRコードが無効です')
+  })
+
+  it('本人登録: PIN誤りは ReportAuthError、正しければ氏名が返る', async () => {
+    await expect(registerDevice('demo-site', '783', '0000')).rejects.toBeInstanceOf(ReportAuthError)
+    const d = await registerDevice('demo-site', '783', '0412')
+    expect(d).toMatchObject({ staffNo: '783', staffName: '三角 龍彦' })
+  })
+
+  it('共用端末: スタッフNo＋PINが必要で、同じ報告は二重登録しない', async () => {
+    const [slot] = (await fetchContext('demo-site')).slots
+    await expect(submitReport('demo-site', { slotId: slot!.id, type: 'onduty', staffNo: '783', pin: '9999' })).rejects.toBeInstanceOf(ReportAuthError)
+    const a = await submitReport('demo-site', { slotId: slot!.id, type: 'onduty', staffNo: '783', pin: '0412' })
+    const b = await submitReport('demo-site', { slotId: slot!.id, type: 'onduty', staffNo: '783', pin: '0412' })
+    expect(a.status).toBe('sent')
+    expect(b.status === 'sent' && b.result.duplicate).toBe(true)
+    const c = await fetchContext('demo-site')
+    expect(c.slots[0]!.reports.map((r) => [r.type, r.staffName, r.receivedAt])).toEqual([['onduty', '三角 龍彦', '2026-10-30T07:30']])
+  })
+
+  it('個人スマホ: 登録後は端末だけで送信でき、取消すると未送信に戻る', async () => {
+    const d = await registerDevice('demo-site', '784', '0903')
+    saveDevice({ secret: d.secret, staffNo: d.staffNo, staffName: d.staffName })
+    const ctx = await fetchContext('demo-site')
+    expect(ctx.staff).toEqual({ no: '784', name: '藤井 隆幸' })
+    const slot = ctx.slots[1]!
+    const out = await submitReport('demo-site', { slotId: slot.id, type: 'onduty' })
+    expect(out.status).toBe('sent')
+    expect((await fetchContext('demo-site')).slots[1]!.reports).toHaveLength(1)
+    if (out.status === 'sent') await voidReport('demo-site', out.result.reportId)
+    expect((await fetchContext('demo-site')).slots[1]!.reports).toHaveLength(0)
+  })
+
+  it('その他報告: 遅刻は到着見込みが無ければ送らない', async () => {
+    const d = await registerDevice('demo-site', '783', '0412')
+    saveDevice(d)
+    const [slot] = (await fetchContext('demo-site')).slots
+    await expect(submitReport('demo-site', { slotId: slot!.id, type: 'other', otherKind: 'late' })).rejects.toThrow('到着見込み時刻')
+    const ok = await submitReport('demo-site', { slotId: slot!.id, type: 'other', otherKind: 'late', eta: '08:20', note: '電車遅延' })
+    expect(ok.status).toBe('sent')
+  })
+
+  it('受付時間外の勤務枠は出さない（終了2時間後で締める）', async () => {
+    vi.setSystemTime(new Date(2026, 9, 30, 19, 30)) // 日勤1(〜17:00)は締め、日勤2(〜18:30)は20:30まで受付
+    expect((await fetchContext('demo-site')).slots.map((s) => s.name)).toEqual(['日勤2（隊長）'])
+    vi.setSystemTime(new Date(2026, 9, 30, 20, 31)) // 当日分はすべて締め、翌日の日勤1（8:00開始）が開始12時間前から受付
+    expect((await fetchContext('demo-site')).slots.map((s) => [s.name, s.workDate])).toEqual([['日勤1（荷捌）', '2026-10-31']])
+  })
+})

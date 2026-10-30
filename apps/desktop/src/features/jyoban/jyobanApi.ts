@@ -170,3 +170,9 @@ export function publicOrigin(): string {
   const env = (import.meta.env ?? {}) as Record<string, string | undefined>
   return env.VITE_PUBLIC_ORIGIN ?? globalThis.location?.origin ?? ''
 }
+
+/** デモ動作（Supabase未構成）用: 勤務員PWAの報告画面が同じブラウザ内の設定を読む。 */
+export function demoSnapshot(): { sites: JyobanSite[]; slots: JyobanSlot[] } {
+  const s = readLocal()
+  return { sites: s.sites, slots: s.slots.map(({ sortOrder: _o, ...rest }) => rest) }
+}

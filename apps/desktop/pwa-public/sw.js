@@ -1,7 +1,7 @@
 /* MAMOR-AI 勤務員PWA サービスワーカー（app-shellキャッシュ）。
    ネットワーク優先＋オフライン時キャッシュフォールバック。バージョンでキャッシュ更新。 */
-const CACHE = 'mamorai-worker-v1'
-const SHELL = ['/app/', '/app/index.html', '/app/manifest.webmanifest']
+const CACHE = 'mamorai-worker-v2'
+const SHELL = ['/app/', '/app/index.html', '/app/manifest.webmanifest', '/app/jyoban.webmanifest']
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()))
