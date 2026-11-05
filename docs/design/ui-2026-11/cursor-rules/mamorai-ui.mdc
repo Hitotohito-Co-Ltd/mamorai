@@ -1,0 +1,19 @@
+---
+description: MAMOR-AI の画面を作る・直すときのUIルール（2026-11 UI案）
+globs: apps/desktop/src/**/*.tsx, apps/desktop/src/**/*.css
+alwaysApply: false
+---
+
+# MAMOR-AI UI ルール
+
+- 画面の見た目は `docs/design/ui-2026-11/` に従う。仕様は `DESIGN_SPEC.md`、見た目は `screens/*.png`、構造と文言は `html/*.html`。
+- 色・文字・角丸は `docs/design/ui-2026-11/design-tokens.css` の `--mm-*` 変数を使う。新しい色をその場で作らない。
+- モックアップの inline style をそのまま貼らない。既存の CSS ファイル（`styles.css`、`pwa/pwa.css`、`pwa/jyoban/jyoban.css`）にクラスとして書く。
+- 状態の色は DESIGN_SPEC §0.3 の組み合わせ（文字・背景・枠）で使う。緑 #10B981 は文字や白文字ボタンの背景に使わない。
+- 押せる要素は高さ 44px 以上。`<button>` / `<a>` / `<input>`＋`<label>` を使う。div に onClick を付けない。アイコンだけのボタンには aria-label。
+- 絵文字を使わない。アイコンは線のSVG。
+- 状態判定・集計・並び順・期限計算は `packages/input-core` に純粋関数で書き、テストを付ける。画面は結果を表示するだけ。
+- 画面の表示可否は `capabilitiesForRole` で決める。
+- 画面のサンプルデータ（人数・氏名・支店名）をハードコードしない。`［ ］` はプレースホルダー。
+- DB を変えるときは `supabase/migrations` に追加のみ・冪等で書き、既存テーブルへの列は NULL 許容にする。
+- 変更ごとに `pnpm -r test`、管理コンソールと勤務員PWAの両方のビルドを通す。

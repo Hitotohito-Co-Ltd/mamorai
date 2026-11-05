@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>講習会・研修</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; display: flex; flex-direction: column; font-variant-numeric: tabular-nums; position: relative; overflow: hidden">
+  <header style="background: #1E3A5F; color: #FFFFFF; padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 4px">
+    <span style="font-size: 12px; color: #A7F3D0; letter-spacing: 0.04em">MAMOR-AI 勤務員アプリ</span>
+    <span style="font-size: 22px; font-weight: 700">講習会・研修</span>
+  </header>
+  <main style="flex: 1; padding: 16px 20px 10px; display: flex; flex-direction: column; gap: 12px; min-height: 0">
+    <section aria-label="今年度の受講時間" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+      <span style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-size: 13px; font-weight: 700; color: #1E3A5F">今年度の現任教育</span><span style="font-size: 14px; color: #374151"><strong style="font-size: 22px; color: #111827">6</strong> / 10時間</span></span>
+      <span style="display: block; height: 10px; border-radius: 999px; background: #E2E8F0; overflow: hidden"><span style="display: block; width: 60%; height: 100%; background: #1E3A5F; border-radius: 999px"></span></span>
+      <span style="font-size: 12px; color: #9A3412">あと4時間。年度内（3/31まで）に受講してください。</span>
+    </section>
+
+    <h2 style="margin: 4px 0 0; font-size: 15px; color: #1E3A5F">開催予定</h2>
+    <sc-for list="{{items}}" as="s" hint-placeholder-count="3">
+      <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+        <span style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap">
+          <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; {{s.tagStyle}}">{{s.tag}}</span>
+          <span style="font-size: 12px; color: #4B5563">{{s.seats}}</span>
+        </span>
+        <span style="font-size: 16px; font-weight: 700; color: #111827">{{s.title}}</span>
+        <span style="font-size: 13px; color: #374151">{{s.when}}</span>
+        <sc-if value="{{s.canApply}}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{s.open}}" style="height: 44px; border-radius: 10px; border: 1px solid #1E3A5F; background: #FFFFFF; color: #1E3A5F; font: inherit; font-size: 15px; font-weight: 700">申し込む</button>
+        </sc-if>
+        <sc-if value="{{s.applied}}" hint-placeholder-val="{{ false }}">
+          <span style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; font-size: 11px; text-align: center">
+            <span style="padding: 5px 0; border-radius: 6px; background: #D1FAE5; color: #065F46; font-weight: 700">申込済</span>
+            <span style="padding: 5px 0; border-radius: 6px; {{s.step2}}">現場承認</span>
+            <span style="padding: 5px 0; border-radius: 6px; background: #F1F5F9; color: #4B5563; border: 1px dashed #94A3B8">会社受理</span>
+          </span>
+        </sc-if>
+      </div>
+    </sc-for>
+  </main>
+  <nav aria-label="アプリのメニュー" style="display: grid; grid-template-columns: repeat(5, 1fr); background: #FFFFFF; border-top: 1px solid #E2E8F0; padding: 6px 4px 14px">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+      <a href="{{t.href}}" aria-current="{{t.cur}}" style="display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 52px; justify-content: center; text-decoration: none; font-size: 11px; {{t.style}}">
+        <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}" fill="none" stroke="{{t.color}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>{{t.label}}</a>
+    </sc-for>
+  </nav>
+
+  <sc-if value="{{sheet}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; inset: 0; background: rgba(15,23,42,0.55); display: flex; align-items: flex-end">
+      <section aria-label="申込内容の確認" style="width: 100%; background: #FFFFFF; border-radius: 20px 20px 0 0; padding: 24px 20px 30px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 13px; color: #4B5563">{{sheetWhen}}</span>
+        <span style="font-size: 20px; font-weight: 700; color: #111827">{{sheetTitle}}</span>
+        <div style="background: #F8FAFC; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 14px">
+          <span style="display: flex; justify-content: space-between"><span style="color: #4B5563">氏名</span><span style="font-weight: 500">笠井</span></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4B5563">生年月日</span><span style="font-weight: 500">［生年月日］</span></span>
+          <span style="display: flex; justify-content: space-between"><span style="color: #4B5563">部署</span><span style="font-weight: 500">［部署］</span></span>
+        </div>
+        <span style="font-size: 12px; color: #4B5563">ログイン中の情報を自動で入れています。</span>
+        <button type="button" onClick="{{apply}}" style="height: 56px; border-radius: 14px; border: 0; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 18px; font-weight: 700">この内容で申し込む</button>
+        <button type="button" onClick="{{close}}" style="height: 48px; border-radius: 14px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1F2937; font: inherit; font-size: 15px">やめる</button>
+      </section>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: null, applied: { t1: 'site' } };
+  }
+  renderVals() {
+    const st = this.state || {};
+    const applied = st.applied || {};
+    const list = [
+      { id: 't1', tag: '現任教育（法定）', tagStyle: 'background:#1E3A5F;color:#FFFFFF', title: '現任教育 第3回（4時間）', when: '11/18（水）13:00〜17:00 ｜ 本社 研修室', seats: '残り 6 / 定員 20' },
+      { id: 't2', tag: '現任教育（法定）', tagStyle: 'background:#1E3A5F;color:#FFFFFF', title: '現任教育 第4回（4時間）', when: '12/9（水）13:00〜17:00 ｜ 本社 研修室', seats: '残り 14 / 定員 20' },
+      { id: 't3', tag: '任意', tagStyle: 'background:#F1F5F9;color:#334155', title: '普通救命講習', when: '12/16（水）9:00〜12:00 ｜ ［会場］', seats: '残り 3 / 定員 10' }
+    ];
+    const items = list.map((s) => Object.assign({}, s, {
+      canApply: !applied[s.id],
+      applied: !!applied[s.id],
+      step2: applied[s.id] === 'site' ? 'background:#D1FAE5;color:#065F46;font-weight:700' : 'background:#F1F5F9;color:#4B5563;border:1px dashed #94A3B8',
+      open: () => this.setState({ open: s.id })
+    }));
+    const cur = list.find((s) => s.id === st.open);
+    const tabs = [
+      { label: '上番報告', href: 'App-Sites.dc.html', d: 'M12 2L20 5V11C20 16.5 16.5 20.5 12 22C7.5 20.5 4 16.5 4 11V5Z M8.5 12L11 14.5L15.5 9.5' },
+      { label: 'シフト希望', href: 'App-Shift.dc.html', d: 'M5 5H19A1.5 1.5 0 0 1 20.5 6.5V18.5A1.5 1.5 0 0 1 19 20H5A1.5 1.5 0 0 1 3.5 18.5V6.5A1.5 1.5 0 0 1 5 5Z M3.5 10H20.5 M8 3V7 M16 3V7' },
+      { label: '有給申請', href: 'App-Leave.dc.html', d: 'M6 3H14L19 8V21H6Z M9 13H16 M9 17H14' },
+      { label: '講習会', href: 'App-Training.dc.html', d: 'M3 9L12 4L21 9L12 14Z M7 11.5V16C9.5 18 14.5 18 17 16V11.5', on: true },
+      { label: 'お知らせ', href: 'App-Notice.dc.html', d: 'M6 16V11C6 7.5 8.5 5 12 5C15.5 5 18 7.5 18 11V16L20 18H4Z M10 20.5H14' }
+    ].map((t) => Object.assign({}, t, {
+      cur: t.on ? 'page' : 'false',
+      color: t.on ? '#1E3A5F' : '#4B5563',
+      style: t.on ? 'color:#1E3A5F;font-weight:700' : 'color:#4B5563'
+    }));
+    return {
+      items: items, tabs: tabs,
+      sheet: !!cur, sheetTitle: cur ? cur.title : '', sheetWhen: cur ? cur.when : '',
+      close: () => this.setState({ open: null }),
+      apply: () => { const a = Object.assign({}, applied); a[st.open] = 'new'; this.setState({ applied: a, open: null }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

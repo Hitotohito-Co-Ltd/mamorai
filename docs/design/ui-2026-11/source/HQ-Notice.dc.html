@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>お知らせ配信と既読</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F9}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: stretch">
+  <nav aria-label="メニュー" style="flex: 1 1 232px; max-width: 260px; min-width: 220px; background: #1E3A5F; color: #FFFFFF; display: flex; flex-direction: column; gap: 4px; padding: 20px 14px 32px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px">
+      <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1L24 5V14C24 21 19 26.5 13 29C7 26.5 2 21 2 14V5Z" fill="none" stroke="#10B981" stroke-width="2"></path><path d="M7.5 20V10L13 16L18.5 10V20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"></path></svg>
+      <span style="display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 17px; letter-spacing: 0.04em">MAMOR-AI</span><span style="font-size: 11px; color: #C7D2E0">本部</span></span>
+    </div>
+    <span style="font-size: 11px; color: #A9B8CB; padding: 8px 10px 4px; letter-spacing: 0.08em">配置確認</span>
+    <a href="Main.dc.html" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">全社の状況</a>
+    <a href="Branch.dc.html" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">支店別の状況</a>
+    <span style="font-size: 11px; color: #A9B8CB; padding: 16px 10px 4px; letter-spacing: 0.08em">業務</span>
+    <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">勤務員・名簿</a>
+    <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">有給の確認</a>
+    <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">講習会・教育</a>
+    <a href="#" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; background: #2B4C75; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700; box-shadow: inset 3px 0 0 #10B981">お知らせ配信</a>
+    <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">CSV・帳票出力</a>
+    <span style="margin-top: auto; padding: 24px 10px 0; font-size: 12px; color: #C7D2E0">［担当者名］｜本社管理者</span>
+  </nav>
+
+  <main style="flex: 999 1 640px; min-width: 0; padding: 28px 32px 48px; box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; align-content: start; max-width: 1240px">
+    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #1E3A5F; grid-column: 1 / -1">お知らせ配信</h1>
+
+    <section aria-label="新しいお知らせ" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">新しいお知らせ</h2>
+      <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="font-size: 13px; font-weight: 500; color: #374151; padding-bottom: 6px">宛先</legend>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button type="button" aria-pressed="false" style="height: 38px; padding: 0 14px; border: 1px solid #CBD5E1; border-radius: 999px; background: #FFFFFF; font: inherit; font-size: 13px; color: #1F2937">全社</button>
+          <button type="button" aria-pressed="true" style="height: 38px; padding: 0 14px; border: 0; border-radius: 999px; background: #1E3A5F; font: inherit; font-size: 13px; color: #FFFFFF; font-weight: 500">支店を選ぶ：［支店A］</button>
+          <button type="button" aria-pressed="false" style="height: 38px; padding: 0 14px; border: 1px solid #CBD5E1; border-radius: 999px; background: #FFFFFF; font: inherit; font-size: 13px; color: #1F2937">現場を選ぶ</button>
+          <button type="button" aria-pressed="false" style="height: 38px; padding: 0 14px; border: 1px solid #CBD5E1; border-radius: 999px; background: #FFFFFF; font: inherit; font-size: 13px; color: #1F2937">個人を選ぶ</button>
+        </div>
+        <span style="font-size: 12px; color: #4B5563">［支店A］配下 12現場・88人に届きます</span>
+      </fieldset>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="kind" style="font-size: 13px; font-weight: 500; color: #374151">区分</label>
+        <select id="kind" style="height: 44px; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 14px; background: #FFFFFF"><option>重要</option><option>業務連絡</option><option>お知らせ</option></select>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="title" style="font-size: 13px; font-weight: 500; color: #374151">件名</label>
+        <input id="title" value="年末年始の配置について" style="height: 44px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 12px; font: inherit; font-size: 14px">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <label for="body" style="font-size: 13px; font-weight: 500; color: #374151">本文</label>
+        <textarea id="body" rows="5" style="box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 10px 12px; font: inherit; font-size: 14px; line-height: 1.7; resize: vertical">［本文を入力］</textarea>
+      </div>
+      <label style="display: flex; align-items: center; gap: 10px; font-size: 14px; min-height: 44px"><input type="checkbox" checked style="width: 20px; height: 20px">「確認しました」を押してもらう（既読を集計）</label>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap">
+        <button type="button" style="height: 46px; padding: 0 20px; border: 0; border-radius: 8px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 15px; font-weight: 700">配信する</button>
+        <button type="button" style="height: 46px; padding: 0 16px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #1F2937; font: inherit; font-size: 14px">下書き保存</button>
+      </div>
+    </section>
+
+    <section aria-label="配信済みと確認状況" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">配信済み・確認状況</h2>
+      <sc-for list="{{sent}}" as="s" hint-placeholder-count="3">
+        <div style="border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+          <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; {{s.tagStyle}}">{{s.tag}}</span><span style="font-size: 12px; color: #4B5563">{{s.to}} ｜ {{s.date}}</span></span>
+          <span style="font-size: 15px; font-weight: 700; color: #111827">{{s.title}}</span>
+          <span style="display: flex; align-items: center; gap: 10px">
+            <span style="flex: 1; height: 8px; border-radius: 999px; background: #E2E8F0; overflow: hidden"><span style="display: block; height: 100%; border-radius: 999px; {{s.bar}}"></span></span>
+            <span style="font-size: 13px; font-weight: 700; color: #111827; min-width: 92px; text-align: right">確認 {{s.read}} / {{s.total}}</span>
+          </span>
+          <span style="font-size: 12px; color: #4B5563">{{s.missing}}</span>
+        </div>
+      </sc-for>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const src = [
+      { tag: '重要', tagStyle: 'background:#B91C1C;color:#FFFFFF', to: 'ららぽーと立川立飛', date: '10/31 06:30', title: '台風接近に伴う勤務体制の変更', read: 6, total: 10, missing: '未確認：萩原、［氏名］ほか2名 ｜ 再通知する', color: '#B91C1C' },
+      { tag: 'お知らせ', tagStyle: 'background:#F1F5F9;color:#334155', to: '全社', date: '10/28', title: '現任教育（法定10時間）申込受付中', read: 241, total: 312, missing: '未確認 71名 ｜ 未確認者を一覧で見る', color: '#1E3A5F' },
+      { tag: '業務連絡', tagStyle: 'background:#DBEAFE;color:#1E40AF', to: '［支店A］', date: '10/24', title: '制服クリーニング回収日', read: 88, total: 88, missing: '全員確認済み', color: '#047857' }
+    ];
+    const sent = src.map((s) => Object.assign({}, s, {
+      bar: 'width:' + Math.round(s.read / s.total * 100) + '%;background:' + s.color
+    }));
+    return { sent: sent };
+  }
+}
+</script>
+</body>
+</html>

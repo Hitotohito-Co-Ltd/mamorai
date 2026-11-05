@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>お知らせ</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; display: flex; flex-direction: column; font-variant-numeric: tabular-nums">
+  <header style="background: #1E3A5F; color: #FFFFFF; padding: 18px 20px 16px; display: flex; justify-content: space-between; align-items: flex-end">
+    <span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; color: #A7F3D0; letter-spacing: 0.04em">MAMOR-AI 勤務員アプリ</span><span style="font-size: 22px; font-weight: 700">お知らせ</span></span>
+    <span style="font-size: 13px; color: #D6DEE8">未確認 {{unread}}件</span>
+  </header>
+  <main style="flex: 1; padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px; min-height: 0">
+    <sc-for list="{{list}}" as="n" hint-placeholder-count="3">
+      <div style="background: #FFFFFF; border-radius: 12px; display: flex; flex-direction: column; {{n.box}}">
+        <button type="button" onClick="{{n.toggle}}" aria-expanded="{{n.expanded}}" style="display: flex; gap: 12px; align-items: flex-start; padding: 14px; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; width: 100%">
+          <span style="width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; flex: none; {{n.dot}}"></span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+            <span style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap"><span style="font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; {{n.tagStyle}}">{{n.tag}}</span><span style="font-size: 12px; color: #4B5563">{{n.from}} ｜ {{n.date}}</span></span>
+            <span style="font-size: 16px; font-weight: 700; color: #111827">{{n.title}}</span>
+          </span>
+        </button>
+        <sc-if value="{{n.open}}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 0 14px 14px 36px; display: flex; flex-direction: column; gap: 12px">
+            <p style="margin: 0; font-size: 14px; line-height: 1.75; color: #374151">{{n.body}}</p>
+            <sc-if value="{{n.needAck}}" hint-placeholder-val="{{ true }}">
+              <button type="button" onClick="{{n.ack}}" style="height: 48px; border-radius: 12px; border: 0; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 700">確認しました</button>
+            </sc-if>
+            <sc-if value="{{n.acked}}" hint-placeholder-val="{{ false }}">
+              <span style="font-size: 13px; color: #047857; font-weight: 500">確認済み（本社・現場に通知されています）</span>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </main>
+  <nav aria-label="アプリのメニュー" style="display: grid; grid-template-columns: repeat(5, 1fr); background: #FFFFFF; border-top: 1px solid #E2E8F0; padding: 6px 4px 14px">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+      <a href="{{t.href}}" aria-current="{{t.cur}}" style="display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 52px; justify-content: center; text-decoration: none; font-size: 11px; {{t.style}}">
+        <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}" fill="none" stroke="{{t.color}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>{{t.label}}</a>
+    </sc-for>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: 'n1', read: { n3: true, n4: true } };
+  }
+  renderVals() {
+    const st = this.state || {};
+    const read = st.read || {};
+    const T = {
+      imp: { tag: '重要', tagStyle: 'background:#B91C1C;color:#FFFFFF' },
+      work: { tag: '業務連絡', tagStyle: 'background:#DBEAFE;color:#1E40AF' },
+      info: { tag: 'お知らせ', tagStyle: 'background:#F1F5F9;color:#334155' }
+    };
+    const src = [
+      { id: 'n1', k: 'imp', from: '現場', date: '10/31 06:30', title: '台風接近に伴う勤務体制の変更', body: '本日の夜勤より、館内巡回を1時間ごとに強化します。詳細は現場責任者の指示に従ってください。' },
+      { id: 'n2', k: 'info', from: '本社', date: '10/28', title: '現任教育（法定10時間）申込受付中', body: '講習会タブから申し込めます。年度内に必ず受講してください。' },
+      { id: 'n3', k: 'work', from: '現場', date: '10/24', title: '制服クリーニング回収日', body: '毎週水曜に回収します。所定の袋に入れて防災センターへ提出してください。' },
+      { id: 'n4', k: 'info', from: '本社', date: '10/15', title: '［お知らせのタイトル］', body: '［本文］' }
+    ];
+    const list = src.map((n) => {
+      const isRead = !!read[n.id];
+      const open = st.open === n.id;
+      return Object.assign({}, n, T[n.k], {
+        open: open, expanded: open ? 'true' : 'false',
+        needAck: !isRead, acked: isRead,
+        dot: isRead ? 'background:transparent' : 'background:#DC2626',
+        box: n.k === 'imp' && !isRead ? 'border:2px solid #DC2626' : 'border:1px solid #E2E8F0',
+        toggle: () => this.setState({ open: open ? null : n.id }),
+        ack: () => { const r = Object.assign({}, read); r[n.id] = true; this.setState({ read: r }); }
+      });
+    });
+    const tabs = [
+      { label: '上番報告', href: 'App-Sites.dc.html', d: 'M12 2L20 5V11C20 16.5 16.5 20.5 12 22C7.5 20.5 4 16.5 4 11V5Z M8.5 12L11 14.5L15.5 9.5' },
+      { label: 'シフト希望', href: 'App-Shift.dc.html', d: 'M5 5H19A1.5 1.5 0 0 1 20.5 6.5V18.5A1.5 1.5 0 0 1 19 20H5A1.5 1.5 0 0 1 3.5 18.5V6.5A1.5 1.5 0 0 1 5 5Z M3.5 10H20.5 M8 3V7 M16 3V7' },
+      { label: '有給申請', href: 'App-Leave.dc.html', d: 'M6 3H14L19 8V21H6Z M9 13H16 M9 17H14' },
+      { label: '講習会', href: 'App-Training.dc.html', d: 'M3 9L12 4L21 9L12 14Z M7 11.5V16C9.5 18 14.5 18 17 16V11.5' },
+      { label: 'お知らせ', href: 'App-Notice.dc.html', d: 'M6 16V11C6 7.5 8.5 5 12 5C15.5 5 18 7.5 18 11V16L20 18H4Z M10 20.5H14', on: true }
+    ].map((t) => Object.assign({}, t, {
+      cur: t.on ? 'page' : 'false',
+      color: t.on ? '#1E3A5F' : '#4B5563',
+      style: t.on ? 'color:#1E3A5F;font-weight:700' : 'color:#4B5563'
+    }));
+    return { list: list, tabs: tabs, unread: list.filter((n) => n.needAck).length };
+  }
+}
+</script>
+</body>
+</html>
