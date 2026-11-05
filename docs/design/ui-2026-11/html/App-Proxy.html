@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8">
+<title>代理報告</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet"><style>
+body{margin:0}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style></head>
+<body>
+<div id="dc-root">
+
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; display: flex; flex-direction: column; font-variant-numeric: tabular-nums">
+  <header style="background: #1E3A5F; color: #FFFFFF; padding: 18px 20px; display: flex; flex-direction: column; gap: 4px">
+    <span style="font-size: 12px; color: #A7F3D0; letter-spacing: 0.04em">代理報告 ｜ 現場責任者：高尾</span>
+    <span style="font-size: 20px; font-weight: 700">ららぽーと立川立飛</span>
+    <span style="font-size: 13px; color: #D6DEE8">10/31（土）｜ 未報告 3名</span>
+  </header>
+  <main style="flex: 1; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+    <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+      <legend style="font-size: 14px; font-weight: 700; color: #1E3A5F; padding: 0 0 8px">1. 対象者を選ぶ</legend>
+      
+        <button type="button" aria-pressed="false" style="display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 14px; border-radius: 12px; font: inherit; text-align: left; cursor: pointer; background:#FFFFFF;border:1px solid #E2E8F0">
+          <span style="width: 22px; height: 22px; border-radius: 50%; box-sizing: border-box; flex: none; border:2px solid #94A3B8;background:#FFFFFF"></span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700; color: #111827">萩原</span><span style="font-size: 12px; color: #4B5563">No.［スタッフNo］｜ 日勤1 ｜ 未確認（7:45 期限）</span></span>
+        </button>
+      
+        <button type="button" aria-pressed="true" style="display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 14px; border-radius: 12px; font: inherit; text-align: left; cursor: pointer; background:#FFFFFF;border:2px solid #1E3A5F">
+          <span style="width: 22px; height: 22px; border-radius: 50%; box-sizing: border-box; flex: none; border:7px solid #1E3A5F;background:#FFFFFF"></span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700; color: #111827">［氏名］</span><span style="font-size: 12px; color: #4B5563">協力会社 ｜ 日勤1 ｜ 報告前</span></span>
+        </button>
+      
+        <button type="button" aria-pressed="false" style="display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 14px; border-radius: 12px; font: inherit; text-align: left; cursor: pointer; background:#FFFFFF;border:1px solid #E2E8F0">
+          <span style="width: 22px; height: 22px; border-radius: 50%; box-sizing: border-box; flex: none; border:2px solid #94A3B8;background:#FFFFFF"></span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700; color: #111827">［氏名］</span><span style="font-size: 12px; color: #4B5563">No.［スタッフNo］｜ 日勤2 ｜ 報告前</span></span>
+        </button>
+      
+    </fieldset>
+
+    <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+      <legend style="font-size: 14px; font-weight: 700; color: #1E3A5F; padding: 0 0 8px">2. 報告の種類</legend>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px">
+        
+          <button type="button" aria-pressed="true" style="height: 48px; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; background:#1E3A5F;color:#FFFFFF;border:0">上番</button>
+        
+          <button type="button" aria-pressed="false" style="height: 48px; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; background:#FFFFFF;color:#1F2937;border:1px solid #CBD5E1">下番</button>
+        
+          <button type="button" aria-pressed="false" style="height: 48px; border-radius: 10px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; background:#FFFFFF;color:#1F2937;border:1px solid #CBD5E1">欠勤</button>
+        
+      </div>
+    </fieldset>
+
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="why" style="font-size: 14px; font-weight: 700; color: #1E3A5F">3. 理由（任意）</label>
+      <input id="why" value="スマホを忘れたため" style="height: 48px; box-sizing: border-box; border: 1px solid rgb(203, 213, 225); border-radius: 10px; padding: 0px 12px; font-style: inherit; font-variant: inherit; font-weight: inherit; font-stretch: inherit; line-height: inherit; font-family: inherit; font-optical-sizing: inherit; font-size-adjust: inherit; font-kerning: inherit; font-feature-settings: inherit; font-variation-settings: inherit; font-language-override: inherit; font-size: 15px; background: rgb(255, 255, 255);">
+    </div>
+
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 58px; border-radius: 14px; background: #1E3A5F; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none; margin-top: auto">［氏名］ さんの上番を代理で報告</a>
+    <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #4B5563; text-align: center">代理で報告したことと、代理した人の名前が記録されます。</p>
+  </main>
+</div>
+</div>
+
+
+
+</body></html>

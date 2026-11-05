@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>勤務員アプリ ログイン</title>
+<script src="./dc-shim.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; display: flex; flex-direction: column">
+  <header style="background: #1E3A5F; color: #FFFFFF; padding: 56px 24px 36px; display: flex; flex-direction: column; align-items: center; gap: 12px">
+    <svg width="52" height="60" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1L24 5V14C24 21 19 26.5 13 29C7 26.5 2 21 2 14V5Z" fill="none" stroke="#10B981" stroke-width="1.6"></path><path d="M7.5 20V10L13 16L18.5 10V20" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"></path></svg>
+    <span style="font-size: 24px; font-weight: 700; letter-spacing: 0.06em">MAMOR-AI</span>
+    <span style="font-size: 14px; color: #D6DEE8">勤務員アプリ</span>
+  </header>
+  <main style="flex: 1; padding: 28px 24px; display: flex; flex-direction: column; gap: 18px">
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="cc" style="font-size: 14px; font-weight: 500; color: #374151">会社コード</label>
+      <input id="cc" value="［会社コード］" style="height: 52px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 10px; padding: 0 14px; font: inherit; font-size: 17px; background: #FFFFFF; color: #111827">
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="sn" style="font-size: 14px; font-weight: 500; color: #374151">スタッフNo</label>
+      <input id="sn" inputmode="numeric" value="10234" style="height: 52px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 10px; padding: 0 14px; font: inherit; font-size: 17px; background: #FFFFFF; color: #111827">
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <label for="pin" style="font-size: 14px; font-weight: 500; color: #374151">PIN</label>
+      <input id="pin" type="password" inputmode="numeric" value="0000" style="height: 52px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 10px; padding: 0 14px; font: inherit; font-size: 17px; letter-spacing: 0.3em; background: #FFFFFF; color: #111827">
+    </div>
+    <a href="App-Sites.dc.html" style="display: flex; align-items: center; justify-content: center; height: 56px; border-radius: 12px; background: #1E3A5F; color: #FFFFFF; font-size: 18px; font-weight: 700; text-decoration: none; margin-top: 6px">ログイン</a>
+    <p style="margin: 0; font-size: 13px; line-height: 1.7; color: #4B5563">初回のPINは生年月日から作られています。最初のログインで新しいPINに変えてください。PINを忘れたときは現場責任者に初期化を頼んでください。</p>
+    <p style="margin: auto 0 0; font-size: 12px; line-height: 1.7; color: #4B5563; text-align: center">一度ログインすると、このスマホは上番報告用に本人の端末として登録されます。</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

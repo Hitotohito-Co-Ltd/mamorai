@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>施設責任者 本日の配置状況</title>
+<script src="./dc-shim.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F9}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: stretch">
+  <nav aria-label="メニュー" style="flex: 1 1 232px; max-width: 260px; min-width: 220px; background: #1E3A5F; color: #FFFFFF; display: flex; flex-direction: column; gap: 4px; padding: 20px 14px 32px; box-sizing: border-box">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px">
+      <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1L24 5V14C24 21 19 26.5 13 29C7 26.5 2 21 2 14V5Z" fill="none" stroke="#10B981" stroke-width="2"></path><path d="M7.5 20V10L13 16L18.5 10V20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"></path></svg>
+      <span style="display: flex; flex-direction: column"><span style="font-weight: 700; font-size: 17px; letter-spacing: 0.04em">MAMOR-AI</span><span style="font-size: 11px; color: #C7D2E0">現場 ｜ ららぽーと立川立飛</span></span>
+    </div>
+    <a href="Site-Home.dc.html" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">ホーム</a>
+    <a href="#" aria-current="page" style="display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; background: #2B4C75; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700; box-shadow: inset 3px 0 0 #10B981">本日の配置状況</a>
+    <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">勤務者一覧</a>
+    <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">日報入力</a>
+    <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">シフト</a>
+    <a href="#" style="display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #E5EAF1; text-decoration: none; font-size: 14px">申請の承認</a>
+    <span style="margin-top: auto; padding: 24px 10px 0; font-size: 12px; color: #C7D2E0">現場責任者（現場PINでログイン中）</span>
+  </nav>
+
+  <main style="flex: 999 1 640px; min-width: 0; padding: 28px 32px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; max-width: 1240px">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #1E3A5F">ららぽーと立川立飛　本日の配置状況</h1>
+        <p style="margin: 0; font-size: 13px; color: #4B5563">2026年10月31日（土）｜ 交通 ｜ <span style="color: #047857; font-weight: 500">● 自動更新中</span>（最終受信 07:52）</p>
+      </div>
+      <button type="button" style="height: 40px; padding: 0 14px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 14px; color: #1F2937">更新</button>
+    </div>
+
+    <section aria-label="現場の指標" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px">
+      <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 500; color: #374151">約定人数</span><span style="font-size: 32px; font-weight: 700; line-height: 1; color: #111827">10</span></div>
+      <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 500; color: #374151">出勤確認</span><span style="font-size: 32px; font-weight: 700; line-height: 1; color: #047857">{{okCount}}</span></div>
+      <div style="background: #FEF2F2; border: 2px solid #DC2626; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 500; color: #374151">未確認</span><span style="font-size: 32px; font-weight: 700; line-height: 1; color: #B91C1C">{{unCount}}</span></div>
+      <div style="background: #FFF7ED; border: 1px solid #FDBA74; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; font-weight: 500; color: #374151">遅刻</span><span style="font-size: 32px; font-weight: 700; line-height: 1; color: #C2410C">1</span></div>
+    </section>
+
+    <section aria-label="勤務者ごとの状況" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow-x: auto">
+      <div style="min-width: 1000px">
+        <div style="display: grid; grid-template-columns: 36px 1.1fr 80px 1fr 84px 84px 84px 1.6fr 1.3fr; gap: 10px; padding: 12px 20px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; font-weight: 500; color: #4B5563">
+          <span>No.</span><span>氏名</span><span>区分</span><span>勤務枠</span><span>出発</span><span>上番</span><span>下番</span><span>状況・備考</span><span>操作</span>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+          <div style="display: grid; grid-template-columns: 36px 1.1fr 80px 1fr 84px 84px 84px 1.6fr 1.3fr; gap: 10px; align-items: center; padding: 12px 20px; border-bottom: 1px solid #EEF2F6; font-size: 14px; {{r.row}}">
+            <span style="color: #4B5563">{{r.no}}</span>
+            <span style="display: flex; flex-direction: column; gap: 1px"><span style="font-weight: 500; color: #111827">{{r.name}}</span><span style="font-size: 12px; color: #4B5563">{{r.staff}}</span></span>
+            <span style="font-size: 13px; color: #4B5563">{{r.cat}}</span>
+            <span style="font-size: 13px; color: #374151">{{r.slot}}</span>
+            <span>{{r.dep}}</span>
+            <span style="font-weight: 500; {{r.onStyle}}">{{r.on}}</span>
+            <span style="color: #4B5563">{{r.off}}</span>
+            <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="display: inline-flex; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; {{r.pill}}">{{r.state}}</span><span style="font-size: 12px; color: #374151">{{r.note}}</span></span>
+            <span style="display: flex; gap: 8px; flex-wrap: wrap">
+              <sc-if value="{{r.canProxy}}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{r.proxy}}" style="height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 500">代理で上番</button>
+              </sc-if>
+              <sc-if value="{{r.canCall}}" hint-placeholder-val="{{ false }}">
+                <button type="button" style="height: 36px; padding: 0 12px; border: 1px solid #1E3A5F; border-radius: 8px; background: #FFFFFF; color: #1E3A5F; font: inherit; font-size: 13px; font-weight: 500">電話</button>
+              </sc-if>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+    <p style="margin: 0; font-size: 13px; color: #4B5563">代理で報告すると、代理した人（現場責任者）も記録されます。協力会社の方はこの画面から代理で報告します。</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { proxied: {} };
+  }
+  renderVals() {
+    const px = (this.state && this.state.proxied) || {};
+    const P = {
+      ok: { state: '出勤済み', pill: 'background:#D1FAE5;color:#065F46', row: '', onStyle: 'color:#111827' },
+      proxy: { state: '出勤済み（代理）', pill: 'background:#D1FAE5;color:#065F46;box-shadow:inset 0 0 0 1px #10B981', row: '', onStyle: 'color:#111827' },
+      late: { state: '遅刻', pill: 'background:#FFEDD5;color:#9A3412', row: 'background:#FFFBF5', onStyle: 'color:#C2410C' },
+      un: { state: '未確認', pill: 'background:#FEE2E2;color:#991B1B', row: 'background:#FEF2F2', onStyle: 'color:#B91C1C' },
+      before: { state: '報告前', pill: 'background:#F1F5F9;color:#334155', row: '', onStyle: 'color:#4B5563' }
+    };
+    const base = [
+      { id: 'p1', name: '萩原', staff: 'No.［スタッフNo］', cat: '交通', slot: '日勤1（荷捌）7:45〜', dep: '—', on: '未着', off: '—', st: 'un', note: '7:45 期限・電話未応答' },
+      { id: 'p2', name: '［氏名］', staff: 'No.［スタッフNo］', cat: '交通', slot: '日勤1 7:30〜', dep: '06:58', on: '07:52', off: '—', st: 'late', note: '交通遅延の連絡あり（6:58）' },
+      { id: 'p3', name: '高尾', staff: 'No.［スタッフNo］', cat: '交通', slot: '日勤2（隊長）', dep: '06:40', on: '07:21', off: '—', st: 'ok', note: '' },
+      { id: 'p4', name: '［氏名］', staff: '協力会社', cat: '協力会社', slot: '日勤1 7:30〜', dep: '—', on: '07:25', off: '—', st: 'proxy', note: '代理：高尾' },
+      { id: 'p5', name: '［氏名］', staff: 'No.［スタッフNo］', cat: '交通', slot: '日勤1 7:30〜', dep: '06:51', on: '07:18', off: '—', st: 'ok', note: '' },
+      { id: 'p6', name: '［氏名］', staff: 'No.［スタッフNo］', cat: '交通', slot: '日勤1 7:30〜', dep: '—', on: '07:22', off: '—', st: 'ok', note: '' },
+      { id: 'p7', name: '［氏名］', staff: 'No.［スタッフNo］', cat: '交通', slot: '日勤1 7:30〜', dep: '06:47', on: '07:26', off: '—', st: 'ok', note: '' },
+      { id: 'p8', name: '［氏名］', staff: 'No.［スタッフNo］', cat: '交通', slot: '日勤1 7:30〜', dep: '—', on: '07:29', off: '—', st: 'ok', note: '' },
+      { id: 'p9', name: '［氏名］', staff: 'No.［スタッフNo］', cat: '交通', slot: '日勤2 9:00〜', dep: '07:44', on: '—', off: '—', st: 'before', note: '出発済み・上番期限 8:45' },
+      { id: 'p10', name: '［氏名］', staff: 'No.［スタッフNo］', cat: '交通', slot: '夜勤 22:00〜', dep: '—', on: '—', off: '—', st: 'before', note: '' }
+    ];
+    const rows = base.map((r, i) => {
+      const key = px[r.id] ? 'proxy' : r.st;
+      return Object.assign({}, r, P[key], {
+        no: i + 1,
+        on: px[r.id] ? '07:53' : r.on,
+        note: px[r.id] ? '代理：［現場責任者］' : r.note,
+        canProxy: key === 'un',
+        canCall: key === 'un' || key === 'late',
+        proxy: () => { const n = Object.assign({}, px); n[r.id] = true; this.setState({ proxied: n }); }
+      });
+    });
+    const okCount = rows.filter((r) => r.state.indexOf('出勤済み') === 0 || r.state === '遅刻').length;
+    const unCount = rows.filter((r) => r.state === '未確認').length;
+    return { rows: rows, okCount: okCount, unCount: unCount };
+  }
+}
+</script>
+</body>
+</html>

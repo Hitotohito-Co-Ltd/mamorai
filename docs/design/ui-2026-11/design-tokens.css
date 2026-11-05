@@ -1,0 +1,62 @@
+/* MAMOR-AI UI案 デザイントークン（2026-11）
+ * 既存の変数（styles.css の --navy / --g / --r など、pwa.css の --navy / --ok など）と
+ * 並べて使えるよう、接頭辞 --mm- を付けています。置き換えるときは下のコメントの対応を参考にしてください。
+ */
+:root {
+  /* ブランド */
+  --mm-navy: #1E3A5F;          /* 主色：ヘッダー・左メニュー・主ボタン（既存 --navy に相当） */
+  --mm-navy-hover: #0F2440;    /* リンクのホバー */
+  --mm-navy-active: #2B4C75;   /* 左メニューの選択中背景 */
+  --mm-green: #10B981;         /* アクセント：ロゴ・選択中の左線。文字色には使わない（白地で 2.5:1） */
+  --mm-green-text: #047857;    /* 緑の文字・「はい」ボタン背景（白文字 5.5:1） */
+
+  /* 文字 */
+  --mm-ink: #111827;           /* 見出し・数値 */
+  --mm-text: #1F2937;          /* 本文 */
+  --mm-text-2: #374151;        /* ラベル */
+  --mm-muted: #4B5563;         /* 補足（白地・#F4F6F9 地で 4.5:1 以上） */
+  --mm-on-navy: #FFFFFF;
+  --mm-on-navy-2: #D6DEE8;     /* 紺地の補足文字 */
+  --mm-on-navy-3: #A9B8CB;     /* 紺地の区切り見出し */
+  --mm-on-navy-accent: #A7F3D0;/* 紺地の小見出し（アプリ名など） */
+
+  /* 面・線 */
+  --mm-bg: #F4F6F9;            /* 画面の地 */
+  --mm-card: #FFFFFF;
+  --mm-head-row: #F8FAFC;      /* 表のヘッダー行 */
+  --mm-line: #E2E8F0;          /* 枠線 */
+  --mm-line-row: #EEF2F6;      /* 表の行区切り */
+  --mm-input-line: #CBD5E1;    /* 入力欄・副ボタンの枠 */
+
+  /* 状態色（文字 / 背景 / 枠）— 指標と状態バッジで共通 */
+  --mm-ok-text: #065F46;    --mm-ok-bg: #D1FAE5;    --mm-ok-soft: #ECFDF5;    --mm-ok-line: #A7F3D0;    /* 出勤済み・承認済み */
+  --mm-alert-text: #991B1B; --mm-alert-bg: #FEE2E2; --mm-alert-soft: #FEF2F2; --mm-alert-line: #DC2626; --mm-alert-num: #B91C1C; /* 未確認・重要 */
+  --mm-late-text: #9A3412;  --mm-late-bg: #FFEDD5;  --mm-late-soft: #FFF7ED;  --mm-late-line: #FDBA74;  --mm-late-num: #C2410C;  /* 遅刻・その他報告・休み希望 */
+  --mm-fill-text: #1E40AF;  --mm-fill-bg: #DBEAFE;  --mm-fill-soft: #EFF6FF;  --mm-fill-line: #BFDBFE;  --mm-fill-num: #1D4ED8;  /* 補填済み・業務連絡・有給 */
+  --mm-gap-text: #5B21B6;   --mm-gap-bg: #EDE9FE;   --mm-gap-soft: #F5F3FF;   --mm-gap-line: #DDD6FE;   --mm-gap-num: #6D28D9;   /* 欠時間・講習会 */
+  --mm-neutral-text: #334155; --mm-neutral-bg: #F1F5F9;                                                    /* 報告前・任意 */
+  --mm-absent-text: #1F2937; --mm-absent-bg: #E5E7EB;                                                      /* 欠勤・却下 */
+
+  /* 文字サイズ（px） */
+  --mm-fs-xs: 11px;  /* 下タブ・補足 */
+  --mm-fs-sm: 12px;  /* 表ヘッダー・バッジ */
+  --mm-fs-md: 13px;  /* 補足文 */
+  --mm-fs-base: 14px;/* PC本文 */
+  --mm-fs-lg: 16px;  /* スマホ本文・カード見出し */
+  --mm-fs-xl: 22px;  /* スマホ画面タイトル */
+  --mm-fs-2xl: 24px; /* PC画面タイトル */
+  --mm-fs-num: 30px; /* 指標の数値 */
+  --mm-font: 'Noto Sans JP', system-ui, sans-serif;  /* 数値は font-variant-numeric: tabular-nums */
+
+  /* 角丸・余白 */
+  --mm-r-sm: 8px;    /* ボタン・入力（PC） */
+  --mm-r-md: 10px;   /* 指標カード・入力（スマホ） */
+  --mm-r-lg: 12px;   /* カード・表 */
+  --mm-r-xl: 14px;   /* スマホのボタン */
+  --mm-r-2xl: 20px;  /* 上番ボタン・ボトムシート */
+  --mm-r-pill: 999px;
+  --mm-touch: 44px;  /* 押せる要素の最小の高さ */
+  --mm-space-page-pc: 28px 32px 48px;
+  --mm-space-page-sp: 16px 20px;
+  --mm-sidebar-w: 232px;
+}
