@@ -5,8 +5,8 @@
 // DB側（0407 の jyoban_work_date）と同じ規則。片方を変えたらもう片方も合わせること。
 import { toEpochDay } from '../shift/constraints.js'
 import {
-  isSlotScheduledOn, isValidHm, JYOBAN_OTHER_KINDS,
-  type JyobanSlot, type JyobanReport, type JyobanReportType, type JyobanOtherKind,
+  isSlotScheduledOn, isValidHm, JYOBAN_OTHER_KINDS, JYOBAN_TIMED_TYPES, JYOBAN_TYPE_LABEL,
+  type JyobanSlot, type JyobanReport, type JyobanReportType, type JyobanOtherKind, type JyobanTimedType,
 } from './model.js'
 
 const DAY = 24 * 60
@@ -47,33 +47,47 @@ export function resolveWorkDate(slot: JyobanSlot, nowLocal: string): string | nu
 }
 
 export interface ReportButton {
-  type: Exclude<JyobanReportType, 'other'>
+  type: JyobanTimedType
   label: string
   /** 締切 'HH:MM' */
   due: string
   done: boolean
   /** 送信時刻 'HH:MM' */
   doneAt?: string
-  /** 上番済みのため不要になった出発連絡 */
+  /** 後の報告が済んだため不要になった報告（上番済みの出発連絡、出発済みの起床連絡など） */
   skipped: boolean
   /** 次に押すべきボタン（大きく表示） */
   primary: boolean
 }
 
-/** 勤務枠×勤務日の報告ボタン。reports は本人分（共用端末は当該勤務者分）。 */
+function dueOf(slot: JyobanSlot, t: JyobanTimedType): string | null {
+  switch (t) {
+    case 'wakeup': return slot.wakeupRequired === true && isValidHm(slot.wakeupDue) ? slot.wakeupDue : null
+    case 'departure': return slot.departureRequired && isValidHm(slot.departureDue) ? slot.departureDue : null
+    case 'onduty': return slot.ondutyRequired && isValidHm(slot.ondutyDue) ? slot.ondutyDue : null
+    case 'offduty': return slot.offdutyRequired === true && isValidHm(slot.offdutyDue) ? slot.offdutyDue : null
+  }
+}
+
+/**
+ * 勤務枠×勤務日の報告ボタン（起床 → 出発 → 上番 → 下番 の順・要のものだけ）。
+ * reports は本人分（共用端末は当該勤務者分）。後の報告が済んだ前の報告は「省略」。
+ */
 export function reportButtons(slot: JyobanSlot, workDate: string, reports: JyobanReport[]): ReportButton[] {
   const mine = reports.filter((r) => r.slotId === slot.id && r.workDate === workDate && r.voided !== true)
   const first = (t: JyobanReportType): JyobanReport | undefined =>
     mine.filter((r) => r.type === t).sort((a, b) => a.receivedAt.localeCompare(b.receivedAt))[0]
-  const onduty = first('onduty')
+  const done = new Map(JYOBAN_TIMED_TYPES.map((t) => [t, first(t)] as const))
   const out: ReportButton[] = []
-  if (slot.departureRequired && slot.departureDue !== null) {
-    const d = first('departure')
-    out.push({ type: 'departure', label: '出発連絡', due: slot.departureDue, done: d !== undefined, doneAt: d?.receivedAt.slice(11, 16), skipped: d === undefined && onduty !== undefined, primary: false })
-  }
-  if (slot.ondutyRequired && slot.ondutyDue !== null) {
-    out.push({ type: 'onduty', label: '上番連絡', due: slot.ondutyDue, done: onduty !== undefined, doneAt: onduty?.receivedAt.slice(11, 16), skipped: false, primary: false })
-  }
+  JYOBAN_TIMED_TYPES.forEach((t, i) => {
+    const due = dueOf(slot, t)
+    if (due === null) return
+    const d = done.get(t)
+    const laterDone = JYOBAN_TIMED_TYPES.slice(i + 1).some((u) => done.get(u) !== undefined)
+    // 下番は省略しない（勤務の終わりの記録として必ず残す）
+    const skipped = t !== 'offduty' && d === undefined && laterDone
+    out.push({ type: t, label: JYOBAN_TYPE_LABEL[t], due, done: d !== undefined, doneAt: d?.receivedAt.slice(11, 16), skipped, primary: false })
+  })
   const next = out.find((b) => !b.done && !b.skipped)
   if (next !== undefined) next.primary = true
   return out

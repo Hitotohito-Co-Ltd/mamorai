@@ -30,6 +30,7 @@ interface SiteRow {
 interface SlotRow {
   id: string; site_id: string; name: string; work_start: string; work_end: string
   departure_required: boolean; departure_due: string | null; onduty_required: boolean; onduty_due: string | null
+  wakeup_required?: boolean | null; wakeup_due?: string | null; offduty_required?: boolean | null; offduty_due?: string | null
   grace_min: number; weekdays: number[]; is_active: boolean; sort_order: number
 }
 const siteFrom = (r: SiteRow): JyobanSite => ({
@@ -39,12 +40,16 @@ const siteFrom = (r: SiteRow): JyobanSite => ({
 const slotFrom = (r: SlotRow): JyobanSlot => ({
   id: r.id, siteId: r.site_id, name: r.name, workStart: r.work_start, workEnd: r.work_end,
   departureRequired: r.departure_required, departureDue: r.departure_due, ondutyRequired: r.onduty_required, ondutyDue: r.onduty_due,
+  wakeupRequired: r.wakeup_required ?? false, wakeupDue: r.wakeup_due ?? null,
+  offdutyRequired: r.offduty_required ?? false, offdutyDue: r.offduty_due ?? null,
   graceMin: r.grace_min, weekdays: r.weekdays, isActive: r.is_active,
 })
 const slotTo = (s: JyobanSlot, sortOrder: number): Omit<SlotRow, 'id'> => ({
   site_id: s.siteId, name: s.name.trim(), work_start: s.workStart, work_end: s.workEnd,
   departure_required: s.departureRequired, departure_due: s.departureRequired ? s.departureDue : null,
   onduty_required: s.ondutyRequired, onduty_due: s.ondutyRequired ? s.ondutyDue : null,
+  wakeup_required: s.wakeupRequired === true, wakeup_due: s.wakeupRequired === true ? s.wakeupDue ?? null : null,
+  offduty_required: s.offdutyRequired === true, offduty_due: s.offdutyRequired === true ? s.offdutyDue ?? null : null,
   grace_min: s.graceMin, weekdays: [...s.weekdays].sort((a, b) => a - b), is_active: s.isActive, sort_order: sortOrder,
 })
 

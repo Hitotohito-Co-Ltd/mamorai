@@ -1,4 +1,4 @@
-// [JYB] 上番報告（出発連絡・上番連絡）の純粋ロジック（UI/DB非依存・決定論）
+// [JYB] 上番報告（起床・出発・上番・下番の連絡）の純粋ロジック（UI/DB非依存・決定論）
 //   - 勤務枠（現場×勤務枠ごとの報告要否・締切・猶予）の設定検証
 //   - 稼働日判定 / 締切の分換算
 //   - ステータス判定（未連絡・その他報告・出発済み・締切前・上番済み・確認済み）
@@ -7,7 +7,13 @@
 // 現在時刻・乱数などの非決定APIは使わない（now は引数で受け取る）。
 import { toEpochDay } from '../shift/constraints.js'
 
-export type JyobanReportType = 'departure' | 'onduty' | 'other'
+export type JyobanReportType = 'wakeup' | 'departure' | 'onduty' | 'offduty' | 'other'
+/** 期限つきの報告（その他以外）。時系列順。 */
+export type JyobanTimedType = Exclude<JyobanReportType, 'other'>
+export const JYOBAN_TIMED_TYPES: JyobanTimedType[] = ['wakeup', 'departure', 'onduty', 'offduty']
+export const JYOBAN_TYPE_LABEL: Record<JyobanTimedType, string> = {
+  wakeup: '起床連絡', departure: '出発連絡', onduty: '上番連絡', offduty: '下番連絡',
+}
 export type JyobanOtherKind = 'late' | 'oversleep' | 'traffic_delay' | 'sick' | 'absent' | 'other'
 
 /** その他報告の区分ラベル（UI表示用）。遅刻系は到着見込み時刻が必須。 */
@@ -35,6 +41,12 @@ export interface JyobanSlot {
   ondutyRequired: boolean
   /** 上番連絡の締切 'HH:MM'（不要なら null） */
   ondutyDue: string | null
+  /** 起床連絡（未設定の旧データは不要扱い） */
+  wakeupRequired?: boolean
+  wakeupDue?: string | null
+  /** 下番連絡（未設定の旧データは不要扱い）。期限が勤務開始以前の時刻なら翌日 */
+  offdutyRequired?: boolean
+  offdutyDue?: string | null
   /** 締切からアラート（未連絡）までの猶予（分） */
   graceMin: number
   /** 適用曜日（0=日〜6=土） */
@@ -84,8 +96,10 @@ export interface ReportCheck {
 
 export interface SlotStatusResult {
   status: SlotStatus
+  wakeup: ReportCheck
   departure: ReportCheck
   onduty: ReportCheck
+  offduty: ReportCheck
   /** 最新の未取消その他報告 */
   other?: JyobanReport
   /** 勤務表の配置者と報告者が異なる（交代・代理） */
@@ -131,6 +145,18 @@ export function validateJyobanSlot(slot: JyobanSlot): SlotFieldError[] {
       && dueMinutes(slot.departureDue, slot.workStart) >= dueMinutes(slot.ondutyDue, slot.workStart)) {
     errors.push({ field: 'departureDue', message: '出発連絡の締切は上番連絡の締切より前にしてください' })
   }
+  if (slot.wakeupRequired === true && !isValidHm(slot.wakeupDue)) {
+    errors.push({ field: 'wakeupDue', message: '起床連絡の締切をHH:MMで入力してください' })
+  }
+  if (slot.offdutyRequired === true && !isValidHm(slot.offdutyDue)) {
+    errors.push({ field: 'offdutyDue', message: '下番連絡の締切をHH:MMで入力してください' })
+  }
+  if (slot.wakeupRequired === true && isValidHm(slot.wakeupDue) && isValidHm(slot.workStart)) {
+    const w = dueMinutes(slot.wakeupDue, slot.workStart)
+    const later = [slot.departureRequired ? slot.departureDue : null, slot.ondutyRequired ? slot.ondutyDue : null]
+      .filter(isValidHm).map((d) => dueMinutes(d, slot.workStart))
+    if (later.some((m) => w >= m)) errors.push({ field: 'wakeupDue', message: '起床連絡の締切は出発・上番連絡の締切より前にしてください' })
+  }
   if (!Number.isInteger(slot.graceMin) || slot.graceMin < 0 || slot.graceMin > 120) {
     errors.push({ field: 'graceMin', message: '猶予は0〜120分の整数で入力してください' })
   }
@@ -160,6 +186,24 @@ export function dueMinutes(due: string, workStart: string): number {
   return d - s > 12 * 60 ? d - 24 * 60 : d
 }
 
+/**
+ * 下番連絡の期限を「勤務日0時からの分」に換算する。勤務開始以前の時刻は翌日とみなす（夜勤明け）。
+ */
+export function offdutyDueMinutes(due: string, workStart: string): number {
+  const d = hmToMin(due)
+  return d <= hmToMin(workStart) ? d + 24 * 60 : d
+}
+
+/** 報告種別ごとの期限（勤務日0時からの分）。不要・未設定なら null。 */
+export function typeDueMinutes(slot: JyobanSlot, type: JyobanTimedType): number | null {
+  switch (type) {
+    case 'wakeup': return slot.wakeupRequired === true && isValidHm(slot.wakeupDue) ? dueMinutes(slot.wakeupDue, slot.workStart) : null
+    case 'departure': return slot.departureRequired && isValidHm(slot.departureDue) ? dueMinutes(slot.departureDue, slot.workStart) : null
+    case 'onduty': return slot.ondutyRequired && isValidHm(slot.ondutyDue) ? dueMinutes(slot.ondutyDue, slot.workStart) : null
+    case 'offduty': return slot.offdutyRequired === true && isValidHm(slot.offdutyDue) ? offdutyDueMinutes(slot.offdutyDue, slot.workStart) : null
+  }
+}
+
 /** ローカル日時 'YYYY-MM-DDTHH:MM' を「勤務日0時からの分」に換算する（前日なら負、翌日なら1440超）。 */
 export function localMinutesFrom(workDate: string, localDateTime: string): number {
   const dayDiff = toEpochDay(localDateTime.slice(0, 10)) - toEpochDay(workDate)
@@ -176,13 +220,12 @@ function firstReport(list: JyobanReport[], workDate: string): { report: JyobanRe
 }
 
 function check(
-  required: boolean, due: string | null, slot: JyobanSlot, workDate: string,
+  dueAt: number | null, slot: JyobanSlot,
   nowMinutes: number, found: { report: JyobanReport; at: number } | undefined,
 ): ReportCheck {
-  if (!required || due === null) {
+  if (dueAt === null) {
     return found === undefined ? { state: 'not_required' } : { state: 'done', atMinutes: found.at, lateMin: 0 }
   }
-  const dueAt = dueMinutes(due, slot.workStart)
   if (found !== undefined) return { state: 'done', atMinutes: found.at, lateMin: Math.max(0, found.at - dueAt) }
   return nowMinutes > dueAt + slot.graceMin ? { state: 'missing' } : { state: 'pending' }
 }
@@ -211,24 +254,34 @@ export function computeSlotStatus(input: ComputeSlotStatusInput): SlotStatusResu
     if (other === undefined || localMinutesFrom(workDate, r.receivedAt) >= localMinutesFrom(workDate, other.receivedAt)) other = r
   }
 
-  const departure = check(slot.departureRequired, slot.departureDue, slot, workDate, nowMinutes, dep)
-  const onduty = check(slot.ondutyRequired, slot.ondutyDue, slot, workDate, nowMinutes, on)
+  const wak = firstReport(mine.filter((r) => r.type === 'wakeup'), workDate)
+  const off = firstReport(mine.filter((r) => r.type === 'offduty'), workDate)
+  const wakeup0 = check(typeDueMinutes(slot, 'wakeup'), slot, nowMinutes, wak)
+  const departure = check(typeDueMinutes(slot, 'departure'), slot, nowMinutes, dep)
+  const onduty = check(typeDueMinutes(slot, 'onduty'), slot, nowMinutes, on)
+  const offduty = check(typeDueMinutes(slot, 'offduty'), slot, nowMinutes, off)
   // 上番済みなら、出発連絡の未着は「省略」とし未連絡扱いにしない（隊員を責めない運用）
   const ondutyDone = onduty.state === 'done'
   const dep2: ReportCheck = ondutyDone && (departure.state === 'missing' || departure.state === 'pending')
     ? { state: 'skipped' } : departure
 
+  // 出発・上番・下番のどれかが届いていれば、起床連絡の未着は「省略」とする
+  const laterDone = dep !== undefined || on !== undefined || off !== undefined
+  const wakeup: ReportCheck = laterDone && (wakeup0.state === 'missing' || wakeup0.state === 'pending')
+    ? { state: 'skipped' } : wakeup0
+
   const reporter = (on ?? dep)?.report
   const substitute = input.scheduledStaffNo !== undefined && reporter !== undefined
     && reporter.staffNo !== input.scheduledStaffNo
 
-  const base = { departure: dep2, onduty, other, substitute, reporterStaffNo: reporter?.staffNo }
+  const base = { wakeup, departure: dep2, onduty, offduty, other, substitute, reporterStaffNo: reporter?.staffNo }
 
   if (!isSlotScheduledOn(slot, workDate)) return { status: 'not_scheduled', ...base }
 
-  const needsAttention = dep2.state === 'missing' || onduty.state === 'missing' || other !== undefined
+  const anyMissing = [wakeup, dep2, onduty, offduty].some((c) => c.state === 'missing')
+  const needsAttention = anyMissing || other !== undefined
   if (needsAttention && input.acknowledged === true) return { status: 'acknowledged', ...base }
-  if (dep2.state === 'missing' || onduty.state === 'missing') return { status: 'missing', ...base }
+  if (anyMissing) return { status: 'missing', ...base }
   if (other !== undefined) return { status: 'other_reported', ...base }
 
   const finished = slot.ondutyRequired ? ondutyDone : dep2.state === 'done'

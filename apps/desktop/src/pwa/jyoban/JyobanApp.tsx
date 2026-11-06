@@ -10,9 +10,10 @@ import {
   ReportAuthError, NetworkError,
   type ReportContext, type CtxSlot, type ReportType, type Device, type RecentSite,
 } from './reportApi.js'
+import { pushState, enablePush, type PushState } from './pushApi.js'
 import './jyoban.css'
 
-const TYPE_LABEL: Record<ReportType, string> = { departure: '出発連絡', onduty: '上番連絡', other: 'その他の報告' }
+const TYPE_LABEL: Record<ReportType, string> = { wakeup: '起床連絡', departure: '出発連絡', onduty: '上番連絡', offduty: '下番連絡', other: 'その他の報告' }
 const hm = (s: string): string => s.replace(/^0(\d):/, '$1:')
 const mdw = (date: string): string => {
   const d = new Date(`${date}T00:00:00`)
@@ -223,6 +224,27 @@ function SitePicker({ sites, current, notice, onPick, onCancel }: {
  *  - 単独起動（/app/r/<QR>）: pathname からトークンを決める
  *  - 勤務員アプリ内（上番報告タブ）: initialToken で現場を指定し、onExit で現場一覧へ戻る
  */
+/** 未報告のお知らせ（アプリ通知）の受け取り。個人スマホのみ */
+function PushCard(): JSX.Element | null {
+  const [st, setSt] = useState<PushState | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { void pushState().then(setSt).catch(() => setSt('unsupported')) }, [])
+  if (st === null || st === 'on' || st === 'unsupported' || st === 'notConfigured') return null
+  if (st === 'needInstall') return <p className="jy-note">報告が遅れたときのお知らせを受け取るには、共有ボタンから「ホーム画面に追加」して、追加したアプリから開いてください。</p>
+  if (st === 'denied') return <p className="jy-note">お知らせがブロックされています。スマホの設定でこのアプリの通知を許可すると、報告が遅れたときにお知らせが届きます。</p>
+  return (
+    <div className="jy-card">
+      <p className="jy-lead">報告が遅れたとき、このスマホにお知らせを送ります。</p>
+      <button type="button" className="jy-btn jy-btn-outline" disabled={busy} onClick={() => {
+        setBusy(true)
+        void enablePush().then((e) => { setMsg(e); if (e === null) setSt('on') }).finally(() => setBusy(false))
+      }}>お知らせを受け取る</button>
+      {msg && <p className="jy-err" role="alert">{msg}</p>}
+    </div>
+  )
+}
+
 export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { pathname?: string; initialToken?: string; onExit?: () => void }): JSX.Element {
   const start = useMemo(() => (initialToken ? { token: initialToken, pick: false } : resolveStart(pathname)), [pathname, initialToken])
   const [token, setToken] = useState<string | null>(start.token)
@@ -385,6 +407,7 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
             {onExit === undefined && <button type="button" className="jy-link" onClick={() => { saveDevice(null); setScreen({ kind: 'register' }) }}>別の人で登録</button>}
           </div>
         )}
+        {personal && <PushCard />}
         {shared && <p className="jy-lead">報告するときに、スタッフNoとPINで本人確認します。</p>}
         {pending > 0 && <p className="jy-pending" role="status">送信待ち {pending}件 ｜ 電波が戻ると自動で送ります</p>}
 
@@ -411,7 +434,7 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
                   </div>
                 )
               }
-              if (b.skipped) return <p key={b.type} className="jy-skip">{b.label}：上番連絡済みのため不要</p>
+              if (b.skipped) return <p key={b.type} className="jy-skip">{b.label}：後の報告が済んでいるため不要</p>
               return (
                 <button key={b.type} type="button" className={b.primary ? 'jy-big' : 'jy-btn jy-btn-navy jy-btn-tall'} onClick={() => setConfirm(b.type)}>
                   {b.primary && <svg width="40" height="40" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 4L37 9.5V21C37 30 30.5 37 22 40C13.5 37 7 30 7 21V9.5Z" fill="none" stroke="#10B981" strokeWidth="2.5" /><path d="M15 22L20 27L29.5 17" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>}

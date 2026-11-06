@@ -136,7 +136,7 @@ reset role;
 -- 20 勤務日の判定（input-core resolveWorkDate と同じ結果）
 insert into t_r select 20,'勤務日判定がTSと一致', bool_and(got is not distinct from want), string_agg(coalesce(got::text,'null')||'/'||coalesce(want::text,'null'),' ')
 from (
-  select jyoban_work_date(row(gen_random_uuid(),gen_random_uuid(),gen_random_uuid(),'x',ws,we,false,null,true,'00:00',5,'{0,1,2,3,4,5,6}'::smallint[],true,0,now(),now())::jyoban_slots, ts::timestamp) got, want::date want
+  select jyoban_work_date(jsonb_populate_record(null::jyoban_slots, jsonb_build_object('id',gen_random_uuid(),'name','x','work_start',ws,'work_end',we,'onduty_required',true,'onduty_due','00:00','grace_min',5,'weekdays',to_jsonb(array[0,1,2,3,4,5,6]),'is_active',true)), ts::timestamp) got, want::date want
   from (values
     ('08:15','15:00','2026-10-30 06:24','2026-10-30'),
     ('21:00','06:00','2026-10-31 02:00','2026-10-30'),

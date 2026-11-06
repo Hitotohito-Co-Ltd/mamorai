@@ -522,7 +522,7 @@ body {
 .jy-day input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .jy-day:focus-within { outline: 2px solid var(--bl); outline-offset: 1px; }
 .jy-day-on { background: var(--navy); border-color: var(--navy); color: #fff; }
-.jy-reports { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; }
+.jy-reports { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); border: 1px solid var(--bd); border-radius: 8px; overflow: hidden; }
 .jy-report { padding: 12px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--bd); }
 .jy-report:last-child { border-right: 0; }
 .jy-report-h { display: flex; justify-content: space-between; align-items: center; }
@@ -530,3 +530,17 @@ body {
 .jy-errors { margin: 0; padding-left: 18px; color: var(--r); font-size: 14px; }
 .jy-slot-actions { justify-content: flex-end; }
 .jy-slot-actions .btn:disabled, .jy-qr-side .btn:disabled { opacity: .45; cursor: default; }
+
+/* [JYB] 未報告コール: 担当者・通知設定 */
+.jy-assign { margin-top: 10px; }
+.jy-assign-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.jy-assign-table th, .jy-assign-table td { border-bottom: 1px solid var(--bd); padding: 6px 8px; text-align: left; vertical-align: middle; }
+.jy-assign-table th { font-weight: 600; white-space: nowrap; }
+.jy-assign-table .input { min-width: 150px; }
+.jy-notify-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 12px 0; }
+.jy-notify-grid fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.jy-check { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+.jy-num { width: 72px; }
+.jy-log { margin-top: 12px; }
+.jy-log summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 640px) { .jy-assign-table { display: block; overflow-x: auto; } }

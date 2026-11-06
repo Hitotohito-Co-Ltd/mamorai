@@ -22,7 +22,10 @@ describe('backward compatibility migrations [REQ-007]', () => {
     const files = migrationFiles()
     // Act & Assert （ファイルが無ければ検証対象ゼロ = 破壊なし）
     for (const f of files) {
-      expect(/\bdrop\s+(table|column|constraint|index|type|view)\b/.test(f.sql), `${f.path} が破壊的 DROP を含む`).toBe(false)
+      // 例外: CHECK制約の「許す値を広げる」差し替えだけは、行末に /* compat: widen-check */ を付けた行に限り許す
+      //   （既存データはすべて新しい制約も満たすため、データを壊さない）。それ以外の DROP は従来どおり禁止。
+      const sql = f.sql.split('\n').filter((line) => !(line.includes('/* compat: widen-check */') && /\bdrop\s+constraint\b/.test(line))).join('\n')
+      expect(/\bdrop\s+(table|column|constraint|index|type|view)\b/.test(sql), `${f.path} が破壊的 DROP を含む`).toBe(false)
       expect(/\balter\s+column\b[^;]*\btype\b/.test(f.sql), `${f.path} が ALTER ... TYPE を含む`).toBe(false)
       expect(/\brename\s+(to|column)\b/.test(f.sql), `${f.path} が RENAME を含む`).toBe(false)
     }
