@@ -37,3 +37,4 @@ web/verify_*.png
 web/aishift.png
 web/labor.png
 web/app_output_center.png
+dist-pwa/

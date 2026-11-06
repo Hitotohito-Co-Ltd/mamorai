@@ -4,6 +4,7 @@ import express, { type Express } from 'express'
 import cors from 'cors'
 import { createRiskRouter } from './routes/risk.js'
 import { createShiftOptimizeRouter } from './routes/shift-optimize.js'
+import { createJyobanCallsRouter } from './routes/jyoban-calls.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
 // 開発用に許可オリジンを限定（Vite dev サーバ）。本番は環境変数で上書きする。
@@ -21,6 +22,8 @@ export function createApp(): Express {
   app.use('/api/risk', createRiskRouter())
   // /api/shift は NL→制約(Claude) / 制約→下案(最適化) / HITL確定 を提供。キーはこの層のみ。
   app.use('/api/shift', createShiftOptimizeRouter())
+  // /api/jobs/jyoban-calls は外部スケジューラ専用（Bearer CRON_SECRET）。未報告の起床・出発・上番・下番を通知する。
+  app.use('/api/jobs/jyoban-calls', createJyobanCallsRouter())
   return app
 }
 

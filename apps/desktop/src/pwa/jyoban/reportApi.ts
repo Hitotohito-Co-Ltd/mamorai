@@ -8,7 +8,7 @@ import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient.js'
 import { authStaff } from '../../shared/staffStore.js'
 import { demoSnapshot } from '../../features/jyoban/jyobanApi.js'
 
-export type ReportType = 'departure' | 'onduty' | 'other'
+export type ReportType = 'wakeup' | 'departure' | 'onduty' | 'offduty' | 'other'
 export interface CtxReport extends JyobanReport { id: string }
 export interface CtxSlot extends JyobanSlot { workDate: string; reports: CtxReport[] }
 export interface ReportContext {
@@ -128,7 +128,8 @@ interface CtxJson {
   now: string
   slots: {
     id: string; name: string; work_start: string; work_end: string; departure_required: boolean; departure_due: string | null
-    onduty_required: boolean; onduty_due: string | null; grace_min: number; weekdays: number[]; work_date: string
+    onduty_required: boolean; onduty_due: string | null
+    wakeup_required?: boolean; wakeup_due?: string | null; offduty_required?: boolean; offduty_due?: string | null; grace_min: number; weekdays: number[]; work_date: string
     reports: { id: string; type: ReportType; other_kind: JyobanOtherKind | null; eta: string | null; staff_no: string; staff_name: string; voided: boolean; received_at: string }[]
   }[]
 }
@@ -140,6 +141,8 @@ function ctxFrom(j: CtxJson): ReportContext {
     slots: j.slots.map((s) => ({
       id: s.id, siteId: '', name: s.name, workStart: s.work_start, workEnd: s.work_end,
       departureRequired: s.departure_required, departureDue: s.departure_due, ondutyRequired: s.onduty_required, ondutyDue: s.onduty_due,
+      wakeupRequired: s.wakeup_required ?? false, wakeupDue: s.wakeup_due ?? null,
+      offdutyRequired: s.offduty_required ?? false, offdutyDue: s.offduty_due ?? null,
       graceMin: s.grace_min, weekdays: s.weekdays, isActive: true, workDate: s.work_date,
       reports: s.reports.map((r) => ({
         id: r.id, slotId: s.id, workDate: s.work_date, type: r.type, staffNo: r.staff_no, staffName: r.staff_name,
