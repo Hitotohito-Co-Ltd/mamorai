@@ -2,7 +2,7 @@
 
 TDD-Writer: 赤松 灯 (⑦)  
 作成日: 2026-11-07  
-仕様バージョン: behavioral-spec.md 追補 v2.10（インターフェース契約・境界の確定を含む）
+仕様バージョン: behavioral-spec.md 追補 v2.13（インターフェース契約・境界の確定を含む）
 再生成: 2026-11-07 第1回（v2.6）と第2回（v2.10。Adversary FIND-004/005/006/007/009）。spec/evidence/sprint-8-test-regeneration.md 参照
 結果（第2回の RED 時点）: s8 は 136 件中 107 PASS / 29 RED。RED は全て第2回で追加した新規テスト（実装が v2.10 に未追随）。第1回の RED 2件（S8-026-03, S8-033-03）は実装修正により PASS 済み
 
@@ -121,7 +121,7 @@ TDD-Writer: 赤松 灯 (⑦)
 | S8-035-01 | noConsent_同意なしの人は他社の案件に応募できない | no_consent | PASS |
 | S8-035-02 | noConsent_同意なしは自社の案件でも no_consent で不可 | `reasons` が `['no_consent']` | PASS |
 | S8-035-03 | noConsent_対_同意ありなら同じ自社の案件は応募可 | 対 | PASS |
-| S8-035-DB1〜DB9 | talent_rls_check.sql | シナリオ 1〜9（他社管理者は他社 person を読めない／自社は読める／運営は全件／自社は同意なしも見える／search_candidates は同意済みだけ・同グループだけ・権限外を拒否 ほか） | AUTH_GATE / DATA_PERSISTENCE | 9シナリオ all PASS（sprint-8-green-phase.log。search_candidates は 0411 で実装済み） |
+| S8-035-DB | supabase/tests/talent_rls_check.sql の23シナリオ（本番と同じ連鎖 0000〜0413 で実行。Supabase 既定の全権限付与下で RLS だけが砦） | AUTH_GATE / DATA_PERSISTENCE | 23シナリオ（実行結果は sprint-8-green-phase 系の記録を参照） |
 
 ### NFR-05: 1,000 人分 listRenewals の性能
 
@@ -164,20 +164,14 @@ TDD-Writer: 赤松 灯 (⑦)
 | REQ-038 | 未作成 | Sprint 9（未着手）|
 | REQ-035 画面 | 未作成 | OQ-12a/b/c が未決のため着手しない（DB 側のみ Sprint 8 で検証済み） |
 
-### Planner への差し戻し（仕様に書かれていないためテストにしていない）
-- 夜勤で start と end が同時刻（例 22:00〜22:00）を 24 時間勤務とみなすか。`dailyHours` と `shiftsOverlap` の期待が決められない。
-- 同じ personId で同日・同 daysLeft の異種項目（契約満了と在留期限が同日）の並び。「入力順」の入力が人の入力順か、種別の順かが不明。
-- `age60` の「シフト日に満60歳以上」を複数シフト日でどう判定するか（全シフト日か、最初の日か）。
-- 暦として存在しない日付（`2026-13-45`）を `verifiedOn` の形式不正とみなすか。
-
 ---
 
 ## 作成ファイル
 
 | ファイル | 種別 |
 |---|---|
-| `packages/input-core/src/__tests__/s8_talent_req026_034.test.ts` | Vitest ユニットテスト（136 テスト） |
-| `supabase/tests/talent_rls_check.sql` | DB RLS/関数 検証 SQL（9 シナリオ） |
+| `packages/input-core/src/__tests__/s8_talent_req026_034.test.ts` | Vitest ユニットテスト（231 テスト） |
+| `supabase/tests/talent_rls_check.sql` | DB RLS/関数 検証 SQL（23 シナリオ） |
 | `supabase/tests/run_talent_rls_check.sh` | RLS 検証実行スクリプト |
 | `spec/evidence/sprint-8-red-phase.log` | 初回〜第1回 RED フェーズ実行エビデンス |
 | `spec/evidence/sprint-8-red-phase-2.md` | 第2回 RED フェーズ実行エビデンス |
@@ -197,3 +191,20 @@ TDD-Writer: 赤松 灯 (⑦)
 | S8-033-kind | REQ-033 | 同順位の種別の並び | 4 | 同人・同日の3種が contract→annual_training→residence / personId が先 / 期限切れ同日 / daysLeft が種別より優先 | PASS |
 | S8-029-age60 | REQ-029 | age60 は全シフト日で満60歳以上 | 6 | 59歳と60歳の日が混在→不可（順序を逆にしても）/ 両日60歳以上→可 / 単日59歳→不可 / 確認日は全シフト日以前 | PASS |
 | S8-029-cal | REQ-029 | verifiedOn の暦検証 | 10 | 不可6（2026-13-45, 2026-02-30, 04-31, 平年02-29, 00月, 00日）/ 可4（02-28, うるう年02-29, 04-30, 01-01） | PASS |
+
+---
+
+## 追加 第4回（仕様 v2.13。Adversary 第2回 FIND-104/105/106/107/108/111）
+
+追加 67 件（s8 は 231 件）。うち 36 件が RED（実装が v2.13 に未追随）、31 件は対（有効入力）で PASS。
+
+| 区分 | REQ | describe（s8_talent_req026_034.test.ts） | 件数 | RED |
+|---|---|---|---|---|
+| A | REQ-026/037 | 不正な入力は invalid_input で拒否（シフト日・birthDate・residence.expiresOn・employmentDays、対の有効入力） | 26 | 18 |
+| B | REQ-029 | 例外区分 kind の検証（bogus、有効4区分） | 5 | 1 |
+| C | REQ-032 | 在留の拒否と警告は同時に返さない | 4 | 2 |
+| D | REQ-034 | 線引き記録は確認者が非空白・確認日が暦の日付のときだけ有効 | 11 | 10 |
+| E | REQ-033 | 基準日より後に新任を修了する人は現任教育の対象外 | 3 | 2 |
+| F | REQ-033 | 同日・同 daysLeft の並びはコードポイント順 | 3 | 3 |
+| G | REQ-031 | 日またぎ勤務は全時間を始業日に計上 | 4 | 0 |
+| H | REQ-026/028/031/032 | 新任の修了日境界、複数雇用、入社日境界、非警備、警告値の最大/最小 | 11 | 0 |

@@ -537,7 +537,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` のコードポイント順（ロケールに依存しない昇順）、それも同じなら `contract`、`annual_training`、`residence` の順で並べる。期限切れの項目の `daysLeft` は負の値（期限日が基準日の前日なら -1）とする。
 - WHEN 現任教育の更新手続きを作る THE システム SHALL `dueOn` を基準日の年度末（3 月 31 日）にする（REQ-033）。
 - WHEN シフトの終了時刻が開始時刻と同じ THE システム SHALL 24 時間勤務として扱い、翌日に終わる勤務の時間の重なりと通算に使う（REQ-031）。
-- WHEN `checkEligibility` または `validateJobForPublish` の入力に不正な値がある THE システム SHALL `invalid_input` で拒否し、応募可・公開可にしない。不正な値とは、シフト日・生年月日・在留期限・確認日が暦に存在する `YYYY-MM-DD` でないこと、派遣案件の `employmentDays` が 0 以上の整数でないこと（REQ-026・REQ-037）。
+- WHEN `checkEligibility` または `validateJobForPublish` の入力に不正な値がある THE システム SHALL `invalid_input` で拒否し、応募可・公開可にしない。不正な値とは、シフト日・生年月日・在留期限が暦に存在する `YYYY-MM-DD` でないこと、派遣案件の `employmentDays` が 0 以上の整数でないこと（REQ-026・REQ-037）。確認日（日雇派遣の例外の `verifiedOn`、線引き確認の `confirmedOn`）の不正は `invalid_input` にせず、それぞれ `dispatch_exception_invalid`、`boundary_not_confirmed` とする。
 - WHEN 日雇派遣の例外区分 `kind` が定義された区分（`age60` / `day_student` / `side_job` / `household_income`）以外 THE システム SHALL `dispatch_exception_invalid` で拒否する（REQ-029）。
 - WHEN 在留の判定で `residence_invalid` が 1 つでもある THE システム SHALL `residence_expiring` の警告を返さない（拒否と警告を同時に返さない。REQ-032）。
 - WHEN 労働時間を通算する THE システム SHALL 日をまたぐ勤務の全時間を、始業日の労働としてまとめて計上する（労働基準法の扱い。継続勤務が二暦日にわたる場合は始業時刻の属する日の労働。社労士の確認前提。REQ-031）。
@@ -585,6 +585,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.11: TDD-Writer が差し戻した曖昧さ4件を確定(夜勤の同時刻=24時間、同順位の並び=contract→annual_training→residence、age60 は全シフト日で判定、存在しない日付は不可)。実装は既にこの振る舞いなので、テストは後追いで追加する。
 - 2026-11-07 v2.12: Spec-Validator v2.11 審査 CONDITIONAL 71点(−29)の是正。REQ-035 に同意送信の計測を追加、候補検索の EARS を WHEN 形に、REQ-044 の依存に REQ-040 と更新手続きの許可表の行を追加、兼務は和集合と定義、キャリアライズを用語に追加、状態ヘッダと履歴を整理、台帳の 035 を実態に合わせた。Planner 案6点を OQ-20 に集約し、許可表の該当行に『Planner 案』を明記。
 - 2026-11-07 v2.13: Adversary Sprint 8 第2回 FAIL(High2・Medium5・Low3)を受けて仕様判断が要る点を確定。invalid_input、例外区分の列挙、拒否時は警告を返さない、日またぎ通算は始業日、線引き記録の中身、派遣は職種必須、site_id/slot_id の会社一致、新任の未来日、並びはコードポイント順。OQ-21 を追加。
+- 2026-11-07 v2.14: TDD-Writer の差し戻しを受け、確認日の不正は invalid_input にせず dispatch_exception_invalid / boundary_not_confirmed とすると確定(v2.13 の invalid_input の対象に確認日を含めていたのは矛盾)。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
