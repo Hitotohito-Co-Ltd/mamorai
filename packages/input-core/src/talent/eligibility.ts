@@ -1,0 +1,142 @@
+// [TLN] 応募可否の判定。「契約の形 × 本人の状態」を1か所で決める（画面とserverで同じ式を使う）
+import type {
+  BusyShift,
+  EligibilityReason,
+  EligibilityResult,
+  JobPost,
+  JobShift,
+  PersonProfile,
+} from './model.js'
+
+const MS_PER_DAY = 86_400_000
+const DAILY_DISPATCH_MAX_DAYS = 30
+const RESIDENCE_WARN_DAYS = 60
+
+function utcDay(d: string): number {
+  const [y, m, dd] = d.split('-').map(Number)
+  return Date.UTC(y!, m! - 1, dd!)
+}
+function minutes(t: string): number {
+  const [h, m] = t.split(':').map(Number)
+  return h! * 60 + m!
+}
+
+/** 満年齢 */
+export function ageOn(birthDate: string, on: string): number {
+  const [by, bm, bd] = birthDate.split('-').map(Number)
+  const [y, m, d] = on.split('-').map(Number)
+  let age = y! - by!
+  if (m! < bm! || (m === bm && d! < bd!)) age -= 1
+  return age
+}
+
+/** 年度（4月始まり） */
+export function fiscalYearOf(date: string): number {
+  const [y, m] = date.split('-').map(Number)
+  return m! >= 4 ? y! : y! - 1
+}
+
+/** 日をまたぐ勤務（終了が開始以前）は翌日終了として扱う */
+function span(s: JobShift): [number, number] {
+  const base = utcDay(s.date) / 60_000
+  const st = base + minutes(s.start)
+  let en = base + minutes(s.end)
+  if (en <= st) en += 24 * 60
+  return [st, en]
+}
+
+export function shiftsOverlap(a: JobShift, b: JobShift): boolean {
+  const [as, ae] = span(a)
+  const [bs, be] = span(b)
+  return as < be && bs < ae
+}
+
+function dailyHours(shifts: JobShift[], date: string): number {
+  return shifts.filter((s) => s.date === date).reduce((sum, s) => {
+    const [st, en] = span(s)
+    return sum + (en - st) / 60
+  }, 0)
+}
+
+/** 警備の枠に応募するための教育状態（新任修了＋その年度の現任、または新任をその年度に修了） */
+function securityTraining(p: PersonProfile, onDate: string): EligibilityReason | null {
+  const t = p.guardTraining
+  if (!t.basicDoneOn || t.basicDoneOn > onDate) return 'security_basic_training_missing'
+  const fy = fiscalYearOf(onDate)
+  const basicThisYear = fiscalYearOf(t.basicDoneOn) === fy
+  if (!basicThisYear && !t.annualFiscalYears.includes(fy)) return 'security_annual_training_missing'
+  return null
+}
+
+/**
+ * 応募可否。全シフト日について判定し、1日でも満たさない日があれば不可。
+ * reasons は管理者向け。スタッフの「しごと」一覧では不可の案件を出さない。
+ */
+export function checkEligibility(
+  person: PersonProfile,
+  job: JobPost,
+  busy: BusyShift[] = [],
+): EligibilityResult {
+  const reasons = new Set<EligibilityReason>()
+  const warnings = new Set<'daily_hours_over_8' | 'residence_expiring'>()
+
+  if (!person.consentJointUse) reasons.add('no_consent')
+
+  // 警備業務は派遣にできない
+  if (job.isSecurityWork && job.form === 'dispatch') reasons.add('security_dispatch_forbidden')
+
+  // 雇用主に登録（在籍）していること
+  const dates = job.shifts.map((s) => s.date)
+  const first = dates.slice().sort()[0] ?? ''
+  const registered = person.employments.some(
+    (e) => e.companyId === job.employerCompanyId && e.startOn <= first && (!e.endOn || e.endOn >= first),
+  )
+  if (!registered) reasons.add('not_registered')
+
+  // 日雇派遣（30日以内）は例外に当たる人だけ
+  if (job.form === 'dispatch' && job.employmentDays <= DAILY_DISPATCH_MAX_DAYS && !person.dailyDispatchException) {
+    reasons.add('daily_dispatch_not_allowed')
+  }
+
+  // 運営と警備の線引きの確認
+  if (job.needsBoundaryCheck && !job.boundaryCheck) reasons.add('boundary_not_confirmed')
+
+  for (const s of job.shifts) {
+    const age = ageOn(person.birthDate, s.date)
+    if (age < 18 && (job.isSecurityWork || job.nightWork)) reasons.add('under_age')
+    if (job.isSecurityWork && job.form !== 'dispatch') {
+      const r = securityTraining(person, s.date)
+      if (r) reasons.add(r)
+    }
+    const res = person.residence
+    if (res) {
+      if (!res.workAllowed || (res.expiresOn && res.expiresOn < s.date)) reasons.add('residence_invalid')
+      else if (res.expiresOn && (utcDay(res.expiresOn) - utcDay(s.date)) / MS_PER_DAY <= RESIDENCE_WARN_DAYS) {
+        warnings.add('residence_expiring')
+      }
+    }
+    if (busy.some((b) => shiftsOverlap(b, s))) reasons.add('time_overlap')
+  }
+
+  // 複数社の労働時間の通算（1日8時間超は警告）
+  for (const d of new Set(dates)) {
+    const total = dailyHours(busy, d) + dailyHours(job.shifts, d)
+    if (total > 8) warnings.add('daily_hours_over_8')
+  }
+
+  const list = [...reasons]
+  return { eligible: list.length === 0, reasons: list, warnings: [...warnings] }
+}
+
+/** スタッフの「しごと」一覧用: 応募できる案件だけを残す（理由は出さない） */
+export function listApplicableJobs(person: PersonProfile, jobs: JobPost[], busy: BusyShift[] = []): JobPost[] {
+  return jobs.filter((j) => checkEligibility(person, j, busy).eligible)
+}
+
+/** 案件の公開前チェック（管理者向け）。公開してよければ空配列 */
+export function validateJobForPublish(job: JobPost): EligibilityReason[] {
+  const out: EligibilityReason[] = []
+  if (job.isSecurityWork && job.form === 'dispatch') out.push('security_dispatch_forbidden')
+  if (job.needsBoundaryCheck && !job.boundaryCheck) out.push('boundary_not_confirmed')
+  return out
+}

@@ -40,3 +40,7 @@ export * from './jyoban/report.js'
 export * from './jyoban/calls.js'
 // Auth: ロール別アクセス制御（3系統ログインの認可の単一の真実）
 export * from './auth/authz.js'
+// 人材基盤: スタッフ台帳 / 案件 / 応募可否 / 更新手続き
+export * from './talent/model.js'
+export * from './talent/eligibility.js'
+export * from './talent/renewal.js'
