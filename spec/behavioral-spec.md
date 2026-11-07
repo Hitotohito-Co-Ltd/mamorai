@@ -405,7 +405,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 ### REQ-034: 運営枠と警備枠の線引き確認
 **EARS:** IF 案件が「業務内容で判断が必要」とされ、確認者と確認日の記録がない THEN THE システム SHALL 公開を拒否し、その案件への応募も拒否する。確認者は現場責任者または支店とする。
-**Verification Type:** ERROR_HANDLING（確認者のロール判定は REQ-040 で ROLE_ACCESS として検証する）　**リスク:** HIGH（雑踏警備の無資格配置）　**依存:** REQ-027　**Sprint:** 8
+**Verification Type:** ERROR_HANDLING（確認者のロール判定は REQ-040 で ROLE_ACCESS として検証する）　**リスク:** HIGH（雑踏警備の無資格配置）　**依存:** REQ-026, REQ-027　**Sprint:** 8
 **変更対象:** packages/input-core/src/talent/eligibility.ts（validateJobForPublish）, supabase/migrations/0410_talent_foundation.sql
 **テスト観点:** 記録なし→拒否 / 記録あり→可 / （確認者のロール判定は REQ-040 の受入で検証する。本 REQ は「確認者と確認日が記録されているか」だけを判定する）
 **計測要件:** 公開の拒否は REQ-027 の `job_publish_rejected`（error_code=boundary_not_confirmed）で記録する。応募の拒否は REQ-026 の `application_eligibility_checked`（reason_codes に boundary_not_confirmed）で記録する。単独のイベントは作らない。
@@ -422,7 +422,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **EARS:** WHEN 応募者が募集ページから応募する、または管理者が求人媒体（エンゲージ・タウンワーク）の応募を登録する THE システム SHALL 応募を 1 つの一覧にまとめ、応募経路を記録し、応募の状態（`new`→`contacted`→`interviewed`→`hired`/`declined`）を持つ。WHILE 状態が `new` のまま 24 時間を超えている THE システム SHALL 応募を受けた会社の採用担当ロールに通知する（採用担当ロールは REQ-040 の許可表で定義する）。
 **Verification Type:** HAPPY_PATH / ERROR_HANDLING　**リスク:** MEDIUM　**依存:** REQ-035, REQ-040　**Sprint:** 9
 **一覧の3状態:** 空（「応募はありません」を表示）/ 単数 / 大量（500 件）
-**計測要件:** `candidate_applied`（発火: 応募が一覧に保存された直後に 1 回）/ プロパティ: source, `candidate_unhandled_24h_notified`（発火: 通知の送信が成功した直後に 1 回）/ 失敗: `candidate_import_failed`(source, error_code) / KPI: 媒体別の採用単価。
+**計測要件:** `candidate_applied`（発火: 応募が一覧に保存された直後に 1 回）/ プロパティ: source, `candidate_unhandled_24h_notified`（発火: 通知の送信が成功した直後に 1 回）/ プロパティ: source / 失敗: `candidate_unhandled_notify_failed`(error_code) / 失敗: `candidate_import_failed`(source, error_code) / KPI: 媒体別の採用単価。
 **変更対象:** packages/input-core/src/talent/recruit.ts（新規）, server/routes/recruit.ts（新規）, supabase/migrations（採用の追加テーブル）
 **Open:** 媒体との連携方法は OQ-16。
 
@@ -442,7 +442,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 ### REQ-039: 応募から確定、労働条件通知
 **EARS:** WHEN 配置の決め方が「応募→採否」の案件で管理者が採用する、または「即確定」の案件に応募が成立する THE システム SHALL 応募を確定にし、労働条件通知書を発行して通知時刻を記録する。WHEN 本人が労働条件通知を確認した THE システム SHALL 確認時刻を記録する。
-**Verification Type:** HAPPY_PATH / DATA_PERSISTENCE　**リスク:** HIGH（応募成立で労働契約が成立する）　**依存:** REQ-037　**Sprint:** 9
+**Verification Type:** HAPPY_PATH / DATA_PERSISTENCE　**リスク:** HIGH（応募成立で労働契約が成立する）　**依存:** REQ-037, REQ-040　**Sprint:** 9
 **変更対象:** server/routes/applications.ts（新規）, supabase/migrations（確定の RPC）, packages/input-core/src/talent/eligibility.ts
 **計測要件:** `application_confirmed`（発火: 確定の DB 更新が成功した直後に 1 回）/ プロパティ: placement_mode, `conditions_notice_issued`（発火: 通知書の発行記録が保存された直後に 1 回）/ 失敗: `application_confirm_failed`(error_code)。
 
@@ -519,9 +519,10 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 ## 審査履歴
 - 2026-11-07 Spec-Validator 初回: REJECTED（計測要件の欠落3件=REQ-042/043/045、失敗イベント欠落8件、変更対象欠落、REQ-034の依存漏れ）。本版(v2.1)で是正。
-- 2026-11-07 Spec-Validator 第4回: REJECTED 68点(−32: REQ-026/043の発火点=−10、REQ-039/036のEARS=−6、REQ-036の依存=−2、REQ-044の未定義語=−3、REQ-035の3状態=−3、NFR-05のリスク=−2、OQ-10/11の番号重複=−6)。本版(v2.4)で是正。追補のOQは OQ-16 以降に採番し直し、REQ-044 は元REQのある4種別に絞り、有休・現任申込は OQ-18 で別途REQ化する。
-- 2026-11-07 Spec-Validator 第3回: CONDITIONAL 82点(−18: REQ-033の発火点=−5、REQ-044の依存=−2、REQ-035のスプリント不整合=−2・EARS=−3、REQ-036の未定義語=−3、REQ-040の許可表=−3)。本版(v2.3)で是正。許可表の公開・採否は私案のため OQ-15 で RYUGEN の承認を待つ。
 - 2026-11-07 Spec-Validator 再審査: REJECTED 28点(−72: 発火タイミング未特定9件=−45、REQ-034→040 の依存逆流=−10、変更対象欠落7件=−14、REQ-040 の EARS=−3)。本版(v2.2)で是正: 発火点を特定、REQ-034 の依存を REQ-027 のみにして権限テストを REQ-040 の受入へ移動、変更対象を追記、REQ-040 を WHEN 形に、拒否イベントを `job_publish_rejected` に一本化。
+- 2026-11-07 Spec-Validator 第3回: CONDITIONAL 82点(−18: REQ-033の発火点=−5、REQ-044の依存=−2、REQ-035のスプリント不整合=−2・EARS=−3、REQ-036の未定義語=−3、REQ-040の許可表=−3)。本版(v2.3)で是正。許可表の公開・採否は私案のため OQ-15 で RYUGEN の承認を待つ。
+- 2026-11-07 Spec-Validator 第4回: REJECTED 68点(−32: REQ-026/043の発火点=−10、REQ-039/036のEARS=−6、REQ-036の依存=−2、REQ-044の未定義語=−3、REQ-035の3状態=−3、NFR-05のリスク=−2、OQ-10/11の番号重複=−6)。本版(v2.4)で是正。追補のOQは OQ-16 以降に採番し直し、REQ-044 は元REQのある4種別に絞り、有休・現任申込は OQ-18 で別途REQ化する。
+- 2026-11-07 Spec-Validator 第5回: **APPROVED 96点**(−4: REQ-039とREQ-034の依存漏れ各−2)。本版(v2.5)で是正。次の関門は RYUGEN の仕様承認。
 - 遡及実装との食い違い3件を仕様側で確定: ①全雇用が退社済みの人は現任教育の対象外(REQ-033) ②同意なしは横断検索と他社案件の対象外、自社参照は許可(REQ-035) ③在籍は全シフト日で確認(REQ-026)。実装は仕様承認後、先に失敗するテストを書いてから直す。
 
 ## REQ 台帳（追補）
