@@ -2,7 +2,8 @@
 
 TDD-Writer: 赤松 灯 (⑦)  
 作成日: 2026-11-07  
-仕様バージョン: behavioral-spec.md 追補 v2.5 (APPROVED 96点)
+仕様バージョン: behavioral-spec.md 追補 v2.6（インターフェース契約追加。Spec-Validator の再承認は並行して実施中）
+再生成: 2026-11-07（spec/evidence/sprint-8-test-regeneration.md 参照）。結果は 64 件中 62 PASS / 2 RED
 
 ---
 
@@ -24,14 +25,12 @@ TDD-Writer: 赤松 灯 (⑦)
 
 ### REQ-027: 警備業務は派遣にできない
 
-| テスト ID | ファイル | describe / it | 観点 | 状態 |
-|---|---|---|---|---|
-| S8-027-01 | s8_talent_req026_034.test.ts | [REQ-027] / securityDispatch_警備×派遣の案件は公開前チェックで拒否される | ERROR_HANDLING validateJobForPublish | **RED** (戻り値型不一致) |
-| S8-027-02 | s8_talent_req026_034.test.ts | [REQ-027] / securityDispatch_警備×直接雇用は登録可 | HAPPY_PATH | **RED** (同上) |
-| S8-027-03 | s8_talent_req026_034.test.ts | [REQ-027] / securityDispatch_非警備×派遣は登録可 | HAPPY_PATH | **RED** (同上) |
-| S8-027-04 | s8_talent_req026_034.test.ts | [REQ-027] / securityDispatch_eligibility_警備×派遣の案件への応募も拒否される | checkEligibility 経由 | PASS |
-
-> **差し戻し事項 P-01**: `validateJobForPublish` の戻り値型が `{ valid, reasons }` ではない。DB トリガのテストは `talent_rls_check.sql` で確認。
+| テスト ID | describe / it | 観点 | 状態 |
+|---|---|---|---|
+| S8-027-01 | securityDispatch_警備×派遣の案件は公開前チェックで拒否される | `validateJobForPublish` が `['security_dispatch_forbidden']` | PASS |
+| S8-027-02 | securityDispatch_警備×直接雇用は登録可 | `[]` | PASS |
+| S8-027-03 | securityDispatch_非警備×派遣は登録可 | `[]` | PASS |
+| S8-027-04 | securityDispatch_eligibility_警備×派遣の案件への応募も拒否される | checkEligibility 経由 | PASS |
 
 ### REQ-028: 警備の枠への応募資格（教育）
 
@@ -73,48 +72,54 @@ TDD-Writer: 赤松 灯 (⑦)
 | S8-031-04 | s8_talent_req026_034.test.ts | [REQ-031] / dailyHours_8時間1分超で警告付き可（eligible=true） | EDGE_CASE 8h1m | PASS |
 | S8-031-05 | s8_talent_req026_034.test.ts | [REQ-031] / dailyHours_他社の勤務も通算に含める | 他社通算 | PASS |
 
-### REQ-032: 在留カードの就労可否と期限
+### REQ-032: 在留カードの就労可否と期限（基準はシフト日）
 
-| テスト ID | ファイル | describe / it | 観点 | 状態 |
-|---|---|---|---|---|
-| S8-032-01 | s8_talent_req026_034.test.ts | [REQ-032] / residence_就労不可の在留資格なら不可 | ERROR_HANDLING | PASS |
-| S8-032-02 | s8_talent_req026_034.test.ts | [REQ-032] / residence_在留期限翌日以降のシフトは不可 | EDGE_CASE 期限翌日 | PASS |
-| S8-032-03 | s8_talent_req026_034.test.ts | [REQ-032] / residence_在留期限当日のシフトは可 | EDGE_CASE 期限当日 | PASS |
-| S8-032-04 | s8_talent_req026_034.test.ts | [REQ-032] / residence_期限60日以内に迫る場合は警告付き可（60日ちょうど） | EDGE_CASE 60日境界 | PASS |
-| S8-032-05 | s8_talent_req026_034.test.ts | [REQ-032] / residence_期限61日後は警告なし | EDGE_CASE 61日（境界外） | **RED** (実装が61日でも警告) |
-| S8-032-06 | s8_talent_req026_034.test.ts | [REQ-032] / residence_在留情報がない人（日本国籍など）には本要件を適用しない | 対象外確認 | PASS |
+| テスト ID | describe / it | 観点 | 状態 |
+|---|---|---|---|
+| S8-032-01 | residence_就労不可の在留資格なら不可 | ERROR_HANDLING | PASS |
+| S8-032-02 | residence_在留期限翌日以降のシフトは不可 | 期限翌日 | PASS |
+| S8-032-03 | residence_在留期限当日のシフトは可 | 期限当日 | PASS |
+| S8-032-04 | residence_シフト日から在留期限まで60日ちょうどは警告付きで可 | 境界 60日=警告 | PASS |
+| S8-032-05 | residence_シフト日から在留期限まで61日は警告なしで可 | 境界 61日=警告なし | PASS |
+| S8-032-06 | residence_シフト日が期限当日（日数0）は警告付きで可 | 境界 0日=警告 | PASS |
+| S8-032-07 | residence_シフト日が期限の翌日（日数-1）は拒否され警告は出ない | 境界 -1日=拒否 | PASS |
+| S8-032-08 | residence_在留情報がない人（日本国籍など）には本要件を適用しない | 対象外 | PASS |
 
-### REQ-033: 更新手続きの期限一覧
+### REQ-033: 更新手続きの期限一覧（項目 = personId, kind, dueOn, daysLeft, urgency）
 
-| テスト ID | ファイル | describe / it | 観点 | 状態 |
-|---|---|---|---|---|
-| S8-033-01 | s8_talent_req026_034.test.ts | [REQ-033] / list_空の場合_空配列を返す | 3状態: 空 | PASS |
-| S8-033-02 | s8_talent_req026_034.test.ts | [REQ-033] / list_単数_1件の更新手続きを返す | 3状態: 単数 | **RED** (annual_training 未実装) |
-| S8-033-03 | s8_talent_req026_034.test.ts | [REQ-033] / allRetired_全雇用が退社済みの人は現任教育の更新対象外 | ★仕様確定（遡及①） | PASS ※trivially |
-| S8-033-04 | s8_talent_req026_034.test.ts | [REQ-033] / noBasic_新任教育未修了の人は現任教育の更新対象外 | 対象外除外 | PASS ※trivially |
-| S8-033-05 | s8_talent_req026_034.test.ts | [REQ-033] / newlyBasic_今年度に新任修了した人は現任教育の更新対象外 | 対象外除外 | PASS ※trivially |
-| S8-033-06 | s8_talent_req026_034.test.ts | [REQ-033] / contractEnd_退社済みの雇用の契約満了は対象外 | 退社済み除外 | PASS |
-| S8-033-07 | s8_talent_req026_034.test.ts | [REQ-033] / contractEnd_在籍中の雇用の契約満了は30日以内なら含む | contract_end 包含 | **RED** (未実装) |
-| S8-033-08 | s8_talent_req026_034.test.ts | [REQ-033] / sort_期限切れが先頭_次いで期限が近い順 | ソート順 | **RED** (派生FAIL) |
-| S8-033-09 | s8_talent_req026_034.test.ts | [REQ-033] / filter_30日を超える期限は一覧に含まない | フィルタ 31日 | PASS |
-
-> ※trivially: `listRenewals` が空を返す間は除外ロジックのテストは trivially PASS。実装が annual_training を正しく返すようになった後、このテストが exclusion ロジックを機能的に検証するようになる。
+| テスト ID | describe / it | 観点 | 状態 |
+|---|---|---|---|
+| S8-033-01 | list_空の場合_空配列を返す | 3状態: 空 | PASS |
+| S8-033-02 | list_単数_1件の更新手続きを返す | 3状態: 単数（全フィールド） | PASS |
+| S8-033-03 | allRetired_全雇用が退社済みの人は現任教育の更新対象外（仕様確定） | 除外 | **RED**（実装の欠陥: 退社済みの人に annual_training が出る） |
+| S8-033-04 | allRetired_対_在籍中の雇用が1件でもあれば現任教育は更新対象 | 対（含まれる） | PASS |
+| S8-033-05 | noBasic_新任教育未修了の人は現任教育の更新対象外 | 除外 | PASS |
+| S8-033-06 | noBasic_対_新任修了済みで現任未了なら現任教育は更新対象 | 対（含まれる） | PASS |
+| S8-033-07 | newlyBasic_今年度に新任修了した人は現任教育の更新対象外 | 除外 | PASS |
+| S8-033-08 | newlyBasic_対_年度末前日(2026-03-31)に新任修了した人はFY2026では現任教育が更新対象 | 年度境界の対 | PASS |
+| S8-033-09 | contractEnd_退社済みの雇用の契約満了は対象外 | 除外 | PASS |
+| S8-033-10 | contractEnd_対_在籍中の雇用の契約満了は30日以内なら含む | 対（含まれる） | PASS |
+| S8-033-11 | sort_期限切れが先頭_次いで期限が近い順 | personId の並び | PASS |
+| S8-033-12 | filter_期限まで31日の契約満了は一覧に含まない | 境界 31日 | PASS |
+| S8-033-13 | filter_対_期限まで30日ちょうどの契約満了は一覧に含む | 境界 30日 | PASS |
 
 ### REQ-034: 運営枠と警備枠の線引き確認
 
-| テスト ID | ファイル | describe / it | 観点 | 状態 |
-|---|---|---|---|---|
-| S8-034-01 | s8_talent_req026_034.test.ts | [REQ-034] / boundaryCheck_確認が必要で記録がない案件は公開拒否 | ERROR_HANDLING validateJobForPublish | **RED** (戻り値型不一致) |
-| S8-034-02 | s8_talent_req026_034.test.ts | [REQ-034] / boundaryCheck_確認が必要で記録がある案件は公開可 | HAPPY_PATH | **RED** (同上) |
-| S8-034-03 | s8_talent_req026_034.test.ts | [REQ-034] / boundaryCheck_確認不要な案件は記録なしでも公開可 | HAPPY_PATH | **RED** (同上) |
-| S8-034-04 | s8_talent_req026_034.test.ts | [REQ-034] / boundaryCheck_eligibility_記録なしの案件への応募も拒否される | checkEligibility 経由 | PASS |
+| テスト ID | describe / it | 観点 | 状態 |
+|---|---|---|---|
+| S8-034-01 | boundaryCheck_確認が必要で記録がない案件は公開拒否 | `['boundary_not_confirmed']` | PASS |
+| S8-034-02 | boundaryCheck_確認が必要で記録がある案件は公開可 | `[]` | PASS |
+| S8-034-03 | boundaryCheck_確認不要な案件は記録なしでも公開可 | `[]` | PASS |
+| S8-034-04 | boundaryCheck_警備×派遣かつ線引き記録なしは両方の理由コードで拒否される | 複合 | PASS |
+| S8-034-05 | boundaryCheck_eligibility_記録なしの案件への応募も拒否される | checkEligibility 経由 | PASS |
 
-### REQ-035: スタッフ台帳と共同利用の同意（DB 検証）
+### REQ-035: スタッフ台帳と共同利用の同意（v2.6: 同意なしはどの案件にも応募不可）
 
-| テスト ID | ファイル | describe / it | 観点 | 状態 |
-|---|---|---|---|---|
-| S8-035-01 | s8_talent_req026_034.test.ts | [REQ-035] / noConsent_同意なしの人は他社の案件に応募できない | ★仕様確定（遡及③） | PASS |
-| S8-035-02 | s8_talent_req026_034.test.ts | [REQ-035] / noConsent_同意なしでも自社の案件は応募可 | ★仕様確定（遡及③逆側） | **RED** |
+| テスト ID | describe / it | 観点 | 状態 |
+|---|---|---|---|
+| S8-035-01 | noConsent_同意なしの人は他社の案件に応募できない | no_consent | PASS |
+| S8-035-02 | noConsent_同意なしは自社の案件でも no_consent で不可 | `reasons` が `['no_consent']` | PASS |
+| S8-035-03 | noConsent_対_同意ありなら同じ自社の案件は応募可 | 対 | PASS |
 | S8-035-DB1 | talent_rls_check.sql | シナリオ 1: B社管理者は A社の person を読めない | AUTH_GATE 他社 | 実行要 |
 | S8-035-DB2 | talent_rls_check.sql | シナリオ 2: B社管理者は自社の person を 1 件読める | AUTH_GATE 自社 | 実行要 |
 | S8-035-DB3 | talent_rls_check.sql | シナリオ 3: 運営は全 person 3 件を読める | 運営=全件 | 実行要 |
@@ -151,7 +156,7 @@ TDD-Writer: 赤松 灯 (⑦)
 
 | ファイル | 種別 |
 |---|---|
-| `packages/input-core/src/__tests__/s8_talent_req026_034.test.ts` | Vitest ユニットテスト（56 テスト） |
+| `packages/input-core/src/__tests__/s8_talent_req026_034.test.ts` | Vitest ユニットテスト（64 テスト。62 PASS / 2 RED） |
 | `supabase/tests/talent_rls_check.sql` | DB RLS/関数 検証 SQL（6 シナリオ） |
 | `supabase/tests/run_talent_rls_check.sh` | RLS 検証実行スクリプト |
 | `spec/evidence/sprint-8-red-phase.log` | RED フェーズ実行エビデンス |
