@@ -519,12 +519,12 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 
 **型の正本:** `packages/input-core/src/talent/model.ts` の `PersonProfile`, `JobPost`, `BusyShift`, `EligibilityReason`, `EligibilityResult`。テストはこの型から入力を組み立てる。
 
-**理由コード（`EligibilityReason` の全要素）:** `no_consent` / `under_age` / `residence_invalid` / `not_registered` / `security_dispatch_forbidden` / `security_basic_training_missing` / `security_annual_training_missing` / `daily_dispatch_not_allowed` / `time_overlap` / `boundary_not_confirmed`。`reasons` に同じコードは 1 度だけ入り、並び順は規定しない（テストは集合として比較する）。
+**理由コード（`EligibilityReason` の全要素）:** `no_consent` / `under_age` / `residence_invalid` / `not_registered` / `security_dispatch_forbidden` / `security_basic_training_missing` / `security_annual_training_missing` / `daily_dispatch_not_allowed` / `time_overlap` / `boundary_not_confirmed` / `no_shifts` / `dispatch_exception_invalid`。`reasons` に同じコードは 1 度だけ入り、並び順は規定しない（テストは集合として比較する）。
 
 | 関数 | 呼び出し | 戻り値 |
 |---|---|---|
-| `checkEligibility` | (person, job, busy = []) | `{ eligible, reasons, warnings }`。`reasons` が空なら `eligible` は true。`warnings` の要素は `daily_hours_over_8` と `residence_expiring` |
-| `validateJobForPublish` | (job) | `EligibilityReason[]`。空配列なら公開できる。要素があれば公開を拒否する（`security_dispatch_forbidden`, `boundary_not_confirmed` のみ返しうる） |
+| `checkEligibility` | (person, job, busy = []) | `{ eligible, reasons, warnings, details }`。`reasons` が空なら `eligible` は true。`warnings` の要素は `daily_hours_over_8` と `residence_expiring`。`details` は `{ residenceDaysLeft?: number, maxDailyHours?: number }`（`residenceDaysLeft` は警告が出たときの、全シフト日の最小日数。`maxDailyHours` は他社分を含む 1 日の最大労働時間（時間）で、`daily_hours_over_8` の警告が出たときだけ付く） |
+| `validateJobForPublish` | (job) | `EligibilityReason[]`。空配列なら公開できる。要素があれば公開を拒否する（`security_dispatch_forbidden`, `boundary_not_confirmed`, `no_shifts` のみ返しうる） |
 | `listApplicableJobs` | (person, jobs, busy = []) | 応募できる `JobPost[]`（入力順を維持） |
 | `listRenewals` | (people, referenceDate: 'YYYY-MM-DD', soonDays = 30) | `RenewalItem[]` = `{ personId, kind: 'contract'\|'annual_training'\|'residence', dueOn: 'YYYY-MM-DD', daysLeft, urgency: 'expired'\|'soon' }` |
 | `search_candidates`（DB の関数） | (p_company_id uuid, p_filter jsonb default '{}') | `TABLE(person_id uuid, name text)`。呼んだ会社と同じグループで、`consent_joint_use` が true の人だけを返す。`p_filter` は今回は使わない（空でよい） |
@@ -534,6 +534,9 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - WHEN 本人が共同利用に同意していない THE システム SHALL 全案件で `no_consent` により応募を拒否する（REQ-035）。
 - WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` の昇順で並べる。期限切れの項目の `daysLeft` は負の値（期限日が基準日の前日なら -1）とする。同じ `personId` で同日の項目は入力順とする。
 - WHEN 現任教育の更新手続きを作る THE システム SHALL `dueOn` を基準日の年度末（3 月 31 日）にする（REQ-033）。
+- WHEN 案件にシフトが 1 件もない THE システム SHALL `checkEligibility` で `no_shifts` により応募を拒否し、`validateJobForPublish` で公開を拒否する（REQ-026・REQ-037）。
+- WHEN `listRenewals` が「在籍中」を判定する THE システム SHALL 「入社日が基準日以前、かつ退社日がない、または退社日が基準日以後」の雇用を在籍中とする。契約満了と現任教育（在籍中の雇用が 1 件以上必要）の両方がこの定義を使う（REQ-033）。
+- WHEN 日雇派遣（30 日以内）に例外区分で応募する THE システム SHALL 確認日 `verifiedOn` が `YYYY-MM-DD` の形式で、かつシフト日以前であり、区分が `age60` の場合は本人がシフト日に満 60 歳以上である場合に限り例外を認め、満たさなければ `dispatch_exception_invalid` で拒否する（REQ-029）。
 
 ## 追補の非機能要件
 - **NFR-05（性能）** リスク: MID — 一覧の遅延は現場の運用に影響するが、データは壊さない。WHEN 1,000 人分の人と雇用を渡して更新手続き一覧（REQ-033）を求める THE システム SHALL 1 秒以内に結果を返す（Vitest で計測）。
@@ -563,6 +566,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.8: RYUGEN が v2.7 を再承認。OQ-15 を決定（公開・採否・採用応募の対応は採用担当・支店・本社）、OQ-12 を一部決定（同意の取得主体はホールディングス、同意のない人は全案件で応募不可）。REQ-040 の許可表に採用担当列を追加。
 - 2026-11-07 v2.8 追記: RYUGEN が OQ-12 を追加決定（同意の取得・取り直しはアプリで行う）。REQ-035 の画面(Sprint 9)に、同意の通知と同意の記録(取得主体=ホールディングス、同意日時、同意した版)を含める。
 - 2026-11-07 Spec-Validator v2.8 審査: CONDITIONAL 70点(−30: 応援依頼の採否の矛盾=−5、自支店/自社の判定材料=−5、採用担当の付与=−5、REQ-044の表示範囲=−3、REQ-035のEARS=−3、OQ-12の分割=−3、状態ヘッダの凍結文=−2、履歴=−2、REQ-036の不在時=−2)。v2.9 で是正: 許可表に『応援依頼の採否』『採用担当の付与』を追加し範囲を定義、REQ-035 を本人のアプリ同意の EARS に、REQ-036/039/041/044/037 を整合、OQ-12 を a/b/c に分割、OQ-19 を追加。決定事項(本社は自社のみ、採用担当は複数可で支店と兼務可、不在時は本社に通知、支店ロールによる応援依頼の採否の代行)は私の案で、RYUGEN の確認が必要。
+- 2026-11-07 v2.10: Adversary(Sprint 8) FAIL を受けて仕様判断が必要な4件を確定。空のシフト(no_shifts)、在籍中の基準日、警告の値(details)、日雇派遣の例外の検証(dispatch_exception_invalid)。DB のセキュリティ3件(FIND-001/002/003)は仕様どおりの振る舞いの欠陥なので、仕様は変えず実装で直す。
 - 2026-11-07 Spec-Validator 第5回: **APPROVED 96点**(−4: REQ-039とREQ-034の依存漏れ各−2)。本版(v2.5)で是正。RYUGEN の仕様承認を受領（2026-11-07）。承認の範囲は v2.5 の本文。OQ-15・OQ-12 は未承認。
 - 遡及実装との食い違い3件を仕様側で確定: ①全雇用が退社済みの人は現任教育の対象外(REQ-033) ②同意なしは横断検索から外し、自社の管理者の参照は許可(REQ-035。応募の扱いは v2.6 でどの案件も不可に変更) ③在籍は全シフト日で確認(REQ-026)。実装は仕様承認後、先に失敗するテストを書いてから直す。
 
