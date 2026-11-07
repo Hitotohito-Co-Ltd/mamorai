@@ -327,7 +327,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 # 追補 v2.0 — Sprint 8〜10: 人材基盤（スタッフ台帳・案件・応募・更新手続き）
 
-**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** APPROVED v2.5（Spec-Validator 96点、2026-11-07。RYUGEN 承認済み）。ただし OQ-15 が未決のため REQ-036/037/039/040 のテスト生成は凍結中。OQ-12 が未決のため REQ-035 の画面は着手しない
+**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** v2.7 再承認待ち（REQ-026/032/035 と契約節のみ。他は v2.5 のまま凍結）／v2.5 は APPROVED（Spec-Validator 96点、2026-11-07。RYUGEN 承認済み）。ただし OQ-15 が未決のため REQ-036/037/039/040 のテスト生成は凍結中。OQ-12 が未決のため REQ-035 の画面は着手しない
 **参照:** 「MAMOR-AI 人材プラットフォーム構想」「MAMOR-AI 構成案・設計書（2026年11月版）」「UIデザイン案」「帳票一覧」
 **目的:** 複数のExcelと紙の管理を、MAMOR-AI 1つに置き換える。第一弾の対象は 有休申請・労働条件・更新手続き・現任申込・配置入力・スタッフ台帳・採用・案件・配置・シフト。
 
@@ -348,7 +348,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 ## 要件定義（EARS形式）
 
 ### REQ-026: 応募可否の判定
-**EARS:** WHEN スタッフが案件に応募しようとする、または管理者が候補を検索する THE システム SHALL 契約の形・職種・本人の状態（同意・雇用・教育・在留・年齢・既存勤務）から、案件の全シフト日について応募可否と不可の理由コードを 1 つの純粋関数で返す。雇用主への在籍（入社日以後かつ退社日以前）も全シフト日で確認し、1 日でも在籍外の日があれば不可とする。理由が 1 つでもあれば不可とする。
+**EARS:** WHEN スタッフが案件に応募しようとする、または管理者が候補を検索する THE システム SHALL 契約の形・職種・本人の状態（同意・雇用・教育・在留・年齢・既存勤務）から、案件の全シフト日について応募可否と不可の理由コード（`no_consent` を含む。コード一覧は「追補のインターフェース契約」）を 1 つの純粋関数で返す。雇用主への在籍（入社日以後かつ退社日以前）も全シフト日で確認し、1 日でも在籍外の日があれば不可とする。理由が 1 つでもあれば不可とする。
 **Verification Type:** HAPPY_PATH / EDGE_CASE　**リスク:** HIGH（法令違反の応募を通す）　**依存:** なし　**Sprint:** 8
 **変更対象:** packages/input-core/src/talent/eligibility.ts, model.ts
 **テスト観点:** 全シフト日の判定、最終シフト日より前に退社する人は不可、複数理由の同時返却、理由が空なら可、同一入力で同一出力（日時・乱数に非依存）
@@ -390,10 +390,10 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **計測要件:** `application_daily_hours_warned`（発火: 応募APIが警告付きで応募を受理した直後に 1 回）/ プロパティ: total_hours / KPI: 警告件数。
 
 ### REQ-032: 在留カードの就労可否と期限
-**EARS:** WHEN 外国籍のスタッフ（在留情報あり）が応募する THE システム SHALL 就労不可、またはシフト日に在留期限が切れている場合は応募を拒否し、期限が 60 日以内に迫る場合は応募を許可したうえで警告を返す。在留情報がない人（日本国籍など）には本要件を適用しない。
+**EARS:** WHEN 外国籍のスタッフ（在留情報あり）が応募する THE システム SHALL 就労不可、またはシフト日に在留期限が切れている場合は応募を拒否し、いずれかのシフト日について「シフト日から在留期限日までの日数」が 0 以上 60 以下の場合は応募を許可したうえで警告 `residence_expiring` を返す（複数のシフト日があるときは、その日数の最小値を `days_left` とする）。基準日は今日ではなくシフト日とする。在留情報がない人（日本国籍など）には本要件を適用しない。
 **Verification Type:** EDGE_CASE　**リスク:** HIGH　**依存:** REQ-026　**Sprint:** 8
 **変更対象:** packages/input-core/src/talent/eligibility.ts（在留の判定）
-**テスト観点:** 期限当日（可）/ 期限の翌日（不可）/ 就労不可 / 60日ちょうどで警告 / 在留情報なし
+**テスト観点:** 期限当日（可）/ 期限の翌日（不可）/ 就労不可 / 60日ちょうどで警告 / 61日は警告なし / 複数シフト日の最小値 / 在留情報なし
 **計測要件:** 拒否は REQ-026 の `application_eligibility_checked`（reason_codes に residence_invalid）で記録する。警告は `residence_expiry_warned`（発火: 応募APIが警告付きで応募を受理した直後に 1 回）/ プロパティ: days_left / KPI: 期限切れ前の通知件数。
 
 ### REQ-033: 更新手続きの期限一覧
@@ -411,7 +411,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **計測要件:** 公開の拒否は REQ-027 の `job_publish_rejected`（error_code=boundary_not_confirmed）で記録する。応募の拒否は REQ-026 の `application_eligibility_checked`（reason_codes に boundary_not_confirmed）で記録する。単独のイベントは作らない。
 
 ### REQ-035: スタッフ台帳（人と雇用）とグループ共同利用の同意
-**EARS:** WHEN 登録 RPC が人を保存する THE システム SHALL 人をグループで 1 件、雇用を会社ごとに保持する。WHEN 会社の管理者が人を参照する THE システム SHALL 自社に雇用がある人だけを返す。WHEN 本人が共同利用に同意していない THE システム SHALL その人を、グループ横断の候補検索と他社の案件への応募の対象から外す（自社の管理者が自社の雇用として参照することは許可する）。候補検索は同意済みの人だけを返すサーバ側の関数で行い、同意の有無で直接のテーブル参照を変えない。
+**EARS:** WHEN 登録 RPC が人を保存する THE システム SHALL 人をグループで 1 件、雇用を会社ごとに保持する。WHEN 会社の管理者が人を参照する THE システム SHALL 自社に雇用がある人だけを返す。WHEN 本人が共同利用に同意していない THE システム SHALL 理由コード `no_consent` によりどの会社の案件への応募も拒否し、グループ横断の候補検索から外す（自社の管理者が自社の雇用として参照・管理することは許可する）。**v2.6 で「他社の案件」から「どの会社の案件」に確定。同意のない自社スタッフの扱いは RYUGEN の確認待ち（OQ-12）。**候補検索は同意済みの人だけを返すサーバ側の関数で行い、同意の有無で直接のテーブル参照を変えない。
 **Verification Type:** AUTH_GATE / DATA_PERSISTENCE　**リスク:** HIGH（個人情報）　**依存:** REQ-026　**Sprint:** 8（DB）/ 9（画面）
 **一覧の3状態（台帳画面・候補検索）:** 空（「該当するスタッフはいません」）/ 単数 / 大量（5,000 人を 50 件ずつ表示）
 **変更対象:** supabase/migrations/0410_talent_foundation.sql（persons, staff.person_id, RLS）, apps/desktop/src/features/talent/*
@@ -503,20 +503,27 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **計測要件:** 応募時の拒否は REQ-026 の `application_eligibility_checked`（reason_codes に time_overlap）で記録する。確定時の排他で後の応募が弾かれた場合は REQ-039 の `application_confirm_failed`（error_code=time_overlap）で記録する。単独のイベントは作らない。
 **変更対象:** packages/input-core/src/talent/eligibility.ts（shiftsOverlap）, supabase/migrations（確定の RPC での排他）
 
-## 追補のインターフェース契約（v2.6 で追加。REQ-026〜034 の振る舞いは変えず、戻り値の形を固定する）
-TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕様に無く、テストが形を作り出していたため追加した。
+## 追補のインターフェース契約（REQ-026 / 032 / 035 の補足。v2.7）
+**Bead:** REQ-026, REQ-032, REQ-035 に従属（独立した REQ は立てない）　**リスク:** HIGH　**依存:** REQ-026　**変更対象:** packages/input-core/src/talent/model.ts, eligibility.ts, renewal.ts, supabase/migrations（`search_candidates`）　**Sprint:** 8
+TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕様に無く、テストが形を作り出していたため追加した。REQ-026〜034 の振る舞いは変えず、REQ-035 の同意の扱いのみ v2.6 で確定した（REQ-035 の本文に反映済み）。
+
+**型の正本:** `packages/input-core/src/talent/model.ts` の `PersonProfile`, `JobPost`, `BusyShift`, `EligibilityReason`, `EligibilityResult`。テストはこの型から入力を組み立てる。
+
+**理由コード（`EligibilityReason` の全要素）:** `no_consent` / `under_age` / `residence_invalid` / `not_registered` / `security_dispatch_forbidden` / `security_basic_training_missing` / `security_annual_training_missing` / `daily_dispatch_not_allowed` / `time_overlap` / `boundary_not_confirmed`。`reasons` に同じコードは 1 度だけ入り、並び順は規定しない（テストは集合として比較する）。
+
 | 関数 | 呼び出し | 戻り値 |
 |---|---|---|
-| `checkEligibility` | (person, job, busy = []) | `{ eligible: boolean, reasons: EligibilityReason[], warnings: ('daily_hours_over_8' \| 'residence_expiring')[] }`。`reasons` が空なら `eligible` は true |
-| `validateJobForPublish` | (job) | `EligibilityReason[]`。空配列なら公開できる。要素があれば公開を拒否する |
+| `checkEligibility` | (person, job, busy = []) | `{ eligible, reasons, warnings }`。`reasons` が空なら `eligible` は true。`warnings` の要素は `daily_hours_over_8` と `residence_expiring` |
+| `validateJobForPublish` | (job) | `EligibilityReason[]`。空配列なら公開できる。要素があれば公開を拒否する（`security_dispatch_forbidden`, `boundary_not_confirmed` のみ返しうる） |
 | `listApplicableJobs` | (person, jobs, busy = []) | 応募できる `JobPost[]`（入力順を維持） |
-| `listRenewals` | (people, referenceDate, soonDays = 30) | `RenewalItem[]`。`RenewalItem = { personId, kind: 'contract' \| 'annual_training' \| 'residence', dueOn: 'YYYY-MM-DD', daysLeft: number, urgency: 'expired' \| 'soon' }`。期限切れ→期限が近い順 |
-| `search_candidates`（DB の関数） | (p_company_id, 条件) | 同意済みの人だけを返す。名称は v2.6 で確定 |
+| `listRenewals` | (people, referenceDate: 'YYYY-MM-DD', soonDays = 30) | `RenewalItem[]` = `{ personId, kind: 'contract'\|'annual_training'\|'residence', dueOn: 'YYYY-MM-DD', daysLeft, urgency: 'expired'\|'soon' }` |
+| `search_candidates`（DB の関数） | (p_company_id uuid, p_filter jsonb default '{}') | `TABLE(person_id uuid, name text)`。呼んだ会社と同じグループで、`consent_joint_use` が true の人だけを返す。`p_filter` は今回は使わない（空でよい） |
 
-**境界の確定（v2.6）**
-- 在留期限の警告（REQ-032）: 応募するシフト日から在留期限日までの日数が 0 以上 60 以下なら警告する（60 日は警告、61 日は警告なし）。基準は今日ではなくシフト日。
-- 同意（REQ-026・REQ-035）: 共同利用に同意していない人は、どの案件にも応募できない（理由コード `no_consent`）。自社の管理者による参照・管理は許可する。同意の取り方と取り直しは OQ-12 で決める。
-- 現任教育の期限日は年度末の 3 月 31 日（REQ-033）。
+**境界の確定（WHEN 形）**
+- WHEN 応募するシフト日から在留期限日までの日数が 0 以上 60 以下 THE システム SHALL `residence_expiring` の警告を返す（60 日は警告、61 日は警告なし）。
+- WHEN 本人が共同利用に同意していない THE システム SHALL 全案件で `no_consent` により応募を拒否する（REQ-035）。
+- WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` の昇順で並べる。同じ `personId` で同日の項目は入力順とする。
+- WHEN 現任教育の更新手続きを作る THE システム SHALL `dueOn` を基準日の年度末（3 月 31 日）にする（REQ-033）。
 
 ## 追補の非機能要件
 - **NFR-05（性能）** リスク: MID — 一覧の遅延は現場の運用に影響するが、データは壊さない。WHEN 1,000 人分の人と雇用を渡して更新手続き一覧（REQ-033）を求める THE システム SHALL 1 秒以内に結果を返す（Vitest で計測）。
@@ -538,8 +545,9 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 Spec-Validator 第3回: CONDITIONAL 82点(−18: REQ-033の発火点=−5、REQ-044の依存=−2、REQ-035のスプリント不整合=−2・EARS=−3、REQ-036の未定義語=−3、REQ-040の許可表=−3)。本版(v2.3)で是正。許可表の公開・採否は私案のため OQ-15 で RYUGEN の承認を待つ。
 - 2026-11-07 Spec-Validator 第4回: REJECTED 68点(−32: REQ-026/043の発火点=−10、REQ-039/036のEARS=−6、REQ-036の依存=−2、REQ-044の未定義語=−3、REQ-035の3状態=−3、NFR-05のリスク=−2、OQ-10/11の番号重複=−6)。本版(v2.4)で是正。追補のOQは OQ-16 以降に採番し直し、REQ-044 は元REQのある4種別に絞り、有休・現任申込は OQ-18 で別途REQ化する。
 - 2026-11-07 v2.6: TDD-Writer の初回テスト(56件中12件 RED)を精査。実装の欠陥は REQ-026(在籍の全シフト日確認)の1件。REQ-027/034 の6件は戻り値の形が仕様に無かった、REQ-033 の3件と REQ-032 の1件はテスト側の誤り(存在しないフィールド名、日付計算の誤り)。REQ-035 の同意は、全案件で応募不可と確定(保守側)。インターフェース契約を追加。RYUGEN の確認が必要な点は OQ-12 に追記。
+- 2026-11-07 Spec-Validator v2.6 再承認: CONDITIONAL 78点(−22: REQ-035本文と契約の矛盾=−5、履歴の食い違い=−2、境界のEARS形=−3、契約のBead欠落=−2、理由コード/入力の未定義=−3、search_candidatesの未定義=−3、listRenewalsの境界=−2、REQ-032の基準日=−2)。v2.7 で是正。再承認とRYUGENの確認(OQ-12)まで、REQ-026/032/035 に関わるテスト再生成は暫定。
 - 2026-11-07 Spec-Validator 第5回: **APPROVED 96点**(−4: REQ-039とREQ-034の依存漏れ各−2)。本版(v2.5)で是正。RYUGEN の仕様承認を受領（2026-11-07）。承認の範囲は v2.5 の本文。OQ-15・OQ-12 は未承認。
-- 遡及実装との食い違い3件を仕様側で確定: ①全雇用が退社済みの人は現任教育の対象外(REQ-033) ②同意なしは横断検索と他社案件の対象外、自社参照は許可(REQ-035) ③在籍は全シフト日で確認(REQ-026)。実装は仕様承認後、先に失敗するテストを書いてから直す。
+- 遡及実装との食い違い3件を仕様側で確定: ①全雇用が退社済みの人は現任教育の対象外(REQ-033) ②同意なしは横断検索から外し、自社の管理者の参照は許可(REQ-035。応募の扱いは v2.6 でどの案件も不可に変更) ③在籍は全シフト日で確認(REQ-026)。実装は仕様承認後、先に失敗するテストを書いてから直す。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
