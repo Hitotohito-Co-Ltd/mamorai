@@ -16,14 +16,14 @@ insert into companies(id, name, code, group_id) values
   ('cc000000-0000-0000-0000-000000000022', 'B社', 'RLS-B1', 'bb000000-0000-0000-0000-000000000002');
 
 -- A社に所属する person（同意あり）
-insert into persons(id, group_id, name, consent_joint_use) values
-  ('0a000000-0000-0000-0000-000000000001', 'aa000000-0000-0000-0000-000000000001', '田中 花子', true);
+insert into persons(id, group_id, name, consent_joint_use, consent_at) values
+  ('0a000000-0000-0000-0000-000000000001', 'aa000000-0000-0000-0000-000000000001', '田中 花子', true, now());
 -- A社に所属する person（同意なし）
 insert into persons(id, group_id, name, consent_joint_use) values
   ('0a000000-0000-0000-0000-000000000002', 'aa000000-0000-0000-0000-000000000001', '山田 一郎', false);
 -- B社に所属する person
-insert into persons(id, group_id, name, consent_joint_use) values
-  ('0a000000-0000-0000-0000-000000000003', 'bb000000-0000-0000-0000-000000000002', '佐藤 二郎', true);
+insert into persons(id, group_id, name, consent_joint_use, consent_at) values
+  ('0a000000-0000-0000-0000-000000000003', 'bb000000-0000-0000-0000-000000000002', '佐藤 二郎', true, now());
 
 -- A社に staff（雇用）を作る
 insert into staff(id, company_id, person_id, name, staff_no) values
@@ -366,6 +366,95 @@ end $$;
 
 reset role;
 
+-- ── シナリオ 24〜31: Adversary 第3回（FIND-301/307/308）──
+reset role;
+-- 応募のある案件(e…0a)・シフト(f…0a)・応募を用意する
+insert into job_applications(id, company_id, job_shift_id, staff_id, status) values
+  ('a1000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-00000000000a', '0b000000-0000-0000-0000-000000000001', 'confirmed');
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';  -- A社管理者
+
+-- 24: 応募のある案件は削除できない(FIND-307)
+do $$
+declare n int;
+begin
+  begin
+    delete from jobs where id = 'e0000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (24, '応募のある案件は削除できない', false, '削除できてしまった');
+  exception when others then
+    insert into t_rls_results values (24, '応募のある案件は削除できない', sqlerrm like '%応募%', sqlerrm);
+  end;
+end $$;
+-- 25: 応募のあるシフトは削除できない
+do $$
+begin
+  begin
+    delete from job_shifts where id = 'f0000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (25, '応募のあるシフトは削除できない', false, '削除できてしまった');
+  exception when others then
+    insert into t_rls_results values (25, '応募のあるシフトは削除できない', sqlerrm like '%応募%', sqlerrm);
+  end;
+end $$;
+-- 26: 応募が消えていない
+reset role;
+insert into t_rls_results select 26, '確定済みの応募が残っている', count(*) = 1, count(*)::text || ' 件' from job_applications where id = 'a1000000-0000-0000-0000-00000000000a';
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';
+
+-- 27: 金額・日数に負の値は入れられない(FIND-308)
+do $$
+begin
+  begin
+    insert into jobs(company_id, title, form, hourly_wage) values ('cc000000-0000-0000-0000-000000000011', '負の時給', 'spot', -100);
+    insert into t_rls_results values (27, '負の時給は登録できない', false, '登録できてしまった');
+  exception when check_violation then
+    insert into t_rls_results values (27, '負の時給は登録できない', true, sqlerrm);
+  end;
+end $$;
+do $$
+begin
+  begin
+    insert into jobs(company_id, title, form, employment_days) values ('cc000000-0000-0000-0000-000000000011', '負の日数', 'spot', -5);
+    insert into t_rls_results values (28, '負の雇用日数は登録できない', false, '登録できてしまった');
+  exception when check_violation then
+    insert into t_rls_results values (28, '負の雇用日数は登録できない', true, sqlerrm);
+  end;
+end $$;
+-- 29: 派遣の案件は雇用日数が必須(職種は有効な非警備。雇用日数だけが欠けている)
+reset role;
+insert into job_roles(id, group_id, name, is_security) values ('d0000000-0000-0000-0000-0000000000c1', 'aa000000-0000-0000-0000-000000000001', '受付', false);
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';
+do $$
+begin
+  begin
+    insert into jobs(company_id, role_id, title, form) values ('cc000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-0000000000c1', '日数なしの派遣', 'dispatch');
+    insert into t_rls_results values (29, '雇用日数のない派遣は登録できない', false, '登録できてしまった');
+  exception when others then
+    insert into t_rls_results values (29, '雇用日数のない派遣は登録できない', true, sqlerrm);
+  end;
+end $$;
+-- 30: 雇用日数のある非警備の派遣は登録できる(対になる正常系)
+do $$
+begin
+  begin
+    insert into jobs(company_id, role_id, title, form, employment_days) values ('cc000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-0000000000c1', '受付の派遣', 'dispatch', 45);
+    insert into t_rls_results values (30, '雇用日数のある非警備の派遣は登録できる', true, '');
+  exception when others then
+    insert into t_rls_results values (30, '雇用日数のある非警備の派遣は登録できる', false, sqlerrm);
+  end;
+end $$;
+-- 31: 同意が true なのに同意日時がない person は作れない(運営でも)(FIND-301 の 035a 部分)
+reset role;
+do $$
+begin
+  begin
+    insert into persons(group_id, name, consent_joint_use) values ('aa000000-0000-0000-0000-000000000001', '日時なし', true);
+    insert into t_rls_results values (31, '同意ありで同意日時なしの person は作れない', false, '作れてしまった');
+  exception when check_violation then
+    insert into t_rls_results values (31, '同意ありで同意日時なしの person は作れない', true, sqlerrm);
+  end;
+end $$;
 -- ── 結果出力 ──
 select n || '. ' || case when ok then 'PASS' else 'FAIL' end || '  ' || name
   || case when not ok and detail <> '' then '  [' || detail || ']' else '' end
