@@ -80,7 +80,7 @@ function jobInputInvalid(job: JobPost): boolean {
 
 /** 'YYYY-MM-DD' の形式で、暦に存在する日付か */
 export function isRealDate(d: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false
+  if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false
   const [y, m, dd] = d.split('-').map(Number)
   const t = new Date(Date.UTC(y!, m! - 1, dd!))
   return t.getUTCFullYear() === y && t.getUTCMonth() === m! - 1 && t.getUTCDate() === dd
@@ -124,6 +124,7 @@ export function checkEligibility(
     busy.some((b) => !isRealDate(b.date) || !isRealTime(b.start) || !isRealTime(b.end)) ||
     person.employments.some((e) => !isRealDate(e.startOn) || (e.endOn !== undefined && !isRealDate(e.endOn))) ||
     !isRealDate(person.birthDate) ||
+    (person.guardTraining.basicDoneOn !== undefined && !isRealDate(person.guardTraining.basicDoneOn)) ||
     (person.residence?.expiresOn !== undefined && !isRealDate(person.residence.expiresOn))
   ) {
     return { eligible: false, reasons: ['invalid_input'], warnings: [], details: {} }

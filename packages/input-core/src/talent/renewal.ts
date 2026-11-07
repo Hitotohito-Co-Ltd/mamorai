@@ -62,7 +62,7 @@ export function listRenewals(people: PersonProfile[], referenceDate: string, soo
     const isActive = (e: PersonProfile['employments'][number]) =>
       e.startOn <= referenceDate && (e.endOn === undefined || e.endOn >= referenceDate)
     for (const e of p.employments) {
-      if (!e.contractEndOn) continue
+      if (e.contractEndOn === undefined) continue
       if (!isRealDate(e.contractEndOn) || empInvalid(e)) out.push(invalidItem(p.personId, 'contract', e.contractEndOn))
       else if (isActive(e)) out.push(item(p.personId, 'contract', e.contractEndOn, referenceDate, soonDays))
     }
@@ -70,7 +70,10 @@ export function listRenewals(people: PersonProfile[], referenceDate: string, soo
     const anyEmpInvalid = p.employments.some(empInvalid)
     const active = p.employments.some((e) => !empInvalid(e) && isActive(e))
     // 新任教育の修了日が基準日より後（基準日時点で未修了）の人は対象外
-    if (t.basicDoneOn && t.basicDoneOn <= referenceDate) {
+    if (t.basicDoneOn !== undefined && !isRealDate(t.basicDoneOn)) {
+      // 新任教育の修了日が不正: 今年度の現任が済んでいなければ、判定できない項目として返す
+      if (!t.annualFiscalYears.includes(fy)) out.push(invalidItem(p.personId, 'annual_training', `${fy + 1}-03-31`))
+    } else if (t.basicDoneOn && t.basicDoneOn <= referenceDate) {
       const basicThisYear = fiscalYearOf(t.basicDoneOn) === fy
       const pending = !basicThisYear && !t.annualFiscalYears.includes(fy)
       if (pending && anyEmpInvalid) out.push(invalidItem(p.personId, 'annual_training', `${fy + 1}-03-31`))
