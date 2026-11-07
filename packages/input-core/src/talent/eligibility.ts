@@ -60,10 +60,18 @@ function dailyHours(shifts: JobShift[], date: string): number {
 
 const DISPATCH_EXCEPTION_KINDS: readonly string[] = ['age60', 'day_student', 'side_job', 'household_income']
 
-/** 線引き確認の記録: 確認者が空白でなく、確認日が暦に存在する日付 */
+/** 空白とゼロ幅文字（U+200B〜U+200D、U+2060、U+FEFF）。DB 側の判定（0416）と同じ基準 */
+const INVISIBLE_OR_SPACE = /[\s\u3000\u200B-\u200D\u2060\uFEFF]/g
+
+/** 線引き確認の記録: 確認者が空白・ゼロ幅文字を除いて空でなく、確認日が暦に存在する日付 */
 function boundaryRecorded(job: JobPost): boolean {
   const b = job.boundaryCheck
-  return !!b && typeof b.confirmedBy === 'string' && b.confirmedBy.trim() !== '' && isRealDate(b.confirmedOn)
+  return (
+    !!b &&
+    typeof b.confirmedBy === 'string' &&
+    b.confirmedBy.replace(INVISIBLE_OR_SPACE, '') !== '' &&
+    isRealDate(b.confirmedOn)
+  )
 }
 
 /** 'HH:MM'（00:00〜23:59）か */
