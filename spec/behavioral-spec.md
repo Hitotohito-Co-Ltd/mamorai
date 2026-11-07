@@ -521,12 +521,12 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 
 **型の正本:** `packages/input-core/src/talent/model.ts` の `PersonProfile`, `JobPost`, `BusyShift`, `EligibilityReason`, `EligibilityResult`。テストはこの型から入力を組み立てる。
 
-**理由コード（`EligibilityReason` の全要素）:** `no_consent` / `under_age` / `residence_invalid` / `not_registered` / `security_dispatch_forbidden` / `security_basic_training_missing` / `security_annual_training_missing` / `daily_dispatch_not_allowed` / `time_overlap` / `boundary_not_confirmed` / `no_shifts` / `dispatch_exception_invalid`。`reasons` に同じコードは 1 度だけ入り、並び順は規定しない（テストは集合として比較する）。
+**理由コード（`EligibilityReason` の全要素）:** `no_consent` / `under_age` / `residence_invalid` / `not_registered` / `security_dispatch_forbidden` / `security_basic_training_missing` / `security_annual_training_missing` / `daily_dispatch_not_allowed` / `time_overlap` / `boundary_not_confirmed` / `no_shifts` / `dispatch_exception_invalid` / `invalid_input`。`reasons` に同じコードは 1 度だけ入り、並び順は規定しない（テストは集合として比較する）。
 
 | 関数 | 呼び出し | 戻り値 |
 |---|---|---|
 | `checkEligibility` | (person, job, busy = []) | `{ eligible, reasons, warnings, details }`。`reasons` が空なら `eligible` は true。`warnings` の要素は `daily_hours_over_8` と `residence_expiring`。`details` は `{ residenceDaysLeft?: number, maxDailyHours?: number }`（`residenceDaysLeft` は警告が出たときの、全シフト日の最小日数。`maxDailyHours` は他社分を含む 1 日の最大労働時間（時間）で、`daily_hours_over_8` の警告が出たときだけ付く） |
-| `validateJobForPublish` | (job) | `EligibilityReason[]`。空配列なら公開できる。要素があれば公開を拒否する（`security_dispatch_forbidden`, `boundary_not_confirmed`, `no_shifts` のみ返しうる） |
+| `validateJobForPublish` | (job) | `EligibilityReason[]`。空配列なら公開できる。要素があれば公開を拒否する（`security_dispatch_forbidden`, `boundary_not_confirmed`, `no_shifts`, `invalid_input` のみ返しうる） |
 | `listApplicableJobs` | (person, jobs, busy = []) | 応募できる `JobPost[]`（入力順を維持） |
 | `listRenewals` | (people, referenceDate: 'YYYY-MM-DD', soonDays = 30) | `RenewalItem[]` = `{ personId, kind: 'contract'\|'annual_training'\|'residence', dueOn: 'YYYY-MM-DD', daysLeft, urgency: 'expired'\|'soon' }` |
 | `search_candidates`（DB の関数） | (p_company_id uuid, p_filter jsonb default '{}') | `TABLE(person_id uuid, name text)`。呼んだ会社と同じグループで、`consent_joint_use` が true の人だけを返す。`p_filter` は今回は使わない（空でよい） |
@@ -534,11 +534,18 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 **境界の確定（WHEN 形）**
 - WHEN 応募するシフト日から在留期限日までの日数が 0 以上 60 以下 THE システム SHALL `residence_expiring` の警告を返す（60 日は警告、61 日は警告なし）。
 - WHEN 本人が共同利用に同意していない THE システム SHALL 全案件で `no_consent` により応募を拒否する（REQ-035）。
-- WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` の昇順、それも同じなら `contract`、`annual_training`、`residence` の順で並べる。期限切れの項目の `daysLeft` は負の値（期限日が基準日の前日なら -1）とする。
+- WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` のコードポイント順（ロケールに依存しない昇順）、それも同じなら `contract`、`annual_training`、`residence` の順で並べる。期限切れの項目の `daysLeft` は負の値（期限日が基準日の前日なら -1）とする。
 - WHEN 現任教育の更新手続きを作る THE システム SHALL `dueOn` を基準日の年度末（3 月 31 日）にする（REQ-033）。
 - WHEN シフトの終了時刻が開始時刻と同じ THE システム SHALL 24 時間勤務として扱い、翌日に終わる勤務の時間の重なりと通算に使う（REQ-031）。
+- WHEN `checkEligibility` または `validateJobForPublish` の入力に不正な値がある THE システム SHALL `invalid_input` で拒否し、応募可・公開可にしない。不正な値とは、シフト日・生年月日・在留期限・確認日が暦に存在する `YYYY-MM-DD` でないこと、派遣案件の `employmentDays` が 0 以上の整数でないこと（REQ-026・REQ-037）。
+- WHEN 日雇派遣の例外区分 `kind` が定義された区分（`age60` / `day_student` / `side_job` / `household_income`）以外 THE システム SHALL `dispatch_exception_invalid` で拒否する（REQ-029）。
+- WHEN 在留の判定で `residence_invalid` が 1 つでもある THE システム SHALL `residence_expiring` の警告を返さない（拒否と警告を同時に返さない。REQ-032）。
+- WHEN 労働時間を通算する THE システム SHALL 日をまたぐ勤務の全時間を、始業日の労働としてまとめて計上する（労働基準法の扱い。継続勤務が二暦日にわたる場合は始業時刻の属する日の労働。社労士の確認前提。REQ-031）。
+- WHEN 線引きの確認記録を判定する THE システム SHALL 確認者が空白でない文字列で、確認日が暦に存在する日付であるときだけ「記録あり」とする（REQ-034）。
+- WHEN 警備の枠が派遣で作られる、または派遣の案件に職種がない THE システム SHALL DB でも拒否する。派遣の案件は職種の指定を必須とする（REQ-027）。
+- WHEN 案件・シフトが現場（site_id）または勤務枠（slot_id）を指す THE システム SHALL 案件と同じ会社のものだけを許可する（REQ-037）。
 - WHEN 案件にシフトが 1 件もない THE システム SHALL `checkEligibility` で `no_shifts` により応募を拒否し、`validateJobForPublish` で公開を拒否する（REQ-026・REQ-037）。
-- WHEN `listRenewals` が「在籍中」を判定する THE システム SHALL 「入社日が基準日以前、かつ退社日がない、または退社日が基準日以後」の雇用を在籍中とする。契約満了と現任教育（在籍中の雇用が 1 件以上必要）の両方がこの定義を使う（REQ-033）。
+- WHEN `listRenewals` が「在籍中」を判定する THE システム SHALL 「入社日が基準日以前、かつ退社日がない、または退社日が基準日以後」の雇用を在籍中とする。契約満了と現任教育（在籍中の雇用が 1 件以上必要）の両方がこの定義を使う。現任教育は、新任教育の修了日が基準日より後の人（基準日時点で未修了）も対象外とする（REQ-033）。
 - WHEN 日雇派遣（30 日以内）に例外区分で応募する THE システム SHALL 確認日 `verifiedOn` が暦に存在する `YYYY-MM-DD` の日付（`2026-13-45` などは不可）で、かつシフト日以前であり、区分が `age60` の場合は本人がシフト日に満 60 歳以上である場合に限り例外を認め、満たさなければ `dispatch_exception_invalid` で拒否する。複数のシフト日があるときは、すべてのシフト日でこの条件を満たすこと（REQ-029）。
 
 ## 追補の非機能要件
@@ -557,6 +564,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 | OQ-15 | **解決（2026-11-07 RYUGEN）:** 案件の公開・応募の採否・採用応募の対応は、採用担当・支店・本社に許可する（REQ-040 の許可表）。現場責任者・管制は不可。凍結していた REQ-036/037/039/040 のテスト生成を解除する | REQ-036, 037, 039, 040, 044 | RYUGEN |
 | OQ-18 | 有休・現任申込の承認を、既存実装(0402/0103)の遡及仕様 REQ として Sprint 10 に追加する（追加後に REQ-044 の対象へ戻す） | REQ-044 | Planner |
 | OQ-20 | **Planner 案の確認（RYUGEN 未確認）:** ①本社の範囲は自社のみ ②採用担当は会社ごとに複数可・支店ロールと兼務可（権限は和集合） ③採用担当が不在の会社では本社に通知 ④応援依頼の応募の採否を、同一支店の支店ロールが代行できる ⑤更新手続きの確認・対応は、現場責任者=自現場、支店=自支店、本社=自社、管制・採用担当は不可 ⑥採用担当の付与・解除は本社のみ | REQ-036, 040, 041, 044 | RYUGEN |
+| OQ-21 | 線引き確認が必要かどうか（`needs_boundary_check`）を、誰が・何を根拠に決めるか。現状は案件を作る管理者が設定でき、false にできてしまう。職種マスタに既定値を持たせ、変更は本社のみ、などの案 | REQ-034, 037 | RYUGEN |
 | OQ-19 | 支店の区切りと、各現場の所属支店。グループ横断で見る「本部」の権限（REQ-040 の許可表の対象外） | REQ-037, 040 | RYUGEN |
 | OQ-14 | 「欠時間」「約定人数」の定義（UI案の7指標） | 配備状況画面 | RYUGEN |
 
@@ -576,6 +584,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.10: Adversary(Sprint 8) FAIL を受けて仕様判断が必要な4件を確定。空のシフト(no_shifts)、在籍中の基準日、警告の値(details)、日雇派遣の例外の検証(dispatch_exception_invalid)。DB のセキュリティ3件(FIND-001/002/003)は仕様どおりの振る舞いの欠陥なので、仕様は変えず実装で直す。
 - 2026-11-07 v2.11: TDD-Writer が差し戻した曖昧さ4件を確定(夜勤の同時刻=24時間、同順位の並び=contract→annual_training→residence、age60 は全シフト日で判定、存在しない日付は不可)。実装は既にこの振る舞いなので、テストは後追いで追加する。
 - 2026-11-07 v2.12: Spec-Validator v2.11 審査 CONDITIONAL 71点(−29)の是正。REQ-035 に同意送信の計測を追加、候補検索の EARS を WHEN 形に、REQ-044 の依存に REQ-040 と更新手続きの許可表の行を追加、兼務は和集合と定義、キャリアライズを用語に追加、状態ヘッダと履歴を整理、台帳の 035 を実態に合わせた。Planner 案6点を OQ-20 に集約し、許可表の該当行に『Planner 案』を明記。
+- 2026-11-07 v2.13: Adversary Sprint 8 第2回 FAIL(High2・Medium5・Low3)を受けて仕様判断が要る点を確定。invalid_input、例外区分の列挙、拒否時は警告を返さない、日またぎ通算は始業日、線引き記録の中身、派遣は職種必須、site_id/slot_id の会社一致、新任の未来日、並びはコードポイント順。OQ-21 を追加。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
