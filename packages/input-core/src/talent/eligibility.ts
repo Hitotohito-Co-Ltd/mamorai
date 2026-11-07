@@ -12,9 +12,15 @@ const MS_PER_DAY = 86_400_000
 const DAILY_DISPATCH_MAX_DAYS = 30
 const RESIDENCE_WARN_DAYS = 60
 
+/** UTC の日付のエポックミリ秒。Date.UTC は 0〜99 年を 1900 年代に読み替えるため setUTCFullYear を使う */
+function utcMs(y: number, m: number, dd: number): number {
+  const t = new Date(0)
+  t.setUTCFullYear(y, m - 1, dd)
+  return t.getTime()
+}
 function utcDay(d: string): number {
   const [y, m, dd] = d.split('-').map(Number)
-  return Date.UTC(y!, m! - 1, dd!)
+  return utcMs(y!, m!, dd!)
 }
 function minutes(t: string): number {
   const [h, m] = t.split(':').map(Number)
@@ -60,6 +66,13 @@ function dailyHours(shifts: JobShift[], date: string): number {
 
 const DISPATCH_EXCEPTION_KINDS: readonly string[] = ['age60', 'day_student', 'side_job', 'household_income']
 
+/** シフトが夜間（22:00〜翌05:00）にかかるか。開始が 05:00 より前、終了が 22:00 より後、または日をまたぐ（終了が開始以前） */
+function shiftIsNight(s: JobShift): boolean {
+  const st = minutes(s.start)
+  const en = minutes(s.end)
+  return st < 5 * 60 || en > 22 * 60 || en <= st
+}
+
 /** 空白とゼロ幅文字（U+200B〜U+200D、U+2060、U+FEFF）。DB 側の判定（0416）と同じ基準 */
 const INVISIBLE_OR_SPACE = /[\s\u3000\u200B-\u200D\u2060\uFEFF]/g
 
@@ -90,7 +103,7 @@ function jobInputInvalid(job: JobPost): boolean {
 export function isRealDate(d: string): boolean {
   if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false
   const [y, m, dd] = d.split('-').map(Number)
-  const t = new Date(Date.UTC(y!, m! - 1, dd!))
+  const t = new Date(utcMs(y!, m!, dd!))
   return t.getUTCFullYear() === y && t.getUTCMonth() === m! - 1 && t.getUTCDate() === dd
 }
 
@@ -132,6 +145,7 @@ export function checkEligibility(
     busy.some((b) => !isRealDate(b.date) || !isRealTime(b.start) || !isRealTime(b.end)) ||
     person.employments.some((e) => !isRealDate(e.startOn) || (e.endOn !== undefined && !isRealDate(e.endOn))) ||
     !isRealDate(person.birthDate) ||
+    !Array.isArray(person.guardTraining.annualFiscalYears) ||
     (person.guardTraining.basicDoneOn !== undefined && !isRealDate(person.guardTraining.basicDoneOn)) ||
     (person.residence?.expiresOn !== undefined && !isRealDate(person.residence.expiresOn))
   ) {
@@ -169,7 +183,7 @@ export function checkEligibility(
       reasons.add('dispatch_exception_invalid')
     }
     const age = ageOn(person.birthDate, s.date)
-    if (age < 18 && (job.isSecurityWork || job.nightWork)) reasons.add('under_age')
+    if (age < 18 && (job.isSecurityWork || job.nightWork || job.shifts.some(shiftIsNight))) reasons.add('under_age')
     if (job.isSecurityWork && job.form !== 'dispatch') {
       const r = securityTraining(person, s.date)
       if (r) reasons.add(r)

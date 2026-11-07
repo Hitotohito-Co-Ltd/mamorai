@@ -67,10 +67,15 @@ export function listRenewals(people: PersonProfile[], referenceDate: string, soo
       else if (isActive(e)) out.push(item(p.personId, 'contract', e.contractEndOn, referenceDate, soonDays))
     }
     const t = p.guardTraining
+    // 現任教育の履歴が配列でない人は、判定できない項目として返す（一覧全体を失敗させない）
+    const trainingInvalid = !Array.isArray(t.annualFiscalYears)
+    if (trainingInvalid) out.push(invalidItem(p.personId, 'annual_training', `${fy + 1}-03-31`))
     const anyEmpInvalid = p.employments.some(empInvalid)
     const active = p.employments.some((e) => !empInvalid(e) && isActive(e))
     // 新任教育の修了日が基準日より後（基準日時点で未修了）の人は対象外
-    if (t.basicDoneOn !== undefined && !isRealDate(t.basicDoneOn)) {
+    if (trainingInvalid) {
+      // 上で invalid 項目を返した
+    } else if (t.basicDoneOn !== undefined && !isRealDate(t.basicDoneOn)) {
       // 新任教育の修了日が不正: 今年度の現任が済んでいなければ、判定できない項目として返す
       if (!t.annualFiscalYears.includes(fy)) out.push(invalidItem(p.personId, 'annual_training', `${fy + 1}-03-31`))
     } else if (t.basicDoneOn && t.basicDoneOn <= referenceDate) {
