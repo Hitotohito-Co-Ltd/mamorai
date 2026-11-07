@@ -327,7 +327,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 # 追補 v2.0 — Sprint 8〜10: 人材基盤（スタッフ台帳・案件・応募・更新手続き）
 
-**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** v2.19。v2.5 は APPROVED（Spec-Validator 96点）。v2.6〜v2.17 の変更は Spec-Validator の再審査待ち（最新の審査は v2.11 の CONDITIONAL 71点で、v2.12 以降で是正済み）。RYUGEN が確認済みなのは v2.7 の再承認、OQ-15、OQ-12 の一部（同意の取得主体はホールディングス、アプリで取得、同意なしは全案件で応募不可）、OQ-20（Planner 案6点の承認）、OQ-21（推奨案の採用）、Sprint 8 の Adversary 3回 FAIL 後の『直して続行』。OQ-12a/b/c が残るため REQ-035b の同意の画面は着手しない
+**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** v2.20。審査の履歴: v2.5=96点 APPROVED、v2.6=78点、v2.8=70点、v2.11=71点（いずれも是正済み）、v2.19=86点 APPROVED。v2.20 は未審査（v2.19 審査の指摘の是正）。RYUGEN が確認済みなのは v2.7 の再承認、OQ-15、OQ-12 の一部（同意の取得主体はホールディングス、アプリで取得、同意なしは全案件で応募不可）、OQ-20（6点の承認）、OQ-21（推奨案の採用。**入力が途中で切れていたため『推奨案をお願いします』と解釈した。再確認待ち**）、Sprint 8 の Adversary 3回 FAIL 後の『直して続行』。OQ-12a/b/c が残るため REQ-035b の同意の画面は着手しない
 **参照:** 「MAMOR-AI 人材プラットフォーム構想」「MAMOR-AI 構成案・設計書（2026年11月版）」「UIデザイン案」「帳票一覧」
 **目的:** 複数のExcelと紙の管理を、MAMOR-AI 1つに置き換える。第一弾の対象は 有休申請・労働条件・更新手続き・現任申込・配置入力・スタッフ台帳・採用・案件・配置・シフト。
 
@@ -405,7 +405,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **計測要件:** `renewal_list_viewed`（発火: 一覧の取得が成功し描画が完了した直後に 1 回）/ プロパティ: item_count, expired_count / 失敗: `renewal_list_failed`(error_code) / KPI: 期限切れの滞留数。
 
 ### REQ-034: 運営枠と警備枠の線引き確認
-**EARS:** IF 案件が「業務内容で判断が必要」とされ、確認者と確認日の記録がない THEN THE システム SHALL 公開を拒否し、その案件への応募も拒否する。確認者は現場責任者または支店とする。
+**EARS:** IF 案件が「業務内容で判断が必要」とされ、確認者と確認日の記録がない THEN THE システム SHALL 公開を拒否し、その案件への応募も拒否する。確認者は現場責任者または支店とする。IF 本社以外の利用者が案件の `needs_boundary_check` を false に変更しようとする THEN THE システム SHALL 拒否して `permission_denied` を記録する（OQ-21。実装は Sprint 9 の REQ-037）。
 **Verification Type:** ERROR_HANDLING（確認者のロール判定は REQ-040 で ROLE_ACCESS として検証する）　**リスク:** HIGH（雑踏警備の無資格配置）　**依存:** REQ-026, REQ-027　**Sprint:** 8
 **変更対象:** packages/input-core/src/talent/eligibility.ts（validateJobForPublish）, supabase/migrations/0410_talent_foundation.sql
 **線引き確認の要否（OQ-21 で確定）:** `needs_boundary_check` は職種マスタ（`job_roles.needs_boundary_check`）の既定値から案件作成時に引き継ぎ、案件ごとの変更は本社のみ。案件を作る管理者による false への変更は拒否する（Sprint 9 の REQ-037 で実装）。
@@ -415,7 +415,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 ### REQ-035（035a は Sprint 8、035b は Sprint 9）: スタッフ台帳（人と雇用）とグループ共同利用の同意
 **分割（v2.15）:** 035a（Sprint 8）= 人と雇用の台帳、会社ごとの参照制限、同意フラグ、`search_candidates`、同意の整合 CHECK（`consent_joint_use` が true なら `consent_at` が必須）。035b（Sprint 9）= 登録 RPC、本人の同意送信 RPC、同意の取得主体・通知文の版の列、同意列の変更を RPC 経由に限ること（運営を含む直接更新の禁止）、同意の画面。以下の本文のうち『登録 RPC が人を保存する』『本人がアプリで同意を送信した』『同意の記録は本人の送信のみ』は 035b。
 **EARS:** WHEN 登録 RPC が人を保存する THE システム SHALL 人をグループで 1 件、雇用を会社ごとに保持する。WHEN 会社の管理者が人を参照する THE システム SHALL 自社に雇用がある人だけを返す。WHEN 本人が共同利用に同意していない THE システム SHALL 理由コード `no_consent` によりどの会社の案件への応募も拒否し、グループ横断の候補検索から外す（自社の管理者が自社の雇用として参照・管理することは許可する）。**v2.6 で「他社の案件」から「どの会社の案件」に確定。v2.8 で RYUGEN が確定（案A）。** WHEN 本人がアプリで共同利用への同意を送信した THE システム SHALL `consent_joint_use`・取得日時・取得主体（ヒトトヒトホールディングス）・同意した通知文の版を保存し、同意済みの人が子会社の `search_candidates` の結果に含まれるようにする（同意の記録は本人の送信のみで行い、管理者による代理の記録は行わない。書面の扱いは OQ-12b）。WHEN グループ横断の候補検索が呼ばれる THE システム SHALL サーバ側の関数 `search_candidates` を通し、同意済みの人だけを返す。
-**Verification Type:** AUTH_GATE / DATA_PERSISTENCE　**リスク:** HIGH（個人情報）　**依存:** REQ-026　**Sprint:** 8（DB）/ 9（画面）
+**Verification Type:** AUTH_GATE / DATA_PERSISTENCE　**リスク:** HIGH（個人情報）　**依存:** REQ-026　**Sprint:** 035a は 8、035b は 9
 **一覧の3状態（台帳画面・候補検索）:** 空（「該当するスタッフはいません」）/ 単数 / 大量（5,000 人を 50 件ずつ表示）
 **変更対象:** supabase/migrations/0410_talent_foundation.sql（persons, staff.person_id, RLS）, supabase/migrations（同意の取得主体・通知文の版の追加列）, apps/desktop/src/features/talent/*
 **テスト観点（DB）:** 他社の管理者は他社の雇用の person を読めない / 運営は全件 / 同意なしは応募不可 / 同意なしは横断の候補検索に出ない（自社の一覧には出る）
@@ -431,7 +431,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **Open:** 媒体との連携方法は OQ-16。
 
 ### REQ-037: 案件の作成と公開
-**EARS:** WHEN 管理者が案件（雇用主・支店（現場の所属支店から決まる）・契約の形・職種・必要人数・シフト・公開範囲・配置の決め方・単価）を作成して公開する THE システム SHALL REQ-027 と REQ-034 の公開前チェックを実行し、通った案件だけを公開状態にする。公開範囲は「登録スタッフ全員／その現場で働いた人／指名」の 3 種に限り、一般公開は選べない。
+**EARS:** WHEN 管理者が案件（雇用主・支店（現場の所属支店から決まる）・契約の形・職種・必要人数・シフト・公開範囲・配置の決め方・単価）を作成して公開する THE システム SHALL REQ-027 と REQ-034 の公開前チェックを実行し、通った案件だけを公開状態にする。公開範囲は「登録スタッフ全員／その現場で働いた人／指名」の 3 種に限り、一般公開は選べない。WHEN 案件を作成する THE システム SHALL 職種マスタの `job_roles.needs_boundary_check` の既定値を案件の `needs_boundary_check` に引き継ぐ（OQ-21）。
 **Verification Type:** HAPPY_PATH / ERROR_HANDLING / ROLE_ACCESS　**リスク:** HIGH　**依存:** REQ-027, REQ-034, REQ-040　**Sprint:** 9
 **変更対象:** server/routes/jobs.ts（新規）, apps/desktop/src/features/talent/JobEditor.tsx（新規）, packages/input-core/src/talent/eligibility.ts（validateJobForPublish）
 **計測要件:** `job_published`（発火: 公開 API が状態を published に更新して応答を返した直後に 1 回）/ プロパティ: job_form, placement_mode / 拒否は REQ-027 の `job_publish_rejected` を使う。
@@ -445,13 +445,13 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **計測要件:** `job_list_viewed`（発火: 一覧の取得が成功し描画が完了した時に 1 回）/ プロパティ: item_count, `job_applied`（発火: 応募 API が受理を返した直後に 1 回）/ 失敗: `job_apply_failed`(error_code)。
 
 ### REQ-039: 応募から確定、労働条件通知
-**EARS:** WHEN 配置の決め方が「応募→採否」の案件で、許可表で採否を許可された役割が採用する、または「即確定」の案件に応募が成立する THE システム SHALL 応募を確定にし、労働条件通知書を発行して通知時刻を記録する。WHEN 本人が労働条件通知を確認した THE システム SHALL 確認時刻を記録する。
+**EARS:** WHEN 配置の決め方が「応募→採否」の案件で、許可表で採否を許可された役割が採用する、または「即確定」の案件に応募が成立する THE システム SHALL 応募を確定にし、労働条件通知書を発行して通知時刻を記録する。WHEN 本人が労働条件通知を確認した THE システム SHALL 確認時刻を記録する。WHEN 応募を作る・確定する・取り消す THE システム SHALL RPC 経由に限り、会社の管理者による `job_applications` への直接の insert/update/delete を権限で禁止する（既知のリスク KR-1 の解消。同意なし・定員超過・時間の重なり・決定者の偽装を RPC で検査する）。
 **Verification Type:** HAPPY_PATH / DATA_PERSISTENCE　**リスク:** HIGH（応募成立で労働契約が成立する）　**依存:** REQ-037, REQ-040　**Sprint:** 9
 **変更対象:** server/routes/applications.ts（新規）, supabase/migrations（確定の RPC）, packages/input-core/src/talent/eligibility.ts
 **計測要件:** `application_confirmed`（発火: 確定の DB 更新が成功した直後に 1 回）/ プロパティ: placement_mode, `conditions_notice_issued`（発火: 通知書の発行記録が保存された直後に 1 回）/ 失敗: `application_confirm_failed`(error_code)。
 
 ### REQ-040: 権限（誰が何をできるか）
-**EARS:** WHEN 利用者が案件の公開・採否・応援依頼・線引き確認・採用応募の対応・採用担当の付与を実行しようとする THE システム SHALL 次の許可表に従って利用者の役割を判定し、許可のない役割の操作を拒否して `permission_denied` を記録する。
+**EARS:** WHEN 利用者が案件の公開・採否・応援依頼・線引き確認・線引き確認の要否の変更・更新手続きの確認と対応・採用応募の対応・採用担当の付与、または候補検索（`search_candidates`）を実行しようとする THE システム SHALL 次の許可表に従って利用者の役割を判定し、許可のない役割の操作を拒否して `permission_denied` を記録する。
 
 | 操作 | 現場責任者 | 管制 | 支店 | 本社 | 採用担当 | 根拠 |
 |---|---|---|---|---|---|---|
@@ -462,6 +462,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 | 応援依頼の応募の採否を決める | 当該依頼を出した本人のみ許可 | 当該依頼を出した本人のみ許可 | 当該依頼を出した本人、または同一支店の支店ロール | 拒否 | 拒否 | 依頼した人が決める（決定済み）。同一支店の支店ロールの代行は RYUGEN 承認済み（OQ-20） |
 | 採用応募の対応（REQ-036） | 拒否 | 拒否 | 自支店宛ての応募のみ許可 | 許可 | 許可（自社宛ての応募） | RYUGEN 決定（OQ-15） |
 | 線引き確認の要否を案件ごとに変更する | 拒否 | 拒否 | 拒否 | 許可 | 拒否 | RYUGEN 承認済み（OQ-21、職種マスタの既定値から引き継ぎ、変更は本社のみ） |
+| 候補検索（`search_candidates`）と人の個人情報（生年月日・電話・メール）の参照 | 自現場の人のみ許可 | 拒否 | 自支店の人のみ許可 | 許可 | 自社の応募者のみ許可 | 既知のリスク KR-5 の解消案。**Sprint 9 の仕様審査で RYUGEN が確認する** |
 | 採用担当を付与・解除する | 拒否 | 拒否 | 拒否 | 許可 | 拒否 | RYUGEN 承認済み（OQ-20、2026-11-07）。付与は本社のみ |
 | 更新手続きの確認・対応（REQ-033・REQ-044） | 自現場の人のみ許可 | 拒否 | 自支店の人のみ許可 | 許可 | 拒否 | RYUGEN 承認済み（OQ-20、2026-11-07） |
 
@@ -478,13 +479,13 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **受入:** REQ-034 の確認者が現場責任者・支店以外なら拒否されること。他支店・他社・現場責任者による公開、本社以外による採用担当の付与、依頼者以外による応援依頼の採否が、それぞれ拒否されること（本 REQ のテストで検証する）。
 
 ### REQ-041: 応援依頼（未報告コールからの作成）
-**EARS:** WHEN 現場責任者・管制・支店が欠員の枠から応援依頼を作る THE システム SHALL 現場・日時・人数・必要資格を引き継いだ単発案件を作成し、必要な教育・資格を満たし、その時間に他の勤務がないスタッフだけに通知する。キャリアライズだけに登録している人（用語を参照）には表示しない。WHEN 応募が来た THE システム SHALL 依頼した本人へ採否の通知を送り、採否は REQ-040 の許可表（応援依頼の応募の採否）に従う。
+**EARS:** WHEN 現場責任者・管制・支店が欠員の枠から応援依頼を作る THE システム SHALL 現場・日時・人数・必要資格を引き継いだ単発案件を作成し、REQ-026 で応募できると判定される（同意・雇用・教育・年齢・在留・既存勤務のすべてを満たす）スタッフだけに通知する。キャリアライズだけに登録している人（用語を参照）には表示しない。WHEN 応募が来た THE システム SHALL 依頼した本人へ採否の通知を送り、採否は REQ-040 の許可表（応援依頼の応募の採否）に従う。
 **Verification Type:** HAPPY_PATH / ERROR_HANDLING　**リスク:** HIGH　**依存:** REQ-026, REQ-039, REQ-040　**Sprint:** 10
 **変更対象:** server/routes/support.ts（新規）, apps/desktop/src/features/jyoban/（欠員の枠からの作成ボタン）, packages/input-core/src/jyoban/calls.ts
 **計測要件:** `support_request_created`（発火: 案件の保存と通知対象の確定が成功した直後に 1 回）, `support_request_filled`（発火: 必要人数分の応募が確定した直後に 1 回）/ 失敗: `support_request_failed`(error_code) / KPI: 充足までの時間。
 
 ### REQ-042: 補填済みの反映
-**EARS:** WHEN 応援依頼の応募が確定する THE システム SHALL 支店・本部の画面で該当枠を補填済みにし、確定した人の上番報告枠を自動で追加し、未報告コールの対象に含める。
+**EARS:** WHEN 応援依頼の応募が確定する THE システム SHALL 支店と本社（許可表のロール）の画面で該当枠を補填済みにし、確定した人の上番報告枠を自動で追加し、未報告コールの対象に含める。
 **Verification Type:** DATA_PERSISTENCE　**リスク:** MEDIUM　**依存:** REQ-041　**Sprint:** 10
 **変更対象:** supabase/migrations（補填の RPC）, packages/input-core/src/jyoban/calls.ts
 **計測要件:** `support_shift_assigned`（発火: 補填確定時 1 回）/ プロパティ: job_id / 失敗: `support_shift_assign_failed`(error_code)。PII 不含。
@@ -526,7 +527,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 - **KR-3 警備フラグと職種:** 案件の警備判定は職種マスタの選択に依存する。契約の形が警備（`security`）でも、職種が非警備なら警備の年齢・教育の判定を受けない。非警備の職種を選べば警備の判定を回避できる（職種の選択の統制は OQ-21 と合わせて決める）。
 
 ## 追補のインターフェース契約（REQ-026 / 032 / 035 の補足。v2.7）
-**Bead:** REQ-026, REQ-032, REQ-035 に従属（独立した REQ は立てない）　**リスク:** HIGH　**依存:** REQ-026　**変更対象:** packages/input-core/src/talent/model.ts, eligibility.ts, renewal.ts, supabase/migrations（`search_candidates`）　**Sprint:** 8
+**Bead:** REQ-026, REQ-027, REQ-029, REQ-031, REQ-032, REQ-033, REQ-034, REQ-035, REQ-037, REQ-039 に従属（独立した REQ は立てない）　**リスク:** HIGH　**依存:** REQ-026　**変更対象:** packages/input-core/src/talent/model.ts, eligibility.ts, renewal.ts, supabase/migrations（`search_candidates`）　**Sprint:** 8
 TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕様に無く、テストが形を作り出していたため追加した。REQ-026〜034 の振る舞いは変えず、REQ-035 の同意の扱いのみ v2.6 で確定した（REQ-035 の本文に反映済み）。
 
 **型の正本:** `packages/input-core/src/talent/model.ts` の `PersonProfile`, `JobPost`, `BusyShift`, `EligibilityReason`, `EligibilityResult`。テストはこの型から入力を組み立てる。
@@ -605,6 +606,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.17: RYUGEN が OQ-20（Planner 案6点）を承認し、OQ-21 は推奨案（職種マスタの既定値から引き継ぎ、変更は本社のみ）を採用。許可表に『線引き確認の要否を変更する』の行を追加し、『Planner 案』の注記を承認済みに更新。
 - 2026-11-07 v2.18: Adversary Sprint 8 第4回 FAIL(D3・D5 の Medium4・Low1。D1/D2/D4 は PASS)を受けて確定。basicDoneOn の検証、契約満了日の空文字・null は invalid、wage と確認日の DB 検証、KR-1 に delete、KR-4(TRUNCATE)を追加。
 - 2026-11-07 v2.19: Adversary Sprint 8 第5回 FAIL(実装に Critical/High なし。High は D5 の1件=中核3表の会社分離を検証するテストの欠落、Medium4、Low6)を受けて確定。確認日の『今日』は日本時間、確認者のゼロ幅文字、契約満了日の invalid の文面を実装に合わせる、KR-5 を追加、KR-3 を補足。
+- 2026-11-07 v2.20: Spec-Validator v2.19 審査 APPROVED 86点(−14)の是正。ヘッダを審査履歴に合わせる、OQ-21 の確定事項を REQ-034/037 の EARS に、REQ-040 の EARS の列挙漏れと KR-5(候補検索の行)、REQ-039 に KR-1 の解消(応募の RPC 化)、REQ-041 の通知対象を REQ-026 の応募可否に、REQ-042 の『本部』を許可表のロールに、契約の Bead を実態に合わせる、REQ-035 の Sprint 属性。OQ-21 は RYUGEN の入力が途切れた解釈なのでヘッダにも再確認待ちを明記。v2.8 審査行の『RYUGEN の確認が必要』な4点は OQ-20 で解決済み。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
