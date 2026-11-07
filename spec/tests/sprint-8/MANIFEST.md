@@ -183,3 +183,17 @@ TDD-Writer: 赤松 灯 (⑦)
 | `spec/evidence/sprint-8-red-phase-2.md` | 第2回 RED フェーズ実行エビデンス |
 | `spec/evidence/sprint-8-test-regeneration.md` | 再生成の記録 |
 | `spec/tests/sprint-8/MANIFEST.md` | 本ファイル |
+
+
+---
+
+## 追加 第3回（仕様 v2.11: 曖昧さ4件の確定。仕様の後追い）
+
+実装は既にこの振る舞いに準拠していたため、追加した28件は全て初回から PASS（RED なし）。s8 は 164 件、input-core 全体は 596 件 PASS。
+
+| テスト ID | REQ | describe（s8_talent_req026_034.test.ts） | 件数 | 観点 | 状態 |
+|---|---|---|---|---|---|
+| S8-031-24h | REQ-031 | 開始と終了が同時刻のシフトは24時間勤務 | 8 | 翌日の日中と重なる / 終了ちょうど(22:00)は重ならない / 21:59 は重なる / 開始前は重ならない / 応募側が24時間 / 24時間は警告 `daily_hours_over_8` / 8時間勤務は警告なし | PASS |
+| S8-033-kind | REQ-033 | 同順位の種別の並び | 4 | 同人・同日の3種が contract→annual_training→residence / personId が先 / 期限切れ同日 / daysLeft が種別より優先 | PASS |
+| S8-029-age60 | REQ-029 | age60 は全シフト日で満60歳以上 | 6 | 59歳と60歳の日が混在→不可（順序を逆にしても）/ 両日60歳以上→可 / 単日59歳→不可 / 確認日は全シフト日以前 | PASS |
+| S8-029-cal | REQ-029 | verifiedOn の暦検証 | 10 | 不可6（2026-13-45, 2026-02-30, 04-31, 平年02-29, 00月, 00日）/ 可4（02-28, うるう年02-29, 04-30, 01-01） | PASS |
