@@ -455,6 +455,90 @@ begin
     insert into t_rls_results values (31, '同意ありで同意日時なしの person は作れない', true, sqlerrm);
   end;
 end $$;
+-- ── シナリオ 33〜42: Adversary 第4回（FIND-404）。変異に耐える検証と、wage・確認日の検証 ──
+reset role;
+-- B社の案件のシフト、NULL の会社の現場、applied の応募を持つ案件
+insert into job_shifts(id, job_id, company_id, work_date, start_time, end_time, headcount) values
+  ('f0000000-0000-0000-0000-00000000000c', 'e0000000-0000-0000-0000-00000000000b', 'cc000000-0000-0000-0000-000000000022', current_date, '09:00', '17:00', 1);
+insert into sites(id, name, code, company_id) values ('50000000-0000-0000-0000-0000000000f0', '会社なしの現場', 'S-NULL', null);
+insert into jobs(id, company_id, role_id, title, form) values
+  ('e0000000-0000-0000-0000-0000000000d1', 'cc000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-00000000000a', '応募中の案件', 'security');
+insert into job_shifts(id, job_id, company_id, work_date, start_time, end_time, headcount) values
+  ('f0000000-0000-0000-0000-0000000000d1', 'e0000000-0000-0000-0000-0000000000d1', 'cc000000-0000-0000-0000-000000000011', current_date, '09:00', '17:00', 1);
+insert into job_applications(company_id, job_shift_id, staff_id, status) values
+  ('cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-0000000000d1', '0b000000-0000-0000-0000-000000000001', 'applied');
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';  -- A社管理者
+
+-- 33: シフトの支払単価に負の値は入れられない
+do $$ begin
+  begin
+    insert into job_shifts(job_id, company_id, work_date, start_time, end_time, headcount, wage)
+      values ('e0000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', current_date, '09:00', '17:00', 1, -1);
+    insert into t_rls_results values (33, '負の支払単価のシフトは登録できない', false, '登録できてしまった');
+  exception when check_violation then insert into t_rls_results values (33, '負の支払単価のシフトは登録できない', true, sqlerrm);
+  end; end $$;
+-- 34: 線引きの確認日が未来の案件は公開できない
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', '未来の確認日', 'spot', 'published', true, '山田', current_date + 1);
+    insert into t_rls_results values (34, '線引きの確認日が未来の案件は公開できない', false, '公開できてしまった');
+  exception when others then insert into t_rls_results values (34, '線引きの確認日が未来の案件は公開できない', sqlerrm like '%確認日%', sqlerrm);
+  end; end $$;
+-- 35: 線引きの確認日が空(NULL)で確認者だけある案件は公開できない
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by)
+      values ('cc000000-0000-0000-0000-000000000011', '確認日なし', 'spot', 'published', true, '山田');
+    insert into t_rls_results values (35, '確認日が空の線引き確認では公開できない', false, '公開できてしまった');
+  exception when others then insert into t_rls_results values (35, '確認日が空の線引き確認では公開できない', sqlerrm like '%線引き%', sqlerrm);
+  end; end $$;
+-- 36: 有効な線引き確認(確認者あり・確認日が今日)なら公開できる(対になる正常系)
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', '有効な確認', 'spot', 'published', true, '山田', current_date);
+    insert into t_rls_results values (36, '有効な線引き確認なら公開できる', true, '');
+  exception when others then insert into t_rls_results values (36, '有効な線引き確認なら公開できる', false, sqlerrm);
+  end; end $$;
+-- 37: 自社のスタッフでも、他社のシフトへの応募は作れない
+do $$ begin
+  begin
+    insert into job_applications(company_id, job_shift_id, staff_id)
+      values ('cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-00000000000c', '0b000000-0000-0000-0000-000000000002');
+    insert into t_rls_results values (37, '自社のスタッフでも他社のシフトへの応募は作れない', false, '作れてしまった');
+  exception when others then insert into t_rls_results values (37, '自社のスタッフでも他社のシフトへの応募は作れない', sqlerrm like '%応募の会社%', sqlerrm);
+  end; end $$;
+-- 38: 他グループの職種・グループは参照できない
+insert into t_rls_results select 38, '他グループの職種は見えない', count(*) = 0, count(*)::text || ' 件見えた' from job_roles where group_id = 'bb000000-0000-0000-0000-000000000002';
+insert into t_rls_results select 39, '他グループのグループ行は見えない', count(*) = 0, count(*)::text || ' 件見えた' from groups where id = 'bb000000-0000-0000-0000-000000000002';
+-- 40: 負の請求単価は登録できない
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, billing_rate) values ('cc000000-0000-0000-0000-000000000011', '負の請求', 'spot', -1);
+    insert into t_rls_results values (40, '負の請求単価は登録できない', false, '登録できてしまった');
+  exception when check_violation then insert into t_rls_results values (40, '負の請求単価は登録できない', true, sqlerrm);
+  end; end $$;
+-- 41: 会社が未設定の現場を指す案件は登録できない
+do $$ begin
+  begin
+    insert into jobs(company_id, site_id, title, form) values ('cc000000-0000-0000-0000-000000000011', '50000000-0000-0000-0000-0000000000f0', '会社なしの現場', 'spot');
+    insert into t_rls_results values (41, '会社が未設定の現場を指す案件は登録できない', false, '登録できてしまった');
+  exception when others then insert into t_rls_results values (41, '会社が未設定の現場を指す案件は登録できない', sqlerrm like '%現場%', sqlerrm);
+  end; end $$;
+-- 42: applied の応募だけがある案件も削除できない
+do $$ begin
+  begin
+    delete from jobs where id = 'e0000000-0000-0000-0000-0000000000d1';
+    insert into t_rls_results values (42, '応募中(applied)の案件は削除できない', false, '削除できてしまった');
+  exception when others then insert into t_rls_results values (42, '応募中(applied)の案件は削除できない', sqlerrm like '%応募%', sqlerrm);
+  end; end $$;
+-- 43: anon は app_company_has_person も実行できない(既定の権限付与の下で)
+reset role;
+insert into t_rls_results select 43, 'anon は app_company_has_person を実行できない',
+  not has_function_privilege('anon', 'public.app_company_has_person(uuid)', 'EXECUTE'), 'anon の EXECUTE 権限を確認';
+
 -- ── 結果出力 ──
 select n || '. ' || case when ok then 'PASS' else 'FAIL' end || '  ' || name
   || case when not ok and detail <> '' then '  [' || detail || ']' else '' end

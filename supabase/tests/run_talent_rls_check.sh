@@ -12,6 +12,9 @@ P="psql -h ${PGHOST:-127.0.0.1} -p ${PGPORT:-5432} -U postgres -v ON_ERROR_STOP=
 $P -c "drop database if exists tln_rls" -c "create database tln_rls"
 # Supabase 互換スタブ（anon / authenticated / auth.uid() / app_is_platform / app_company_id）
 $P -d tln_rls -f ../tests/jyoban_supabase_stub.sql >/dev/null
+# Supabase の既定に合わせ、以後に作る関数・テーブルへ anon / authenticated の権限が既定で付く状態にする
+# （これが無いと、マイグレーションの revoke を消しても検証が通ってしまう）
+$P -d tln_rls -c "alter default privileges in schema public grant all on functions to anon, authenticated; alter default privileges in schema public grant all on tables to anon, authenticated;" >/dev/null
 # 依存マイグレーションを適用（上番報告まで）
 # 本番と同じ連鎖で検証する（0200〜0202 の FORCE RLS を含む。省くと staff の RLS が無い状態で PASS してしまう）
 for f in \
@@ -38,7 +41,9 @@ for f in \
   0413_talent_hardening2 \
   0413_talent_hardening2 \
   0414_talent_integrity \
-  0414_talent_integrity; do   # 2回=冪等性確認
+  0414_talent_integrity \
+  0415_talent_integrity2 \
+  0415_talent_integrity2; do   # 2回=冪等性確認
   $P -d tln_rls -f "$f.sql" >/dev/null 2>&1 || { echo "FAILED applying $f"; exit 1; }
 done
 # RLS/関数 検証シナリオを実行
