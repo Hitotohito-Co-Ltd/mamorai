@@ -220,3 +220,27 @@ Adversary 第5回の FIND-505 / FIND-507 / FIND-508（変異の生存、TS 側�
 | REQ-033 | soonDays 境界、不正な雇用（v2.19）、基準日と修了日が同日 | 12件＋7件＋4件 |
 
 件数: 775 → 868（新規 93）。緩めた・変更した既存アサーションは 0 件。
+
+
+---
+
+# 追加 第8回（仕様 v2.21）
+
+追加日: 2026-11-07 / 担当: TDD-Writer 赤松 灯 (⑦) / 対象: s8_talent_req026_034.test.ts への追記のみ（実装・マイグレーション・DB の SQL テスト・仕様は未編集、既存テストは未変更。実装 eligibility.ts / renewal.ts は未読）
+
+## 根拠
+Adversary 第6回の FIND-602 / FIND-603 / FIND-606 / FIND-608 / FIND-610（TS 側）と、Planner が確定した仕様 v2.21。承認: 呼び出し元の指示（v2.21 の確定）による。
+
+## どの REQ が変わったか・追加したテスト
+| REQ | 確定内容 | 追加 | RED |
+|---|---|---|---|
+| REQ-030 | 夜間勤務はシフト時刻（22:00〜翌05:00）から導出（FIND-602）。境界・複数シフト・18 歳・nightWork=true の対 | 23 | 10 |
+| REQ-033 | annualFiscalYears が配列でない: checkEligibility は invalid_input、listRenewals は annual_training の invalid 項目（FIND-603）。対: 配列・空配列 | 28 | 19 |
+| REQ-034 | 空白の集合（Unicode 空白＋混在、FIND-608）。対: 可視文字あり | 49 | 0 |
+| REQ-028 | 警備×spot/referral/security×新任未了（FIND-606）。対: dispatch・修了済・非警備 | 10 | 0 |
+| REQ-032/026 | residence.expiresOn の ''/null、対: undefined・有効日 | 4 | 0 |
+| REQ-029 | employmentDays=0 は日雇派遣。対: 例外あり・31 日 | 3 | 0 |
+| REQ-026/037 | 日付の前後空白・改行（6 フィールド×3）、古い年（0099/0000 は有効、'0000-00-00' ほかは invalid） | 18＋9 | 0＋3 |
+
+件数: 868 → 1005（新規 137。うち RED 32）。緩めた・変更した既存アサーションは 0 件。
+FIND-610 は仕様 v2.21 のテスト追補（MANIFEST の更新）に対応。

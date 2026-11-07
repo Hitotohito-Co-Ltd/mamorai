@@ -4175,3 +4175,553 @@ describe('[REQ-034] 確認者がゼロ幅文字・空白だけなら記録なし
     expect(result.eligible).toBe(true)
   })
 })
+
+// ═════════════════════════════════════════════════════════════
+// 第8回（仕様 v2.21。Adversary 第6回 FIND-602/603/606/608/610）
+// 実装 eligibility.ts / renewal.ts は読まずに、仕様の契約と model.ts だけから作成
+// ═════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────
+// A. 夜間勤務はシフト時刻から導出（REQ-030 / FIND-602）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-030] 夜間勤務は nightWork に依らずシフト時刻（22:00〜翌05:00）から導出', () => {
+  const SHIFT_DAY = '2026-05-01'
+  const minor = () => mkPerson({ birthDate: '2008-05-15' }) // 2026-05-01 時点で 17 歳
+  const adult = () => mkPerson({ birthDate: '2000-01-01' })
+  const nonSecJob = (shifts: JobPost['shifts'], nightWork = false) =>
+    mkJob({ form: 'spot', isSecurityWork: false, nightWork, shifts })
+
+  it.each([
+    ['22:00-23:00（22:00 ちょうどから開始）', '22:00', '23:00'],
+    ['21:00-22:30（終了が 22:00 より後）', '21:00', '22:30'],
+    ['04:00-06:00（開始が 05:00 より前）', '04:00', '06:00'],
+    ['20:00-06:00（日またぎ）', '20:00', '06:00'],
+    ['00:00-05:00（開始が 05:00 より前）', '00:00', '05:00'],
+    ['12:00-22:01（終了が 22:00 を 1 分超える）', '12:00', '22:01'],
+    ['04:59-12:00（開始が 05:00 の 1 分前）', '04:59', '12:00'],
+    ['09:00-09:00（24 時間勤務は翌日に終わる）', '09:00', '09:00'],
+  ])('night_nightWork=false でも %s なら 17歳は under_age', (_label, start, end) => {
+    // Arrange
+    const job = nonSecJob([{ date: SHIFT_DAY, start, end }], false)
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['under_age'])
+  })
+
+  it.each([
+    ['09:00-17:00', '09:00', '17:00'],
+    ['05:00-22:00（開始が 05:00 ちょうど・終了が 22:00 ちょうど）', '05:00', '22:00'],
+    ['05:00-12:00（開始が 05:00 ちょうど）', '05:00', '12:00'],
+    ['12:00-22:00（終了が 22:00 ちょうど）', '12:00', '22:00'],
+    ['05:01-21:59', '05:01', '21:59'],
+  ])('night_対_%s は夜間にかからず 17歳でも under_age にならない', (_label, start, end) => {
+    // Arrange
+    const job = nonSecJob([{ date: SHIFT_DAY, start, end }], false)
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('under_age')
+    expect(result.eligible).toBe(true)
+    expect(result.reasons).toEqual([])
+  })
+
+  it('night_nightWork=true は従来どおり 09:00-17:00 でも 17歳は under_age', () => {
+    // Arrange
+    const job = nonSecJob([{ date: SHIFT_DAY, start: '09:00', end: '17:00' }], true)
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['under_age'])
+  })
+
+  it('night_対_18歳なら夜間（20:00-06:00）でも under_age にならない', () => {
+    // Arrange
+    const job = nonSecJob([{ date: SHIFT_DAY, start: '20:00', end: '06:00' }], false)
+    // Act
+    const result = checkEligibility(adult(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('under_age')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('night_対_18歳の誕生日当日は夜間でも under_age にならない', () => {
+    // Arrange: 2008-05-01 生まれ、シフト日 2026-05-01 で満 18 歳
+    const job = nonSecJob([{ date: SHIFT_DAY, start: '22:00', end: '23:00' }], false)
+    // Act
+    const result = checkEligibility(mkPerson({ birthDate: '2008-05-01' }), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('under_age')
+  })
+
+  it('night_複数シフトのうち 1 つでも夜間にかかれば 17歳は under_age（夜間が 2 つ目）', () => {
+    // Arrange
+    const job = nonSecJob([
+      { date: '2026-05-01', start: '09:00', end: '17:00' },
+      { date: '2026-05-02', start: '21:00', end: '23:00' },
+    ])
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(reasonsOf(result)).toEqual(['under_age'])
+  })
+
+  it('night_複数シフトのうち 1 つでも夜間にかかれば 17歳は under_age（夜間が最初）', () => {
+    // Arrange
+    const job = nonSecJob([
+      { date: '2026-05-01', start: '23:00', end: '23:30' },
+      { date: '2026-05-02', start: '09:00', end: '17:00' },
+      { date: '2026-05-03', start: '10:00', end: '18:00' },
+    ])
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(reasonsOf(result)).toEqual(['under_age'])
+  })
+
+  it('night_対_複数シフトのすべてが日中なら 17歳でも under_age にならない', () => {
+    // Arrange
+    const job = nonSecJob([
+      { date: '2026-05-01', start: '09:00', end: '17:00' },
+      { date: '2026-05-02', start: '05:00', end: '22:00' },
+      { date: '2026-05-03', start: '10:00', end: '18:00' },
+    ])
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('under_age')
+    expect(result.eligible).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// B. annualFiscalYears が不正（REQ-033 / FIND-603）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-033] guardTraining.annualFiscalYears が配列でない', () => {
+  const withAnnual = (annualFiscalYears: unknown, personId = 'p-bad') =>
+    mkPerson({
+      personId,
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01' }],
+      guardTraining: { basicDoneOn: '2020-01-01', annualFiscalYears } as unknown as PersonProfile['guardTraining'],
+    })
+  const withoutAnnualKey = (personId = 'p-bad'): PersonProfile =>
+    mkPerson({
+      personId,
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01' }],
+      guardTraining: { basicDoneOn: '2020-01-01' } as unknown as PersonProfile['guardTraining'],
+    })
+  const REF = '2027-03-10'
+
+  const BAD: Array<[string, () => PersonProfile]> = [
+    ['undefined（値として）', () => withAnnual(undefined)],
+    ['キー欠落', () => withoutAnnualKey()],
+    ['null', () => withAnnual(null)],
+    ['文字列 "2026"', () => withAnnual('2026')],
+    ['数値 2026', () => withAnnual(2026)],
+    ['オブジェクト', () => withAnnual({ 0: 2026 })],
+  ]
+
+  it.each(BAD)('checkEligibility_警備案件で annualFiscalYears が %s なら invalid_input（例外を投げない）', (_l, mk) => {
+    // Arrange
+    const person = mk()
+    // Act
+    const act = () => checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(act).not.toThrow()
+    const result = act()
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+
+  it.each(BAD)('checkEligibility_非警備案件でも annualFiscalYears が %s なら invalid_input', (_l, mk) => {
+    // Arrange
+    const person = mk()
+    const job = mkJob({ form: 'spot', isSecurityWork: false })
+    // Act
+    const result = checkEligibility(person, job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+
+  it.each([
+    ['空配列でも警備案件の判定は例外にならず invalid_input でない', [] as number[]],
+    ['[2025, 2026] なら従来どおり', [2025, 2026]],
+  ])('checkEligibility_対_配列（%s）', (_l, years) => {
+    // Arrange
+    const person = withAnnual(years, 'p-ok')
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+  })
+
+  it('checkEligibility_対_空配列は警備案件で security_annual_training_missing（従来どおり）', () => {
+    // Arrange: 基本教育は修了済み・今年度の現任教育なし
+    const person = withAnnual([], 'p-empty')
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).toEqual(['security_annual_training_missing'])
+  })
+
+  it.each(BAD)('listRenewals_annualFiscalYears が %s の人は annual_training の invalid 項目（年度末）で返り、他の人は通常どおり', (_l, mk) => {
+    // Arrange: 他の人は契約満了が 10 日後
+    const bad = mk()
+    const other = mkPerson({
+      personId: 'p-other',
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', contractEndOn: '2027-03-20' }],
+      guardTraining: { basicDoneOn: '2020-01-01', annualFiscalYears: [2025, 2026] },
+    })
+    // Act
+    const act = () => renewals([other, bad], REF)
+    // Assert
+    expect(act).not.toThrow()
+    expect(act()).toEqual([
+      { personId: 'p-bad', kind: 'annual_training', dueOn: '2027-03-31', daysLeft: null, urgency: 'invalid' },
+      { personId: 'p-other', kind: 'contract', dueOn: '2027-03-20', daysLeft: 10, urgency: 'soon' },
+    ])
+  })
+
+  it('listRenewals_複数の人が不正でも全員が invalid 項目で返り、一覧全体は失敗しない', () => {
+    // Arrange
+    const people = [withAnnual(null, 'p-b'), withAnnual('x', 'p-a'), withAnnual([2025, 2026], 'p-c')]
+    // Act
+    const result = renewals(people, REF)
+    // Assert: invalid は personId 順に先頭、p-c は現任済みで項目なし
+    expect(result).toEqual([
+      { personId: 'p-a', kind: 'annual_training', dueOn: '2027-03-31', daysLeft: null, urgency: 'invalid' },
+      { personId: 'p-b', kind: 'annual_training', dueOn: '2027-03-31', daysLeft: null, urgency: 'invalid' },
+    ])
+  })
+
+  it('listRenewals_対_空配列は未達として annual_training の soon 項目（invalid ではない）', () => {
+    // Arrange
+    const person = withAnnual([], 'p-empty')
+    // Act
+    const result = renewals([person], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-empty', kind: 'annual_training', dueOn: '2027-03-31', daysLeft: 21, urgency: 'soon' },
+    ])
+  })
+
+  it('listRenewals_対_今年度が入った配列なら項目なし', () => {
+    // Arrange / Act / Assert
+    expect(renewals([withAnnual([2026], 'p-done')], REF)).toEqual([])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// C. 空白の集合（REQ-034 / FIND-608）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-034] 確認者が Unicode の空白だけなら記録なし', () => {
+  const withBy = (confirmedBy: string) =>
+    mkJob({ needsBoundaryCheck: true, boundaryCheck: { confirmedBy, confirmedOn: '2026-04-10' } })
+
+  const SPACES: Array<[string, string]> = [
+    ['U+00A0 NBSP', ' '],
+    ['U+1680', ' '],
+    ['U+2000', ' '],
+    ['U+2001', ' '],
+    ['U+2002', ' '],
+    ['U+2003', ' '],
+    ['U+2004', ' '],
+    ['U+2005', ' '],
+    ['U+2006', ' '],
+    ['U+2007', ' '],
+    ['U+2008', ' '],
+    ['U+2009', ' '],
+    ['U+200A', ' '],
+    ['U+2028', ' '],
+    ['U+2029', ' '],
+    ['U+202F', ' '],
+    ['U+205F', ' '],
+    ['U+3000', '　'],
+    ['NBSP の連続', '   '],
+    ['U+202F と U+2003 と U+3000 の混在', '  　'],
+    ['全種の混在', '         　'],
+    ['ASCII 空白・ゼロ幅・Unicode 空白の混在', ' \t\n​ ⁠　﻿ '],
+  ]
+
+  it.each(SPACES)('space_%s だけの確認者は公開拒否 [boundary_not_confirmed]', (_l, by) => {
+    // Arrange / Act / Assert
+    expect(pubReasons(withBy(by))).toEqual(['boundary_not_confirmed'])
+  })
+
+  it.each(SPACES)('space_%s だけの確認者は応募も boundary_not_confirmed', (_l, by) => {
+    // Arrange / Act
+    const result = checkEligibility(mkPerson(), withBy(by), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['boundary_not_confirmed'])
+  })
+
+  it.each([
+    ['半角空白を挟む「山 田」', '山 田'],
+    ['NBSP を挟む', '山 田'],
+    ['U+3000 を挟む', '山　田'],
+    ['U+202F を前後に付ける', ' 山田 '],
+    ['U+2003 を前に付ける', ' 山田'],
+  ])('space_対_可視文字を含む確認者（%s）は記録あり', (_l, by) => {
+    // Arrange
+    const job = withBy(by)
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(pubReasons(job)).toEqual([])
+    expect(result.reasons).toEqual([])
+    expect(result.eligible).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// D. FIND-606 の変異対策（具体値）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-028] 警備職種×直接雇用系×新任教育未了は security_basic_training_missing', () => {
+  const noBasic = () =>
+    mkPerson({ guardTraining: { basicDoneOn: undefined, annualFiscalYears: [2025, 2026] } })
+
+  it.each([['spot'], ['referral'], ['security']] as const)(
+    'basic_form=%s の警備案件で basicDoneOn なしなら不可',
+    (form) => {
+      // Arrange
+      const job = mkJob({ form, isSecurityWork: true })
+      // Act
+      const result = checkEligibility(noBasic(), job, [])
+      // Assert
+      expect(result.eligible).toBe(false)
+      expect(reasonsOf(result)).toEqual(['security_basic_training_missing'])
+    },
+  )
+
+  it('basic_対_form=dispatch の警備案件は教育不足を出さず security_dispatch_forbidden だけ', () => {
+    // Arrange
+    const job = mkJob({ form: 'dispatch', isSecurityWork: true })
+    // Act
+    const result = checkEligibility(noBasic(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('security_basic_training_missing')
+    expect(reasonsOf(result)).toEqual(['security_dispatch_forbidden'])
+  })
+
+  it.each([['spot'], ['referral'], ['security']] as const)(
+    'basic_対_form=%s でも basicDoneOn があれば可',
+    (form) => {
+      // Arrange
+      const job = mkJob({ form, isSecurityWork: true })
+      // Act
+      const result = checkEligibility(mkPerson(), job, [])
+      // Assert
+      expect(result.reasons).toEqual([])
+      expect(result.eligible).toBe(true)
+    },
+  )
+
+  it.each([['spot'], ['referral'], ['security']] as const)(
+    'basic_対_form=%s でも非警備職種なら教育不足を出さない',
+    (form) => {
+      // Arrange
+      const job = mkJob({ form, isSecurityWork: false })
+      // Act
+      const result = checkEligibility(noBasic(), job, [])
+      // Assert
+      expect(reasonsOf(result)).not.toContain('security_basic_training_missing')
+    },
+  )
+})
+
+describe('[REQ-032][REQ-026] residence.expiresOn が空文字・null は invalid_input', () => {
+  const withResidence = (expiresOn: unknown) =>
+    mkPerson({ residence: { workAllowed: true, expiresOn } as unknown as PersonProfile['residence'] })
+
+  it.each([
+    ['空文字', ''],
+    ['null', null],
+  ])('residence_expiresOn が %s なら invalid_input', (_l, v) => {
+    // Arrange
+    const person = withResidence(v)
+    // Act
+    const act = () => checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(act).not.toThrow()
+    expect(act().eligible).toBe(false)
+    expect(reasonsOf(act())).toContain('invalid_input')
+  })
+
+  it('residence_対_expiresOn が undefined（期限なし）なら invalid_input でない', () => {
+    // Arrange
+    const person = mkPerson({ residence: { workAllowed: true } })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(result.reasons).toEqual([])
+    expect(result.eligible).toBe(true)
+  })
+
+  it('residence_対_有効な期限日（シフトの 365 日後）なら invalid_input でない', () => {
+    // Arrange
+    const person = withResidence('2027-05-01')
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(result.reasons).toEqual([])
+    expect(result.warnings).toEqual([])
+  })
+})
+
+describe('[REQ-029] 派遣の employmentDays が 0 は日雇派遣として扱う', () => {
+  const dispatch0 = () =>
+    mkJob({ form: 'dispatch', isSecurityWork: false, employmentDays: 0 })
+
+  it('daily_employmentDays=0 の派遣で例外なしなら daily_dispatch_not_allowed（invalid_input ではない）', () => {
+    // Arrange / Act
+    const result = checkEligibility(mkPerson(), dispatch0(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['daily_dispatch_not_allowed'])
+  })
+
+  it('daily_対_employmentDays=0 でも age60 の例外が有効なら daily_dispatch_not_allowed を出さない', () => {
+    // Arrange
+    const person = mkPerson({
+      birthDate: '1960-01-01',
+      dailyDispatchException: { kind: 'age60', verifiedOn: '2026-01-01' },
+    })
+    // Act
+    const result = checkEligibility(person, dispatch0(), [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('daily_dispatch_not_allowed')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('daily_対_employmentDays=31 の派遣は例外なしでも daily_dispatch_not_allowed を出さない', () => {
+    // Arrange
+    const job = mkJob({ form: 'dispatch', isSecurityWork: false, employmentDays: 31 })
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('daily_dispatch_not_allowed')
+  })
+})
+
+describe('[REQ-026][REQ-037] 日付の前後の空白・改行は invalid_input', () => {
+  const BAD_DATES: Array<[string, string]> = [
+    ['末尾空白', '2026-01-01 '],
+    ['先頭空白', ' 2026-01-01'],
+    ['末尾改行', '2026-01-01\n'],
+  ]
+
+  it.each(BAD_DATES)('date_生年月日が %s なら invalid_input', (_l, v) => {
+    // Arrange
+    const person = mkPerson({ birthDate: v })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+
+  it.each(BAD_DATES)('date_シフト日が %s なら invalid_input（応募・公開前とも）', (_l, v) => {
+    // Arrange
+    const job = mkJob({ shifts: [{ date: v, start: '09:00', end: '17:00' }] })
+    // Act / Assert
+    expect(reasonsOf(checkEligibility(mkPerson(), job, []))).toContain('invalid_input')
+    expect(pubReasons(job)).toContain('invalid_input')
+  })
+
+  it.each(BAD_DATES)('date_在留期限が %s なら invalid_input', (_l, v) => {
+    // Arrange
+    const person = mkPerson({ residence: { workAllowed: true, expiresOn: v } })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+
+  it.each(BAD_DATES)('date_新任教育の修了日が %s なら invalid_input', (_l, v) => {
+    // Arrange
+    const person = mkPerson({ guardTraining: { basicDoneOn: v, annualFiscalYears: [2025, 2026] } })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+
+  it.each(BAD_DATES)('date_他の勤務の日付が %s なら invalid_input', (_l, v) => {
+    // Arrange
+    const busy: BusyShift[] = [{ date: v, start: '09:00', end: '17:00', companyId: 'c-002' }]
+    // Act
+    const result = checkEligibility(mkPerson(), mkJob(), busy)
+    // Assert
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+
+  it.each(BAD_DATES)('date_入社日が %s なら invalid_input', (_l, v) => {
+    // Arrange
+    const person = mkPerson({ employments: [{ companyId: 'c-001', startOn: v }] })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+
+  it('date_対_前後に空白のない 2026-01-01 は生年月日として有効', () => {
+    // Arrange
+    const person = mkPerson({ birthDate: '2000-01-01' })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+    expect(result.eligible).toBe(true)
+  })
+})
+
+describe('[REQ-026][REQ-037] 古い年でも暦に存在する日付は有効', () => {
+  it.each([
+    ['0099-01-01'],
+    ['0000-01-01'],
+    ['0100-03-01'],
+  ])('oldYear_生年月日 %s は invalid_input にならず、年齢が非常に大きいだけで応募可', (birth) => {
+    // Arrange
+    const person = mkPerson({ birthDate: birth })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+    expect(reasonsOf(result)).not.toContain('under_age')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('oldYear_ageOn は 0099-01-01 生まれで 1927 歳（年を 1900 年代に読み替えない）', () => {
+    // Arrange / Act / Assert
+    expect(ageOn('0099-01-01', '2026-05-01')).toBe(1927)
+  })
+
+  it('oldYear_入社日 0099-01-01 も有効で、在籍として判定される', () => {
+    // Arrange
+    const person = mkPerson({ employments: [{ companyId: 'c-001', startOn: '0099-01-01' }] })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+    expect(result.eligible).toBe(true)
+  })
+
+  it.each([
+    ['0000-00-00', '月日が 0'],
+    ['0000-13-01', '13 月'],
+    ['0099-02-29', '99 年は閏年でない'],
+    ['0100-02-29', '100 年は閏年でない'],
+  ])('oldYear_対_%s（%s）は暦に存在しないので invalid_input', (birth) => {
+    // Arrange
+    const person = mkPerson({ birthDate: birth })
+    // Act
+    const result = checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+})

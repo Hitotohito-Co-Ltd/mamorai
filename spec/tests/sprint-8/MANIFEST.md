@@ -2,9 +2,9 @@
 
 TDD-Writer: 赤松 灯 (⑦)  
 作成日: 2026-11-07  
-仕様バージョン: behavioral-spec.md 追補 v2.19（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
-再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）、第6回（v2.18。Adversary 第4回 FIND-401/402/403/405）、第7回（v2.19。Adversary 第5回 FIND-505/507/508）。spec/evidence/sprint-8-test-regeneration.md 参照
-結果（第7回の RED 時点。`pnpm --filter @mamorai/input-core exec vitest run` の実測）: input-core 全体 868 件中 858 PASS / 10 RED。s8 は 436 件中 426 PASS / 10 RED。RED は全て第7回で追加した新規テスト（確認者のゼロ幅文字。実装が v2.19 に未追随）。第7回より前の 775 件は全て PASS（回帰 0）。最新の GREEN 実測（第5回分まで）は spec/evidence/sprint-8-green-phase-4.md（724 件 PASS）。第6回・第7回分の GREEN は未実施
+仕様バージョン: behavioral-spec.md 追補 v2.21（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
+再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）、第6回（v2.18。Adversary 第4回 FIND-401/402/403/405）、第7回（v2.19。Adversary 第5回 FIND-505/507/508）、第8回（v2.21。Adversary 第6回 FIND-602/603/606/608/610）。spec/evidence/sprint-8-test-regeneration.md 参照
+結果（第8回の RED 時点。`pnpm --filter @mamorai/input-core exec vitest run` の実測）: input-core 全体 1005 件中 973 PASS / 32 RED。s8 は 573 件中 541 PASS / 32 RED。RED は全て第8回で追加した新規テスト（夜間勤務の導出 10、annualFiscalYears 不正 19、古い年の日付 3。実装が v2.21 に未追随）。第8回より前の 868 件は全て PASS（回帰 0）。詳細は spec/evidence/sprint-8-red-phase-7.md。第6〜8回分の GREEN は未実施（最新の GREEN 実測は sprint-8-green-phase-4.md の 724 件）
 
 ---
 
@@ -123,7 +123,7 @@ TDD-Writer: 赤松 灯 (⑦)
 | S8-035-01 | noConsent_同意なしの人は他社の案件に応募できない | no_consent | PASS |
 | S8-035-02 | noConsent_同意なしは自社の案件でも no_consent で不可 | `reasons` が `['no_consent']` | PASS |
 | S8-035-03 | noConsent_対_同意ありなら同じ自社の案件は応募可 | 対 | PASS |
-| S8-035-DB | supabase/tests/talent_rls_check.sql の23シナリオ（本番と同じ連鎖 0000〜0413 で実行。Supabase 既定の全権限付与下で RLS だけが砦） | AUTH_GATE / DATA_PERSISTENCE | 23シナリオ（実行結果は sprint-8-green-phase 系の記録を参照） |
+| S8-035-DB | supabase/tests/talent_rls_check.sql の77シナリオ（本番と同じ連鎖 0000〜0413 で実行。Supabase 既定の全権限付与下で RLS だけが砦） | AUTH_GATE / DATA_PERSISTENCE | 77シナリオ（番号 1〜78、32 は欠番。実行結果は sprint-8-green-phase 系の記録を参照） |
 
 ### NFR-05: 1,000 人分 listRenewals の性能
 
@@ -173,7 +173,7 @@ TDD-Writer: 赤松 灯 (⑦)
 | ファイル | 種別 |
 |---|---|
 | `packages/input-core/src/__tests__/s8_talent_req026_034.test.ts` | Vitest ユニットテスト（231 テスト） |
-| `supabase/tests/talent_rls_check.sql` | DB RLS/関数 検証 SQL（23 シナリオ） |
+| `supabase/tests/talent_rls_check.sql` | DB RLS/関数 検証 SQL（77 シナリオ。番号 32 は欠番） |
 | `supabase/tests/run_talent_rls_check.sh` | RLS 検証実行スクリプト |
 | `spec/evidence/sprint-8-red-phase.log` | 初回〜第1回 RED フェーズ実行エビデンス |
 | `spec/evidence/sprint-8-red-phase-2.md` | 第2回 RED フェーズ実行エビデンス |
@@ -267,3 +267,22 @@ TDD-Writer: 赤松 灯 (⑦)
 | REQ-034 | 確認者のゼロ幅文字（U+200B/200C/200D/2060/FEFF、連続、空白混在）→ 記録なし、対: 可視文字あり | 14 | 10 |
 
 注: 「前年度に修了」かつ「基準日と同日」は同時に成立しない（同日なら同じ年度）ため、前年度の対は基準日の前年度末日（2026-03-31）修了で表現した。U+FEFF 単独は JS の trim が除去するため実装が既に満たし PASS。
+
+
+---
+
+## 追加 第8回（仕様 v2.21。Adversary 第6回 FIND-602/603/606/608/610）
+
+追加 137 件（s8 は 573 件）。うち 32 件が RED（実装が v2.21 に未追随）、105 件は対（有効入力）・ミューテーション対応で PASS。RED の詳細は spec/evidence/sprint-8-red-phase-7.md。
+
+| REQ | 内容 | 件数 | RED |
+|---|---|---|---|
+| REQ-030 | 夜間勤務はシフト時刻から導出（22:00-23:00 / 21:00-22:30 / 04:00-06:00 / 20:00-06:00 / 00:00-05:00 / 12:00-22:01 / 04:59-12:00 / 24 時間勤務、複数シフト）。対: 09:00-17:00・05:00-22:00 などの境界、18 歳、nightWork=true | 23 | 10 |
+| REQ-033 | annualFiscalYears が undefined/キー欠落/null/文字列/数値/オブジェクト: checkEligibility は invalid_input（警備・非警備）、listRenewals は annual_training の invalid 項目（dueOn=年度末）で他の人は通常どおり。対: 配列・空配列 | 28 | 19 |
+| REQ-034 | 確認者が Unicode 空白（U+00A0/1680/2000〜200A/2028/2029/202F/205F/3000 と混在）だけなら公開拒否・応募拒否。対: 可視文字あり | 49 | 0 |
+| REQ-028 | 警備×spot/referral/security×新任未了 → security_basic_training_missing。対: dispatch・修了済・非警備 | 10 | 0 |
+| REQ-032/026 | residence.expiresOn の ''/null は invalid_input。対: undefined・有効日 | 4 | 0 |
+| REQ-029 | employmentDays=0 の派遣は日雇派遣。対: age60 例外・31 日 | 3 | 0 |
+| REQ-026/037 | 日付の前後空白・改行（生年月日・シフト日・在留期限・新任修了日・busy・入社日）、古い年（0099/0000 は有効 → 3 件 RED、'0000-00-00' ほかは invalid） | 18＋9 | 0＋3 |
+
+注: 件数は同一 describe 内の it.each 展開を含む実測値。FIND-610 は MANIFEST を最新（仕様 v2.21、DB 77 シナリオ・欠番 32）に更新することで対応した。
