@@ -2,9 +2,9 @@
 
 TDD-Writer: 赤松 灯 (⑦)  
 作成日: 2026-11-07  
-仕様バージョン: behavioral-spec.md 追補 v2.18（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
-再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）、第6回（v2.18。Adversary 第4回 FIND-401/402/403/405）。spec/evidence/sprint-8-test-regeneration.md 参照
-結果（第6回の RED 時点。`pnpm --filter @mamorai/input-core exec vitest run` の実測）: input-core 全体 775 件中 766 PASS / 9 RED。s8 は 343 件中 334 PASS / 9 RED。RED は全て第6回で追加した新規テスト（実装が v2.18 に未追随）。第6回より前の 724 件は全て PASS（回帰 0）。最新の GREEN 実測（第5回分まで）は spec/evidence/sprint-8-green-phase-4.md（724 件 PASS）。第6回分の GREEN は未実施
+仕様バージョン: behavioral-spec.md 追補 v2.19（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
+再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）、第6回（v2.18。Adversary 第4回 FIND-401/402/403/405）、第7回（v2.19。Adversary 第5回 FIND-505/507/508）。spec/evidence/sprint-8-test-regeneration.md 参照
+結果（第7回の RED 時点。`pnpm --filter @mamorai/input-core exec vitest run` の実測）: input-core 全体 868 件中 858 PASS / 10 RED。s8 は 436 件中 426 PASS / 10 RED。RED は全て第7回で追加した新規テスト（確認者のゼロ幅文字。実装が v2.19 に未追随）。第7回より前の 775 件は全て PASS（回帰 0）。最新の GREEN 実測（第5回分まで）は spec/evidence/sprint-8-green-phase-4.md（724 件 PASS）。第6回・第7回分の GREEN は未実施
 
 ---
 
@@ -243,3 +243,27 @@ TDD-Writer: 赤松 灯 (⑦)
 | REQ-026/037 | FIND-403: 時刻（30:00 / 10:60 / 09:00:00 / x09:00 / 09:00x / 先頭空白 / 数値 900 と 00:00・23:59・19:59・20:00 の有効境界）、日付（T 付き / 末尾・先頭文字 / 先頭空白） | 22 | 0 |
 | REQ-029 | FIND-403: 日雇派遣判定は派遣のときだけ（spot / referral / security で 30 日以下） | 7 | 0 |
 | REQ-033 | FIND-403: 退社日が空文字の雇用の invalid 項目（contract / annual_training の dueOn）、personId 接頭辞の並び（ab/abc、''/a） | 7 | 0 |
+
+
+---
+
+## 追加 第7回（仕様 v2.19。Adversary 第5回 FIND-505/507/508）
+
+追加 93 件（s8 は 436 件）。RED 時点の記録: 10 件が RED（確認者のゼロ幅文字のみ）、83 件は対（有効入力）・ミューテーション対応で PASS。RED の詳細は spec/evidence/sprint-8-red-phase-6.md。
+
+| REQ | 内容 | 件数 | RED |
+|---|---|---|---|
+| REQ-030 | 年齢は各シフト日で判定（警備・夜間 × 17歳の日と18歳の日の順序違い、対: 全日18歳・非対象案件） | 9 | 0 |
+| REQ-031 | 時間の重なりは全シフト（最初／2つ目／最後だけ重なる、対: 別日・接する時刻） | 5 | 0 |
+| REQ-027/028 | 警備×派遣は employmentDays 10/30/31/90 で拒否（応募・公開前）、対: 非警備×派遣 | 11 | 0 |
+| REQ-034 | 線引き確認は form 4種すべてで拒否、対: 記録あり／不要 | 12 | 0 |
+| REQ-026/033 | basicDoneOn 空文字は invalid_input／annual_training の invalid 項目、対: undefined | 5 | 0 |
+| REQ-033 | basicDoneOn 不正でも今年度の現任教育済みなら invalid 項目なし、対: 未達 | 5 | 0 |
+| REQ-026 | listApplicableJobs は mode=instant でも可否に影響しない | 1 | 0 |
+| REQ-026 | employmentDays の検証は派遣のみ（spot/security で undefined/NaN/-1 は invalid_input でない、対: 派遣） | 9 | 0 |
+| REQ-033 | soonDays=7 と既定30 の境界を契約・在留・現任教育で固定 | 12 | 0 |
+| REQ-033 | 不正な雇用: 契約は通常項目、現任教育は invalid、契約満了日ありのみ contract invalid | 7 | 0 |
+| REQ-033 | 基準日と新任修了日が同日／翌日／前年度 | 4 | 0 |
+| REQ-034 | 確認者のゼロ幅文字（U+200B/200C/200D/2060/FEFF、連続、空白混在）→ 記録なし、対: 可視文字あり | 14 | 10 |
+
+注: 「前年度に修了」かつ「基準日と同日」は同時に成立しない（同日なら同じ年度）ため、前年度の対は基準日の前年度末日（2026-03-31）修了で表現した。U+FEFF 単独は JS の trim が除去するため実装が既に満たし PASS。
