@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path'
 
 const dir = resolve(dirname(fileURLToPath(import.meta.url)), '../talent')
 const files = readdirSync(dir).filter((n) => n.endsWith('.ts'))
-const forbidden = [/from\s+['"]react['"]/, /from\s+['"]@supabase/, /\bwindow\b/, /\bdocument\b/, /\bfetch\s*\(/, /process\.env/, /Date\.now\s*\(/, /Math\.random\s*\(/, /new\s+Date\s*\(\s*\)/]
+const forbidden = [/from\s+['"]react['"]/, /from\s+['"]@supabase/, /\bwindow\b/, /\bdocument\b/, /\bfetch\s*\(/, /process\.env/, /Date\.now\s*\(/, /Math\.random\s*\(/, /new\s+Date\s*\(\s*\)/, /performance\.now/, /crypto\.randomUUID/, /\bIntl\./, /toLocale(String|DateString|TimeString)/, /(^|[^\w.])(?<!new\s)Date\s*\(\s*\)/]
 
 describe('[TLN] 純粋性', () => {
   it('talentPurity_禁止APIを参照しない', () => {

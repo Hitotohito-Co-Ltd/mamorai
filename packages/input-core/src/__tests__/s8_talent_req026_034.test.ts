@@ -3259,3 +3259,384 @@ describe('[REQ-033] 在留期限の項目は就労可否で条件付けない', 
     expect(allowed).toHaveLength(1)
   })
 })
+
+// ═════════════════════════════════════════════════════════════
+// 第6回（仕様 v2.18。Adversary 第4回 FIND-401/402/403/405）
+// ═════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────────────
+// A. FIND-401: 契約満了日・在留期限が空文字/null でも項目を消さない（REQ-033）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-033] 契約満了日・在留期限が空文字/null でも invalid 項目として返す', () => {
+  const REF = '2027-03-10'
+  const base = (id: string, o: Partial<PersonProfile> = {}) =>
+    mkPerson({
+      personId: id,
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01' }],
+      guardTraining: { basicDoneOn: '2020-01-01', annualFiscalYears: [2025, 2026] },
+      ...o,
+    })
+  const withContract = (id: string, contractEndOn: unknown) =>
+    base(id, {
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', contractEndOn }] as unknown as PersonProfile['employments'],
+    })
+
+  it('contractEndOn_空文字は contract の invalid 項目(dueOn は空文字)で返る', () => {
+    // Arrange
+    const person = withContract('p-empty', '')
+    // Act
+    const result = renewals([person], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-empty', kind: 'contract', dueOn: '', daysLeft: null, urgency: 'invalid' },
+    ])
+  })
+
+  it('contractEndOn_null(any キャスト)は contract の invalid 項目(dueOn は null)で返る', () => {
+    // Arrange
+    const person = withContract('p-null', null)
+    // Act
+    const result = renewals([person], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-null', kind: 'contract', dueOn: null, daysLeft: null, urgency: 'invalid' },
+    ])
+  })
+
+  it('contractEndOn_キー無し(undefined)は項目なし', () => {
+    // Arrange
+    const person = withContract('p-undef', undefined)
+    // Act / Assert
+    expect(renewals([person], REF)).toEqual([])
+  })
+
+  it('contractEndOn_空文字の invalid は期限切れ・間近より先頭に並ぶ', () => {
+    // Arrange
+    const expired = withContract('p-a', '2027-03-01')
+    const soon = withContract('p-b', '2027-03-15')
+    const empty = withContract('p-z', '')
+    // Act
+    const result = renewals([expired, soon, empty], REF)
+    // Assert
+    expect(brief(result)).toEqual([
+      { personId: 'p-z', kind: 'contract', urgency: 'invalid', daysLeft: null },
+      { personId: 'p-a', kind: 'contract', urgency: 'expired', daysLeft: -9 },
+      { personId: 'p-b', kind: 'contract', urgency: 'soon', daysLeft: 5 },
+    ])
+  })
+
+  it('contractEndOn_対_有効な日付なら従来どおり(soon・dueOn・daysLeft)', () => {
+    // Arrange
+    const person = withContract('p-ok', '2027-03-20')
+    // Act
+    const result = renewals([person], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-ok', kind: 'contract', dueOn: '2027-03-20', daysLeft: 10, urgency: 'soon' },
+    ])
+  })
+
+  it('residence_expiresOn が空文字でも residence の invalid 項目(dueOn は空文字)で返る', () => {
+    // Arrange
+    const person = base('p-res-empty', { residence: { workAllowed: true, expiresOn: '' } })
+    // Act
+    const result = renewals([person], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-res-empty', kind: 'residence', dueOn: '', daysLeft: null, urgency: 'invalid' },
+    ])
+  })
+
+  it('residence_対_expiresOn のキーが無ければ項目なし', () => {
+    // Arrange
+    const person = base('p-res-none', { residence: { workAllowed: true } })
+    // Act / Assert
+    expect(renewals([person], REF)).toEqual([])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// B. FIND-402: 新任教育の修了日が不正（REQ-026 / 028 / 033）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-026][REQ-028][REQ-033] basicDoneOn が不正な人', () => {
+  const REF = '2027-03-10' // FY2026。年度末 2027-03-31
+  const bad = (basicDoneOn: unknown, years = [2025]) =>
+    mkPerson({
+      personId: 'p-bad-basic',
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01' }],
+      guardTraining: { basicDoneOn, annualFiscalYears: years } as unknown as PersonProfile['guardTraining'],
+    })
+
+  it.each([
+    ['暦にない 2026-04-99', '2026-04-99'],
+    ['garbage', 'garbage'],
+  ])('basicDoneOn_%s は警備案件で invalid_input', (_l, v) => {
+    // Arrange
+    const job = mkJob()
+    // Act
+    const result = checkEligibility(bad(v), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toContain('invalid_input')
+  })
+
+  it.each([
+    ['暦にない 2026-04-99', '2026-04-99'],
+    ['garbage', 'garbage'],
+  ])('basicDoneOn_%s は非警備案件でも invalid_input', (_l, v) => {
+    // Arrange
+    const job = nonSec([day('2026-05-01')])
+    // Act
+    const result = checkEligibility(bad(v), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+  })
+
+  it('basicDoneOn_対_undefined(未修了)は非警備案件で invalid_input にならず応募可', () => {
+    // Arrange
+    const job = nonSec([day('2026-05-01')])
+    // Act
+    const result = checkEligibility(bad(undefined, []), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('basicDoneOn_対_undefined(未修了)は警備案件で security_basic_training_missing(invalid_input ではない)', () => {
+    // Arrange
+    const job = mkJob()
+    // Act
+    const result = checkEligibility(bad(undefined, []), job, [])
+    // Assert
+    expect(reasonsOf(result)).toContain('security_basic_training_missing')
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+  })
+
+  it.each([
+    ['暦にない 2026-04-99', '2026-04-99'],
+    ['garbage', 'garbage'],
+  ])('listRenewals_basicDoneOn が%sなら annual_training の invalid 項目(dueOn は年度末)', (_l, v) => {
+    // Arrange / Act
+    const result = renewals([bad(v)], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-bad-basic', kind: 'annual_training', dueOn: '2027-03-31', daysLeft: null, urgency: 'invalid' },
+    ])
+  })
+
+  it('listRenewals_対_basicDoneOn が undefined(未修了)なら invalid 項目は出ない', () => {
+    // Arrange / Act
+    const result = renewals([bad(undefined, [])], REF)
+    // Assert
+    expect(result.filter((i) => i.urgency === 'invalid')).toEqual([])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// C. FIND-403: 変異対策（具体的な値で固定）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-026][REQ-037] 時刻の形式(HH:MM 00:00〜23:59)の境界', () => {
+  it.each([
+    ['30:00', '30:00'],
+    ['10:60', '10:60'],
+    ['09:00:00', '09:00:00'],
+    ['x09:00', 'x09:00'],
+    ['09:00x', '09:00x'],
+    ['先頭空白 " 09:00"', ' 09:00'],
+    ['24:00', '24:00'],
+  ])('timeFormat_開始時刻が%sなら invalid_input だけで拒否', (_l, t) => {
+    // Arrange
+    const job = nonSec([day('2026-05-01', t, '17:00')])
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+    expect(pubReasons(job)).toEqual(['invalid_input'])
+  })
+
+  it.each([
+    ['30:00', '30:00'],
+    ['10:60', '10:60'],
+    ['09:00:00', '09:00:00'],
+    ['x09:00', 'x09:00'],
+    ['09:00x', '09:00x'],
+    ['先頭空白 " 09:00"', ' 09:00'],
+  ])('timeFormat_終了時刻が%sなら invalid_input だけで拒否', (_l, t) => {
+    // Arrange
+    const job = nonSec([day('2026-05-01', '08:00', t)])
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+    expect(pubReasons(job)).toEqual(['invalid_input'])
+  })
+
+  it('timeFormat_数値 900 の開始時刻は例外を投げず invalid_input', () => {
+    // Arrange
+    const job = nonSec([{ date: '2026-05-01', start: 900, end: '17:00' } as unknown as JobPost['shifts'][number]])
+    // Act
+    let result: EligibilityResult | undefined
+    expect(() => {
+      result = checkEligibility(mkPerson(), job, [])
+    }).not.toThrow()
+    // Assert
+    expect(result?.eligible).toBe(false)
+    expect(reasonsOf(result as EligibilityResult)).toEqual(['invalid_input'])
+    expect(() => pubReasons(job)).not.toThrow()
+    expect(pubReasons(job)).toEqual(['invalid_input'])
+  })
+
+  it('timeFormat_数値 900 の終了時刻は例外を投げず invalid_input', () => {
+    // Arrange
+    const job = nonSec([{ date: '2026-05-01', start: '08:00', end: 900 } as unknown as JobPost['shifts'][number]])
+    // Act
+    let result: EligibilityResult | undefined
+    expect(() => {
+      result = checkEligibility(mkPerson(), job, [])
+    }).not.toThrow()
+    // Assert
+    expect(result?.eligible).toBe(false)
+    expect(reasonsOf(result as EligibilityResult)).toEqual(['invalid_input'])
+    expect(pubReasons(job)).toEqual(['invalid_input'])
+  })
+
+  it.each([
+    ['00:00 開始(下限)', '00:00', '08:00'],
+    ['23:59 終了(上限)', '22:00', '23:59'],
+    ['19:59', '19:59', '23:00'],
+    ['20:00', '20:00', '23:00'],
+  ])('timeFormat_対_有効な時刻 %s は invalid_input が出ない', (_l, s, e) => {
+    // Arrange
+    const job = nonSec([day('2026-05-01', s, e)])
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+    expect(result.eligible).toBe(true)
+    expect(pubReasons(job)).toEqual([])
+  })
+})
+
+describe('[REQ-026][REQ-037] 日付の形式(YYYY-MM-DD 完全一致)', () => {
+  it.each([
+    ['末尾に時刻 2026-01-01T09:00', '2026-01-01T09:00'],
+    ['末尾に文字 2026-01-01x', '2026-01-01x'],
+    ['先頭に文字 x2026-01-01', 'x2026-01-01'],
+    ['先頭空白 " 2026-01-01"', ' 2026-01-01'],
+  ])('dateFormat_シフト日が%sなら invalid_input だけで拒否', (_l, d) => {
+    // Arrange
+    const job = nonSec([day(d)])
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+    expect(pubReasons(job)).toEqual(['invalid_input'])
+  })
+})
+
+describe('[REQ-029] 日雇派遣の判定は派遣のときだけ', () => {
+  const noTraining = () => mkPerson({ guardTraining: { basicDoneOn: undefined, annualFiscalYears: [] } })
+
+  it.each([
+    ['spot', 30],
+    ['spot', 1],
+    ['referral', 30],
+  ] as const)('dailyDispatchOnlyDispatch_form=%s で employmentDays=%i でも daily_dispatch_not_allowed は出ない', (form, days) => {
+    // Arrange
+    const job = mkJob({ form, isSecurityWork: false, employmentDays: days })
+    // Act
+    const result = checkEligibility(noTraining(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('daily_dispatch_not_allowed')
+    expect(result.eligible).toBe(true)
+  })
+
+  it.each([30, 1])('dailyDispatchOnlyDispatch_form=security で employmentDays=%i でも daily_dispatch_not_allowed は出ない', (days) => {
+    // Arrange
+    const job = mkJob({ form: 'security', isSecurityWork: true, employmentDays: days })
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('daily_dispatch_not_allowed')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('dailyDispatchOnlyDispatch_対_派遣で 30 日なら出る', () => {
+    // Arrange
+    const job = mkJob({ form: 'dispatch', isSecurityWork: false, employmentDays: 30 })
+    // Act
+    const result = checkEligibility(noTraining(), job, [])
+    // Assert
+    expect(reasonsOf(result)).toContain('daily_dispatch_not_allowed')
+  })
+})
+
+describe('[REQ-033] 雇用の退社日が空文字の人の invalid 項目', () => {
+  const REF = '2027-03-10'
+
+  it('endOn_空文字で契約満了日あり・現任教育未了なら contract と annual_training の invalid 項目(dueOn は具体値)', () => {
+    // Arrange
+    const person = mkPerson({
+      personId: 'p-endempty',
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', endOn: '', contractEndOn: '2027-03-20' }],
+      guardTraining: { basicDoneOn: '2020-01-01', annualFiscalYears: [2025] },
+    })
+    // Act
+    const result = renewals([person], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-endempty', kind: 'contract', dueOn: '2027-03-20', daysLeft: null, urgency: 'invalid' },
+      { personId: 'p-endempty', kind: 'annual_training', dueOn: '2027-03-31', daysLeft: null, urgency: 'invalid' },
+    ])
+  })
+
+  it('endOn_空文字の契約満了日が不正でも dueOn は入力値のまま', () => {
+    // Arrange
+    const person = mkPerson({
+      personId: 'p-endempty2',
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', endOn: '', contractEndOn: '2026/05/01' }],
+      guardTraining: { basicDoneOn: '2020-01-01', annualFiscalYears: [2025, 2026] },
+    })
+    // Act
+    const result = renewals([person], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-endempty2', kind: 'contract', dueOn: '2026/05/01', daysLeft: null, urgency: 'invalid' },
+    ])
+  })
+})
+
+describe('[REQ-033] personId が他方の接頭辞のとき短い方が先(コードポイント順)', () => {
+  const REF = '2027-03-10'
+  const p = (id: string) =>
+    mkPerson({
+      personId: id,
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01' }],
+      guardTraining: { basicDoneOn: '2020-01-01', annualFiscalYears: [2025] },
+    })
+
+  it.each([
+    ['ab と abc(短い方が先)', ['ab', 'abc']],
+    ['abc と ab(逆順入力)', ['abc', 'ab']],
+  ])('prefix_%s でも ab が先', (_l, ids) => {
+    // Arrange / Act
+    const result = renewals(ids.map(p), REF)
+    // Assert
+    expect(result.map((i) => i.personId)).toEqual(['ab', 'abc'])
+    expect(result.every((i) => i.daysLeft === 21)).toBe(true)
+  })
+
+  it.each([
+    ['空文字と a', ['', 'a']],
+    ['a と空文字(逆順入力)', ['a', '']],
+  ])('prefix_%s でも空文字が先', (_l, ids) => {
+    // Arrange / Act
+    const result = renewals(ids.map(p), REF)
+    // Assert
+    expect(result.map((i) => i.personId)).toEqual(['', 'a'])
+  })
+})
