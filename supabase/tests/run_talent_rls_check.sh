@@ -13,7 +13,15 @@ $P -c "drop database if exists tln_rls" -c "create database tln_rls"
 # Supabase 互換スタブ（anon / authenticated / auth.uid() / app_is_platform / app_company_id）
 $P -d tln_rls -f ../tests/jyoban_supabase_stub.sql >/dev/null
 # 依存マイグレーションを適用（上番報告まで）
+# 本番と同じ連鎖で検証する（0200〜0202 の FORCE RLS を含む。省くと staff の RLS が無い状態で PASS してしまう）
 for f in \
+  0000_base_assumed \
+  0100_report_additive \
+  0102_shift_additive \
+  0103_notify_training_additive \
+  0200_rls \
+  0201_app_role \
+  0202_rls_hardening \
   0400_production_onboarding \
   0401_pin_recovery \
   0402_leave_ops \
@@ -26,11 +34,13 @@ for f in \
   0411_talent_search_candidates \
   0411_talent_search_candidates \
   0412_talent_hardening \
-  0412_talent_hardening; do   # 2回=冪等性確認
+  0412_talent_hardening \
+  0413_talent_hardening2 \
+  0413_talent_hardening2; do   # 2回=冪等性確認
   $P -d tln_rls -f "$f.sql" >/dev/null 2>&1 || { echo "FAILED applying $f"; exit 1; }
 done
 # RLS/関数 検証シナリオを実行
-out=$($P -d tln_rls -t -A -f "../tests/talent_rls_check.sql" 2>&1)
+out=$($P -d tln_rls -t -A -f "../tests/talent_rls_check.sql" 2>&1) || { echo "$out"; echo "talent RLS check: ERROR（シナリオの実行に失敗）"; exit 1; }
 echo "$out"
 # FAIL を含む行があれば終了コード 1
 if echo "$out" | grep -q FAIL; then

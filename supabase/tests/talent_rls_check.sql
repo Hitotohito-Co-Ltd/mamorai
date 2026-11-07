@@ -42,7 +42,8 @@ insert into app_profiles(user_id, role, company_id) values
   -- 運営（platform）
   ('0c000000-0000-0000-0000-000000000099', 'platform_admin', null);
 
-grant select on companies, app_profiles, groups, persons, staff to authenticated;
+-- Supabase の既定に合わせ、anon / authenticated に全権限を付与する。以降の拒否は RLS とトリガだけで成り立つこと(権限の未付与で通ったように見せない)
+grant all on all tables in schema public to anon, authenticated;
 create table t_rls_results(n int, name text, ok boolean, detail text);
 grant insert, select on t_rls_results to authenticated, anon;
 
@@ -292,6 +293,78 @@ begin
     insert into t_rls_results values (18, '公開範囲に一般公開は選べない', sqlerrm like '%audience%', sqlerrm);
   end;
 end $$;
+
+-- ── シナリオ 19〜23: Adversary 第2回（FIND-102/103/109）──
+reset role;
+insert into sites(id, name, code, company_id) values
+  ('50000000-0000-0000-0000-00000000000a', 'A社の現場', 'S-A', 'cc000000-0000-0000-0000-000000000011'),
+  ('50000000-0000-0000-0000-00000000000b', 'B社の現場', 'S-B', 'cc000000-0000-0000-0000-000000000022');
+insert into jyoban_slots(id, company_id, site_id, name, work_start, work_end, departure_required, departure_due, onduty_required, grace_min, weekdays, is_active, sort_order) values
+  ('51000000-0000-0000-0000-00000000000b', 'cc000000-0000-0000-0000-000000000022', '50000000-0000-0000-0000-00000000000b', 'B社の枠', '09:00', '17:00', true, '08:00', false, 5, '{1,2,3,4,5}', true, 1);
+grant select, insert, update on sites, jyoban_slots to authenticated;
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';  -- A社管理者
+
+-- 19: 警備職種の案件を、職種なしの派遣に書き換えられない(FIND-102)
+do $$
+begin
+  begin
+    update jobs set role_id = null, form = 'dispatch' where id = 'e0000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (19, '警備職種の案件を職種なしの派遣に書き換えられない', false, '書き換えられた');
+  exception when others then
+    insert into t_rls_results values (19, '警備職種の案件を職種なしの派遣に書き換えられない', sqlerrm like '%職種%', sqlerrm);
+  end;
+end $$;
+
+-- 20: 確認者が空文字の線引き確認では公開できない(FIND-103)
+do $$
+begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', '整理員', 'spot', 'published', true, '', current_date);
+    insert into t_rls_results values (20, '確認者が空文字の線引き確認では公開できない', false, '公開できてしまった');
+  exception when others then
+    insert into t_rls_results values (20, '確認者が空文字の線引き確認では公開できない', sqlerrm like '%線引き%', sqlerrm);
+  end;
+end $$;
+
+-- 21: 他社の現場(site_id)を指す案件は登録できない(FIND-109)
+do $$
+begin
+  begin
+    insert into jobs(company_id, site_id, title, form)
+      values ('cc000000-0000-0000-0000-000000000011', '50000000-0000-0000-0000-00000000000b', '越境の現場', 'spot');
+    insert into t_rls_results values (21, '他社の現場を指す案件は登録できない', false, '登録できてしまった');
+  exception when others then
+    insert into t_rls_results values (21, '他社の現場を指す案件は登録できない', sqlerrm like '%現場%', sqlerrm);
+  end;
+end $$;
+
+-- 22: 他社の勤務枠(slot_id)を指すシフトは登録できない(FIND-109)
+do $$
+begin
+  begin
+    insert into job_shifts(job_id, company_id, work_date, start_time, end_time, headcount, slot_id)
+      values ('e0000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', current_date, '09:00', '17:00', 1, '51000000-0000-0000-0000-00000000000b');
+    insert into t_rls_results values (22, '他社の勤務枠を指すシフトは登録できない', false, '登録できてしまった');
+  exception when others then
+    insert into t_rls_results values (22, '他社の勤務枠を指すシフトは登録できない', sqlerrm like '%勤務枠%', sqlerrm);
+  end;
+end $$;
+
+-- 23: 自社の現場・勤務枠を指す案件・シフトは登録できる(対になる正常系)
+do $$
+begin
+  begin
+    insert into jobs(company_id, site_id, title, form)
+      values ('cc000000-0000-0000-0000-000000000011', '50000000-0000-0000-0000-00000000000a', '自社の現場', 'spot');
+    insert into t_rls_results values (23, '自社の現場を指す案件は登録できる', true, '');
+  exception when others then
+    insert into t_rls_results values (23, '自社の現場を指す案件は登録できる', false, sqlerrm);
+  end;
+end $$;
+
+reset role;
 
 -- ── 結果出力 ──
 select n || '. ' || case when ok then 'PASS' else 'FAIL' end || '  ' || name
