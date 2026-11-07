@@ -519,7 +519,8 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **変更対象:** packages/input-core/src/talent/eligibility.ts（shiftsOverlap）, supabase/migrations（確定の RPC での排他）
 
 ## 既知のリスク（Sprint 9 の REQ-039/040 で解消するまで、機能として公開しない）
-- **KR-1 応募テーブルの直接書き込み:** 会社の管理者が `job_applications` に直接 confirmed の行を作れる（同意なし・定員超過・時間の重なり・決定者の偽装を DB が止めない）。Sprint 9 で応募・確定を RPC 経由に限り、直接の insert/update の権限を外す。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
+- **KR-1 応募テーブルの直接書き込み:** 会社の管理者が `job_applications` に直接 confirmed の行を作れる（同意なし・定員超過・時間の重なり・決定者の偽装を DB が止めない）。確定済みの応募を直接 DELETE することもでき、その直後に案件を削除できる（削除ガードは応募が存在する間だけ有効）。Sprint 9 で応募・確定を RPC 経由に限り、直接の insert/update の権限を外す。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
+- **KR-4 TRUNCATE 権限:** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
 - **KR-2 マイグレーションの再適用:** 0410 を 0413 の後に単独で再実行すると、強化した関数・ポリシーが旧版に戻る。マイグレーションは番号順に 1 回ずつ適用する前提（ランナーの手順書に明記）。
 - **KR-3 警備フラグと職種:** 案件の警備判定は職種マスタの選択に依存する。非警備の職種を選べば警備の判定を回避できる（職種の選択の統制は OQ-21 と合わせて決める）。
 
@@ -545,17 +546,18 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` のコードポイント順（ロケールに依存しない昇順。UTF-16 の並びではなく、サロゲートペアの文字を 1 つのコードポイントとして比較する）、それも同じなら `contract`、`annual_training`、`residence` の順で並べる。期限切れの項目の `daysLeft` は負の値（期限日が基準日の前日なら -1）とする。
 - WHEN 現任教育の更新手続きを作る THE システム SHALL `dueOn` を基準日の年度末（3 月 31 日）にする（REQ-033）。
 - WHEN シフトの終了時刻が開始時刻と同じ THE システム SHALL 24 時間勤務として扱い、翌日に終わる勤務の時間の重なりと通算に使う（REQ-031）。
-- WHEN `checkEligibility` または `validateJobForPublish` の入力に不正な値がある THE システム SHALL `invalid_input` で拒否し、応募可・公開可にしない。不正な値とは、次のいずれかである。①シフト日・生年月日・在留期限、他の勤務（`busy`）の日付、雇用の入社日・退社日が、暦に存在する `YYYY-MM-DD` でない ②シフトと他の勤務の開始・終了時刻が、`HH:MM`（00:00〜23:59）でない ③派遣案件の `employmentDays` が 0 以上の整数でない（REQ-026・REQ-037）。雇用の退社日が空文字の場合も不正とする（退社していない場合は項目を持たない）。確認日（日雇派遣の例外の `verifiedOn`、線引き確認の `confirmedOn`）の不正は `invalid_input` にせず、それぞれ `dispatch_exception_invalid`、`boundary_not_confirmed` とする。
+- WHEN `checkEligibility` または `validateJobForPublish` の入力に不正な値がある THE システム SHALL `invalid_input` で拒否し、応募可・公開可にしない。不正な値とは、次のいずれかである。①シフト日・生年月日・在留期限・新任教育の修了日（`basicDoneOn`。値がある場合）、他の勤務（`busy`）の日付、雇用の入社日・退社日が、暦に存在する `YYYY-MM-DD` でない ②シフトと他の勤務の開始・終了時刻が、`HH:MM`（00:00〜23:59）でない ③派遣案件の `employmentDays` が 0 以上の整数でない（REQ-026・REQ-037）。雇用の退社日が空文字の場合も不正とする（退社していない場合は項目を持たない）。確認日（日雇派遣の例外の `verifiedOn`、線引き確認の `confirmedOn`）の不正は `invalid_input` にせず、それぞれ `dispatch_exception_invalid`、`boundary_not_confirmed` とする。
 - WHEN 日雇派遣の例外区分 `kind` が定義された区分（`age60` / `day_student` / `side_job` / `household_income`）以外 THE システム SHALL `dispatch_exception_invalid` で拒否する（REQ-029）。
 - WHEN 在留の判定で `residence_invalid` が 1 つでもある THE システム SHALL `residence_expiring` の警告を返さない（拒否と警告を同時に返さない。REQ-032）。
 - WHEN 労働時間を通算する THE システム SHALL 日をまたぐ勤務の全時間を、始業日の労働としてまとめて計上する（労働基準法の扱い。継続勤務が二暦日にわたる場合は始業時刻の属する日の労働。社労士の確認前提。REQ-031）。
+- WHEN 案件の金額・日数を DB に保存する THE システム SHALL シフトの支払単価（`job_shifts.wage`）も 0 未満を拒否する。線引き確認の確認日が今日より後の場合も DB で拒否する（REQ-034・REQ-037）。
 - WHEN 線引きの確認記録を判定する THE システム SHALL 確認者が空白でない文字列で、確認日が暦に存在する日付であるときだけ「記録あり」とする（REQ-034）。
 - WHEN 警備の枠が派遣で作られる、または派遣の案件に職種がない THE システム SHALL DB でも拒否する。派遣の案件は職種の指定を必須とする（REQ-027）。
 - WHEN 応募が存在する案件またはシフトを削除しようとする THE システム SHALL DB で拒否する（応募の成立は労働契約の成立を伴うため、記録を連鎖して消さない。案件は状態を closed にして終了する）（REQ-037・REQ-039）。
 - WHEN 案件の雇用日数（`employment_days`）、時給（`hourly_wage`）、請求単価（`billing_rate`）を保存する THE システム SHALL DB で 0 未満を拒否し、派遣の案件では雇用日数を必須とする（TS の `invalid_input` と同じ基準。REQ-037）。
 - WHEN 案件・シフトが現場（site_id）または勤務枠（slot_id）を指す THE システム SHALL 案件と同じ会社のものだけを許可する（REQ-037）。
 - WHEN 案件にシフトが 1 件もない THE システム SHALL `checkEligibility` で `no_shifts` により応募を拒否し、`validateJobForPublish` で公開を拒否する（REQ-026・REQ-037）。
-- WHEN `listRenewals` の入力の期限日（契約満了日・在留期限）または雇用の入社日・退社日が不正 THE システム SHALL その項目を一覧から消さず、`urgency: 'invalid'`・`daysLeft: null` の項目として先頭に返す（法令上の期限の見落としを防ぐため）。invalid 項目の `kind` と `dueOn` は、契約満了日が不正なら `contract`・入力された値、在留期限が不正なら `residence`・入力された値。雇用の入社日・退社日が不正で在籍を判定できない人は、契約満了日がある雇用ごとに `contract`（`dueOn` は契約満了日）、現任教育が未了なら `annual_training`（`dueOn` は年度末）の invalid 項目を返す。invalid 項目同士は `personId` のコードポイント順、同じ `personId` では `contract`、`annual_training`、`residence` の順に並べる。基準日が不正なときは `RangeError` を投げる（REQ-033）。`RenewalItem.urgency` に `'invalid'` を、`daysLeft` に `null` を加える。
+- WHEN `listRenewals` の入力の期限日（契約満了日・在留期限）または雇用の入社日・退社日が不正 THE システム SHALL その項目を一覧から消さず、`urgency: 'invalid'`・`daysLeft: null` の項目として先頭に返す（法令上の期限の見落としを防ぐため）。invalid 項目の `kind` と `dueOn` は、契約満了日が不正なら `contract`・入力された値、在留期限が不正なら `residence`・入力された値。雇用の入社日・退社日が不正で在籍を判定できない人は、契約満了日がある雇用ごとに `contract`（`dueOn` は契約満了日）、現任教育が未了なら `annual_training`（`dueOn` は年度末）の invalid 項目を返す。invalid 項目同士は `personId` のコードポイント順、同じ `personId` では `contract`、`annual_training`、`residence` の順に並べる。基準日が不正なときは `RangeError` を投げる（REQ-033）。契約満了日が空文字または null の場合も不正として invalid 項目にする（キーが無い＝undefined の場合だけ対象外）。新任教育の修了日が不正な人は、`annual_training` の invalid 項目（`dueOn` は年度末）を返す。`RenewalItem.urgency` に `'invalid'` を、`daysLeft` に `null` を加える。
 - WHEN `listRenewals` が「在籍中」を判定する THE システム SHALL 「入社日が基準日以前、かつ退社日がない、または退社日が基準日以後」の雇用を在籍中とする。契約満了と現任教育（在籍中の雇用が 1 件以上必要）の両方がこの定義を使う。現任教育は、新任教育の修了日が基準日より後の人（基準日時点で未修了）も対象外とする（REQ-033）。
 - WHEN 日雇派遣（30 日以内）に例外区分で応募する THE システム SHALL 確認日 `verifiedOn` が暦に存在する `YYYY-MM-DD` の日付（`2026-13-45` などは不可）で、かつシフト日以前であり、区分が `age60` の場合は本人がシフト日に満 60 歳以上である場合に限り例外を認め、満たさなければ `dispatch_exception_invalid` で拒否する。複数のシフト日があるときは、すべてのシフト日でこの条件を満たすこと（REQ-029）。
 
@@ -600,6 +602,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.15: Adversary Sprint 8 第3回 FAIL(High1・Medium6・Low3)と RYUGEN の『直して続行』を受けて確定。REQ-035 を 035a/035b に分割、invalid_input を時刻・他の勤務・雇用日に拡張、listRenewals は不正な期限を消さず invalid 項目で返す、並びはコードポイント(サロゲート対)、応募のある案件・シフトは削除不可、金額と日数の CHECK、既知のリスク KR-1〜3 を明記。
 - 2026-11-07 v2.16: TDD-Writer の差し戻し3点(invalid 項目の kind・dueOn・並び)を確定。
 - 2026-11-07 v2.17: RYUGEN が OQ-20（Planner 案6点）を承認し、OQ-21 は推奨案（職種マスタの既定値から引き継ぎ、変更は本社のみ）を採用。許可表に『線引き確認の要否を変更する』の行を追加し、『Planner 案』の注記を承認済みに更新。
+- 2026-11-07 v2.18: Adversary Sprint 8 第4回 FAIL(D3・D5 の Medium4・Low1。D1/D2/D4 は PASS)を受けて確定。basicDoneOn の検証、契約満了日の空文字・null は invalid、wage と確認日の DB 検証、KR-1 に delete、KR-4(TRUNCATE)を追加。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
