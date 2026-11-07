@@ -8,6 +8,10 @@ import {
   checkEligibility,
   validateJobForPublish,
   listRenewals,
+  listApplicableJobs,
+  ageOn,
+  fiscalYearOf,
+  shiftsOverlap,
 } from '../index.js'
 import type {
   PersonProfile,
@@ -376,7 +380,9 @@ describe('[REQ-029] 日雇派遣（30日以内）の例外', () => {
 
   it('dailyDispatch_30日の派遣で例外あり（60歳以上）_可', () => {
     // Arrange
+    // v2.10: age60 は本人がシフト日に満60歳以上であることが条件。1960-01-01 生まれ＝2026-05-01 に66歳
     const person = mkPerson({
+      birthDate: '1960-01-01',
       dailyDispatchException: { kind: 'age60', verifiedOn: '2026-01-01' },
       guardTraining: { basicDoneOn: undefined, annualFiscalYears: [] },
     })
@@ -1064,15 +1070,22 @@ describe('[NFR-05] 更新手続き一覧の性能', () => {
     })
   }
 
-  it('performance_1000人分_結果が配列として返る（性能計測と分離）', () => {
+  it('performance_1000人分_結果が期待件数ちょうど（契約満了250＋現任教育250＝500件）で並び順も正しい', () => {
     // Arrange
     const persons = mk1000Persons()
+    const id = (i: number) => `p-perf-${i.toString().padStart(4, '0')}`
+    const idx = Array.from({ length: 1000 }, (_, i) => i)
+    // 期待: 契約満了(2027-03-15, 残10日)が先、現任教育(2027-03-31, 残26日)が後。それぞれ personId 昇順
+    const expected = [
+      ...idx.filter(i => i % 4 === 1).map(i => [id(i), 'contract', 10]),
+      ...idx.filter(i => i % 4 === 0).map(i => [id(i), 'annual_training', 26]),
+    ]
     // Act
     const result = listRenewals(persons, RENEWAL_DATE_FY2026)
-    // Assert: 配列であること（結果の正確性は他のテストで確認）
-    expect(Array.isArray(result)).toBe(true)
-    // i%4===0 (250人, 現任) と i%4===1 (250人, 契約) がヒット → 合計 500 件以上
-    expect(result.length).toBeGreaterThanOrEqual(500)
+    // Assert
+    expect(result.length).toBe(500)
+    expect(result.map(r => [r.personId, r.kind, r.daysLeft])).toEqual(expected)
+    expect(result.every(r => r.urgency === 'soon')).toBe(true)
   })
 
   it('performance_1000人分の_listRenewals_が_1秒以内に完了する', () => {
@@ -1086,6 +1099,741 @@ describe('[NFR-05] 更新手続き一覧の性能', () => {
     expect(elapsed).toBeLessThan(1000)
   })
 })
+
+// ═════════════════════════════════════════════════════════════
+// 再生成 第2回（仕様 v2.10 / Adversary FIND-004/005/006/007/009）
+// ═════════════════════════════════════════════════════════════
+
+/** v2.10 の戻り値（details を含む）。model.ts が未更新でもテストは仕様の形で読む */
+type ResultWithDetails = EligibilityResult & {
+  details: { residenceDaysLeft?: number; maxDailyHours?: number }
+}
+const detailed = (r: EligibilityResult) => r as ResultWithDetails
+
+const NO_TRAINING = { basicDoneOn: undefined, annualFiscalYears: [] as number[] }
+
+// ─────────────────────────────────────────────────────────────
+// REQ-026 / REQ-037: シフトが 1 件もない案件（no_shifts）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-026] 空のシフト（no_shifts）', () => {
+  it('noShifts_在籍済みの人でもシフトが空なら no_shifts で不可', () => {
+    // Arrange: 条件を全て満たす人 × シフト 0 件の案件
+    const person = mkPerson()
+    const job = mkJob({ shifts: [] })
+    // Act
+    const result = checkEligibility(person, job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('no_shifts')
+  })
+
+  it('noShifts_在籍していない人でもシフトが空なら no_shifts で不可', () => {
+    // Arrange: 雇用が 1 件もない人 × シフト 0 件（全シフト日の確認が空振りして通ってしまわないこと）
+    const person = mkPerson({ employments: [] })
+    const job = mkJob({ shifts: [] })
+    // Act
+    const result = checkEligibility(person, job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('no_shifts')
+  })
+
+  it('noShifts_対_シフトが 1 件あれば no_shifts は出ず応募できる', () => {
+    // Arrange
+    const person = mkPerson()
+    const job = mkJob({ shifts: [{ date: '2026-05-01', start: '09:00', end: '17:00' }] })
+    // Act
+    const result = checkEligibility(person, job, [])
+    // Assert
+    expect(result.reasons).toEqual([])
+    expect(result.eligible).toBe(true)
+  })
+
+  it('noShifts_公開前チェックはシフトが空なら no_shifts だけを返す', () => {
+    // Arrange: 他に問題のない案件
+    const job = mkJob({ shifts: [] })
+    // Act
+    const reasons = validateJobForPublish(job)
+    // Assert
+    expect(reasons).toEqual(['no_shifts'])
+  })
+
+  it('noShifts_対_公開前チェックはシフトが 1 件あれば空配列', () => {
+    // Arrange
+    const job = mkJob({ shifts: [{ date: '2026-05-01', start: '09:00', end: '17:00' }] })
+    // Act / Assert
+    expect(validateJobForPublish(job)).toEqual([])
+  })
+
+  it('noShifts_公開前チェック_他の拒否理由と並ぶ（警備×派遣×空シフト）', () => {
+    // Arrange
+    const job = mkJob({ form: 'dispatch', shifts: [] })
+    // Act
+    const reasons = validateJobForPublish(job)
+    // Assert: 集合として比較（並び順は規定しない）
+    expect([...reasons].sort()).toEqual(['no_shifts', 'security_dispatch_forbidden'])
+  })
+
+  it('noShifts_応募できる案件の一覧からシフトが空の案件は除かれる', () => {
+    // Arrange
+    const person = mkPerson()
+    const ok = mkJob({ jobId: 'j-ok' })
+    const empty = mkJob({ jobId: 'j-empty', shifts: [] })
+    // Act
+    const result = listApplicableJobs(person, [empty, ok], [])
+    // Assert
+    expect(result.map(j => j.jobId)).toEqual(['j-ok'])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// REQ-033: 在籍中の定義（入社日 ≤ 基準日 かつ（退社日なし or 退社日 ≥ 基準日））
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-033] 在籍中の判定（基準日）', () => {
+  const REF = '2026-11-07'
+  const emp = (o: Partial<PersonProfile['employments'][number]>) => ({
+    companyId: 'c-001', startOn: '2020-01-01', ...o,
+  })
+  /** 現任教育は FY2026 まで満たし済み。契約満了だけが結果を左右する */
+  const contractPerson = (id: string, employments: PersonProfile['employments']) =>
+    mkPerson({ personId: id, employments, guardTraining: { basicDoneOn: '2020-06-01', annualFiscalYears: [2025, 2026] } })
+
+  it('inService_退社予定日が基準日より後なら契約満了が出る', () => {
+    // Arrange: 退社予定 2026-12-31（基準日より後）、契約満了 2026-11-20
+    const p = contractPerson('p-a', [emp({ endOn: '2026-12-31', contractEndOn: '2026-11-20' })])
+    // Act
+    const result = listRenewals([p], REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-a', kind: 'contract', dueOn: '2026-11-20', daysLeft: 13, urgency: 'soon' },
+    ])
+  })
+
+  it('inService_退社日が基準日当日なら在籍中で契約満了が出る', () => {
+    // Arrange: 退社日 = 基準日（退社日 ≥ 基準日 は在籍中）
+    const p = contractPerson('p-a', [emp({ endOn: REF, contractEndOn: '2026-11-20' })])
+    // Act
+    const result = listRenewals([p], REF)
+    // Assert
+    expect(result.map(i => [i.personId, i.kind, i.dueOn])).toEqual([['p-a', 'contract', '2026-11-20']])
+  })
+
+  it('inService_退社日が基準日より前なら契約満了は出ない', () => {
+    // Arrange: 退社日 2026-11-06（基準日の前日）
+    const p = contractPerson('p-a', [emp({ endOn: '2026-11-06', contractEndOn: '2026-11-20' })])
+    // Act / Assert
+    expect(listRenewals([p], REF)).toEqual([])
+  })
+
+  it('inService_入社日が基準日より未来の雇用は契約満了が出ない', () => {
+    // Arrange: 入社日 2026-11-08（基準日の翌日）
+    const p = contractPerson('p-a', [emp({ startOn: '2026-11-08', contractEndOn: '2026-11-20' })])
+    // Act / Assert
+    expect(listRenewals([p], REF)).toEqual([])
+  })
+
+  it('inService_対_入社日が基準日当日なら在籍中で契約満了が出る', () => {
+    // Arrange
+    const p = contractPerson('p-a', [emp({ startOn: REF, contractEndOn: '2026-11-20' })])
+    // Act
+    const result = listRenewals([p], REF)
+    // Assert
+    expect(result.map(i => [i.personId, i.kind, i.daysLeft])).toEqual([['p-a', 'contract', 13]])
+  })
+
+  it('inService_複数雇用_在籍中の雇用の契約満了だけが出る', () => {
+    // Arrange: 退社済みの雇用（満了 11-10）と在籍中の雇用（満了 11-20）
+    const p = contractPerson('p-a', [
+      emp({ companyId: 'c-old', endOn: '2026-09-30', contractEndOn: '2026-11-10' }),
+      emp({ companyId: 'c-001', contractEndOn: '2026-11-20' }),
+    ])
+    // Act
+    const result = listRenewals([p], REF)
+    // Assert
+    expect(result.map(i => [i.kind, i.dueOn])).toEqual([['contract', '2026-11-20']])
+  })
+
+  // 現任教育: 基準日 2027-03-05（FY2026、期限 2027-03-31 まで 26 日）。FY2026 の現任は未了
+  const ANNUAL_REF = '2027-03-05'
+  const annualPerson = (id: string, employments: PersonProfile['employments']) =>
+    mkPerson({ personId: id, employments, guardTraining: { basicDoneOn: '2020-06-01', annualFiscalYears: [2025] } })
+  const annualItem = (id: string) =>
+    ({ personId: id, kind: 'annual_training', dueOn: '2027-03-31', daysLeft: 26, urgency: 'soon' })
+
+  it('inService_現任教育_退社日が基準日当日の雇用は在籍中なので対象', () => {
+    // Arrange
+    const p = annualPerson('p-a', [emp({ endOn: ANNUAL_REF })])
+    // Act / Assert
+    expect(listRenewals([p], ANNUAL_REF)).toEqual([annualItem('p-a')])
+  })
+
+  it('inService_現任教育_退社日が基準日の前日なら在籍中の雇用がなく対象外', () => {
+    // Arrange
+    const p = annualPerson('p-a', [emp({ endOn: '2027-03-04' })])
+    // Act / Assert
+    expect(listRenewals([p], ANNUAL_REF)).toEqual([])
+  })
+
+  it('inService_現任教育_入社日が基準日より未来の雇用しかない人は対象外', () => {
+    // Arrange: 入社日 2027-03-06（基準日の翌日）
+    const p = annualPerson('p-a', [emp({ startOn: '2027-03-06' })])
+    // Act / Assert
+    expect(listRenewals([p], ANNUAL_REF)).toEqual([])
+  })
+
+  it('inService_現任教育_対_入社日が基準日当日なら在籍中で対象', () => {
+    // Arrange
+    const p = annualPerson('p-a', [emp({ startOn: ANNUAL_REF })])
+    // Act / Assert
+    expect(listRenewals([p], ANNUAL_REF)).toEqual([annualItem('p-a')])
+  })
+
+  it('inService_現任教育_対_退社済みと未来入社に加えて在籍中が 1 件あれば対象（1 人 1 件）', () => {
+    // Arrange
+    const p = annualPerson('p-a', [
+      emp({ companyId: 'c-old', endOn: '2026-12-01' }),
+      emp({ companyId: 'c-new', startOn: '2027-04-01' }),
+      emp({ companyId: 'c-001' }),
+    ])
+    // Act / Assert
+    expect(listRenewals([p], ANNUAL_REF)).toEqual([annualItem('p-a')])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// REQ-032: details.residenceDaysLeft（全シフト日の最小日数）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-032] details.residenceDaysLeft', () => {
+  // 期限 2026-07-20。シフト 2026-06-30 は 20 日前、2026-05-31 は 50 日前、2026-05-01 は 80 日前
+  const person = () => mkPerson({ residence: { workAllowed: true, expiresOn: '2026-07-20' } })
+  const shift = (date: string) => ({ date, start: '09:00', end: '17:00' })
+
+  it('residenceDaysLeft_20日後と50日後のシフトでは最小の 20', () => {
+    // Arrange: 50 日後のシフトを先に置く（先頭の値を拾う実装を落とす）
+    const job = mkJob({ shifts: [shift('2026-05-31'), shift('2026-06-30')] })
+    // Act
+    const result = detailed(checkEligibility(person(), job, []))
+    // Assert
+    expect(result.eligible).toBe(true)
+    expect(result.warnings).toEqual(['residence_expiring'])
+    expect(result.details.residenceDaysLeft).toBe(20)
+  })
+
+  it('residenceDaysLeft_並びを逆にしても最小の 20（末尾の値を拾う実装を落とす）', () => {
+    // Arrange
+    const job = mkJob({ shifts: [shift('2026-06-30'), shift('2026-05-31')] })
+    // Act
+    const result = detailed(checkEligibility(person(), job, []))
+    // Assert
+    expect(result.details.residenceDaysLeft).toBe(20)
+  })
+
+  it('residenceDaysLeft_60日超のシフト日が混じっても警告対象の最小日数 20 を返す', () => {
+    // Arrange: 80 日後と 20 日後
+    const job = mkJob({ shifts: [shift('2026-05-01'), shift('2026-06-30')] })
+    // Act
+    const result = detailed(checkEligibility(person(), job, []))
+    // Assert
+    expect(result.warnings).toEqual(['residence_expiring'])
+    expect(result.details.residenceDaysLeft).toBe(20)
+  })
+
+  it('residenceDaysLeft_単一シフトで期限当日なら 0', () => {
+    // Arrange
+    const job = mkJob({ shifts: [shift('2026-07-20')] })
+    // Act
+    const result = detailed(checkEligibility(person(), job, []))
+    // Assert
+    expect(result.details.residenceDaysLeft).toBe(0)
+  })
+
+  it('residenceDaysLeft_警告がないとき（61日）はキーが無い', () => {
+    // Arrange: 2026-05-20 → 2026-07-20 は 61 日
+    const job = mkJob({ shifts: [shift('2026-05-20')] })
+    // Act
+    const result = detailed(checkEligibility(person(), job, []))
+    // Assert
+    expect(result.warnings).toEqual([])
+    expect(result.details.residenceDaysLeft).toBeUndefined()
+    expect(Object.keys(result.details)).not.toContain('residenceDaysLeft')
+  })
+
+  it('residenceDaysLeft_在留情報がない人はキーが無い', () => {
+    // Arrange
+    const result = detailed(checkEligibility(mkPerson({ residence: undefined }), mkJob(), []))
+    // Act / Assert
+    expect(Object.keys(result.details)).not.toContain('residenceDaysLeft')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// REQ-031: details.maxDailyHours（他社分を含む 1 日の最大労働時間）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-031] details.maxDailyHours', () => {
+  const nonSecurity = (shifts: JobPost['shifts']) => mkJob({ isSecurityWork: false, nightWork: false, shifts })
+
+  it('maxDailyHours_他社3時間と自社6時間なら 9', () => {
+    // Arrange: 他社 09:00-12:00(3h) + 自社 14:00-20:00(6h)
+    const job = nonSecurity([{ date: '2026-05-01', start: '14:00', end: '20:00' }])
+    const busy: BusyShift[] = [{ companyId: 'c-other', date: '2026-05-01', start: '09:00', end: '12:00' }]
+    // Act
+    const result = detailed(checkEligibility(mkPerson(), job, busy))
+    // Assert
+    expect(result.eligible).toBe(true)
+    expect(result.warnings).toEqual(['daily_hours_over_8'])
+    expect(result.details.maxDailyHours).toBe(9)
+  })
+
+  it('maxDailyHours_複数日では最大の日の値（9 と 7 なら 9、7 と 10 なら 10）', () => {
+    // Arrange: 1 日目 3h+6h=9h、2 日目 1h+6h=7h
+    const jobA = nonSecurity([
+      { date: '2026-05-01', start: '14:00', end: '20:00' },
+      { date: '2026-05-02', start: '14:00', end: '20:00' },
+    ])
+    const busyA: BusyShift[] = [
+      { companyId: 'c-other', date: '2026-05-01', start: '09:00', end: '12:00' },
+      { companyId: 'c-other', date: '2026-05-02', start: '09:00', end: '10:00' },
+    ]
+    // 1 日目 1h+6h=7h、2 日目 4h+6h=10h
+    const busyB: BusyShift[] = [
+      { companyId: 'c-other', date: '2026-05-01', start: '09:00', end: '10:00' },
+      { companyId: 'c-other', date: '2026-05-02', start: '08:00', end: '12:00' },
+    ]
+    // Act
+    const a = detailed(checkEligibility(mkPerson(), jobA, busyA))
+    const b = detailed(checkEligibility(mkPerson(), jobA, busyB))
+    // Assert
+    expect(a.details.maxDailyHours).toBe(9)
+    expect(b.details.maxDailyHours).toBe(10)
+  })
+
+  it('maxDailyHours_別の日の勤務は通算しない（自社6時間の日に別日の他社4時間があっても警告なし）', () => {
+    // Arrange: 他社は前日の 4 時間
+    const job = nonSecurity([{ date: '2026-05-02', start: '14:00', end: '20:00' }])
+    const busy: BusyShift[] = [{ companyId: 'c-other', date: '2026-05-01', start: '09:00', end: '13:00' }]
+    // Act
+    const result = detailed(checkEligibility(mkPerson(), job, busy))
+    // Assert
+    expect(result.warnings).toEqual([])
+    expect(result.details.maxDailyHours).toBeUndefined()
+  })
+
+  it('maxDailyHours_ちょうど8時間なら警告なしでキーが無い', () => {
+    // Arrange: 他社 4h + 自社 4h
+    const job = nonSecurity([{ date: '2026-05-01', start: '14:00', end: '18:00' }])
+    const busy: BusyShift[] = [{ companyId: 'c-other', date: '2026-05-01', start: '09:00', end: '13:00' }]
+    // Act
+    const result = detailed(checkEligibility(mkPerson(), job, busy))
+    // Assert
+    expect(result.warnings).toEqual([])
+    expect(Object.keys(result.details)).not.toContain('maxDailyHours')
+  })
+
+  it('maxDailyHours_既存勤務がなく警告もないときキーが無い', () => {
+    // Arrange / Act
+    const result = detailed(checkEligibility(mkPerson(), mkJob(), []))
+    // Assert: 8 時間ちょうどの勤務 1 件
+    expect(result.warnings).toEqual([])
+    expect(Object.keys(result.details)).not.toContain('maxDailyHours')
+  })
+
+  it('maxDailyHours_在留の警告だけのときは maxDailyHours が無く、時間警告だけのときは residenceDaysLeft が無い', () => {
+    // Arrange
+    const resPerson = mkPerson({ residence: { workAllowed: true, expiresOn: '2026-05-31' } })
+    const hoursJob = nonSecurity([{ date: '2026-05-01', start: '14:00', end: '20:00' }])
+    const busy: BusyShift[] = [{ companyId: 'c-other', date: '2026-05-01', start: '09:00', end: '12:00' }]
+    // Act
+    const onlyResidence = detailed(checkEligibility(resPerson, mkJob(), []))
+    const onlyHours = detailed(checkEligibility(mkPerson(), hoursJob, busy))
+    // Assert
+    expect(onlyResidence.warnings).toEqual(['residence_expiring'])
+    expect(onlyResidence.details).toEqual({ residenceDaysLeft: 30 })
+    expect(onlyHours.warnings).toEqual(['daily_hours_over_8'])
+    expect(onlyHours.details).toEqual({ maxDailyHours: 9 })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// REQ-029: 日雇派遣の例外の検証（dispatch_exception_invalid）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-029] 日雇派遣の例外の検証', () => {
+  const SHIFT_DAY = '2026-05-01'
+  const dispatchJob = (days = 30) =>
+    mkJob({
+      form: 'dispatch', isSecurityWork: false, employmentDays: days,
+      shifts: [{ date: SHIFT_DAY, start: '09:00', end: '17:00' }],
+    })
+  const withException = (
+    kind: 'age60' | 'day_student' | 'side_job' | 'household_income',
+    verifiedOn: string,
+    birthDate = '1990-01-01',
+  ) => mkPerson({ birthDate, guardTraining: NO_TRAINING, dailyDispatchException: { kind, verifiedOn } })
+
+  it.each([
+    ['空文字', ''],
+    ['スラッシュ区切り', '2026/01/01'],
+    ['区切りなし', '20260101'],
+    ['日付でない文字列', 'not-a-date'],
+    ['ゼロ埋めなし', '2026-1-1'],
+  ])('exceptionInvalid_verifiedOn が%sなら dispatch_exception_invalid で不可', (_label, verifiedOn) => {
+    // Arrange
+    const person = withException('day_student', verifiedOn)
+    // Act
+    const result = checkEligibility(person, dispatchJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('dispatch_exception_invalid')
+  })
+
+  it('exceptionInvalid_verifiedOn がシフト日より後なら不可', () => {
+    // Arrange: 確認日 2026-05-02 > シフト日 2026-05-01
+    const person = withException('day_student', '2026-05-02')
+    // Act
+    const result = checkEligibility(person, dispatchJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('dispatch_exception_invalid')
+  })
+
+  it('exceptionInvalid_対_verifiedOn がシフト日当日なら例外が認められ可', () => {
+    // Arrange
+    const person = withException('day_student', SHIFT_DAY)
+    // Act
+    const result = checkEligibility(person, dispatchJob(), [])
+    // Assert
+    expect(result.eligible).toBe(true)
+    expect(result.reasons).toEqual([])
+  })
+
+  it('exceptionInvalid_対_verifiedOn がシフト日より前の day_student は可', () => {
+    // Arrange
+    const person = withException('day_student', '2026-04-30')
+    // Act
+    const result = checkEligibility(person, dispatchJob(), [])
+    // Assert
+    expect(result.eligible).toBe(true)
+    expect(result.reasons).toEqual([])
+  })
+
+  it('exceptionInvalid_age60 で本人がシフト日に59歳なら不可（60歳の誕生日の前日）', () => {
+    // Arrange: 1966-05-02 生まれ → 2026-05-01 は 59 歳（翌日に 60 歳）
+    const person = withException('age60', '2026-01-01', '1966-05-02')
+    // Act
+    const result = checkEligibility(person, dispatchJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toContain('dispatch_exception_invalid')
+  })
+
+  it('exceptionInvalid_対_age60 で60歳の誕生日当日なら可', () => {
+    // Arrange: 1966-05-01 生まれ → 2026-05-01 に満 60 歳
+    const person = withException('age60', '2026-01-01', '1966-05-01')
+    // Act
+    const result = checkEligibility(person, dispatchJob(), [])
+    // Assert
+    expect(result.eligible).toBe(true)
+    expect(result.reasons).toEqual([])
+  })
+
+  it('exceptionInvalid_対_day_student は59歳でも年齢条件を受けず可（年齢条件は age60 だけ）', () => {
+    // Arrange: 1966-05-02 生まれ（59 歳）
+    const person = withException('day_student', '2026-01-01', '1966-05-02')
+    // Act
+    const result = checkEligibility(person, dispatchJob(), [])
+    // Assert
+    expect(result.eligible).toBe(true)
+    expect(result.reasons).toEqual([])
+  })
+
+  it('exceptionInvalid_例外を持たない人は dispatch_exception_invalid ではなく daily_dispatch_not_allowed', () => {
+    // Arrange
+    const person = mkPerson({ guardTraining: NO_TRAINING })
+    // Act
+    const result = checkEligibility(person, dispatchJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toEqual(['daily_dispatch_not_allowed'])
+  })
+
+  it('exceptionInvalid_31日以上の派遣は例外なしでも可（例外不要のまま）', () => {
+    // Arrange
+    const person = mkPerson({ guardTraining: NO_TRAINING })
+    // Act
+    const result = checkEligibility(person, dispatchJob(31), [])
+    // Assert
+    expect(result.eligible).toBe(true)
+    expect(result.reasons).toEqual([])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// REQ-033: 在留期限の更新手続き・期限切れの daysLeft・並び順
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-033] 在留期限の更新手続きと並び順', () => {
+  const REF = '2026-11-07'
+  const resPerson = (id: string, expiresOn: string | undefined, workAllowed = true) =>
+    mkPerson({ personId: id, residence: { workAllowed, expiresOn } })
+  const item = (personId: string, kind: string, dueOn: string, daysLeft: number, urgency: string) =>
+    ({ personId, kind, dueOn, daysLeft, urgency })
+
+  it('residence_期限が基準日の前日なら expired で daysLeft は -1', () => {
+    // Arrange / Act
+    const result = listRenewals([resPerson('p-a', '2026-11-06')], REF)
+    // Assert
+    expect(result).toEqual([item('p-a', 'residence', '2026-11-06', -1, 'expired')])
+  })
+
+  it('residence_期限が37日前なら daysLeft は -37（期限切れの日数は負の値）', () => {
+    // Arrange / Act: 2026-10-01 → 2026-11-07 は 37 日
+    const result = listRenewals([resPerson('p-a', '2026-10-01')], REF)
+    // Assert
+    expect(result).toEqual([item('p-a', 'residence', '2026-10-01', -37, 'expired')])
+  })
+
+  it('residence_期限が基準日当日なら soon で daysLeft は 0', () => {
+    // Arrange / Act
+    const result = listRenewals([resPerson('p-a', REF)], REF)
+    // Assert
+    expect(result).toEqual([item('p-a', 'residence', REF, 0, 'soon')])
+  })
+
+  it('residence_期限まで30日ちょうどは含まれ soon', () => {
+    // Arrange / Act
+    const result = listRenewals([resPerson('p-a', '2026-12-07')], REF)
+    // Assert
+    expect(result).toEqual([item('p-a', 'residence', '2026-12-07', 30, 'soon')])
+  })
+
+  it('residence_期限まで31日は含まれない', () => {
+    // Arrange / Act
+    const result = listRenewals([resPerson('p-a', '2026-12-08')], REF)
+    // Assert
+    expect(result).toEqual([])
+  })
+
+  it('residence_在留情報がない人・期限日がない人は対象外', () => {
+    // Arrange
+    const none = mkPerson({ personId: 'p-none', residence: undefined })
+    const noDate = resPerson('p-nodate', undefined)
+    // Act / Assert
+    expect(listRenewals([none, noDate], REF)).toEqual([])
+  })
+
+  it('contractExpired_契約満了が基準日の前日なら expired で daysLeft は -1', () => {
+    // Arrange
+    const p = mkPerson({
+      personId: 'p-a',
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', contractEndOn: '2026-11-06' }],
+    })
+    // Act / Assert
+    expect(listRenewals([p], REF)).toEqual([item('p-a', 'contract', '2026-11-06', -1, 'expired')])
+  })
+
+  it('sort_同日・同 daysLeft は personId の昇順（入力が逆順でも）', () => {
+    // Arrange: 契約満了が全員 2026-11-20。入力は p-c, p-a, p-b の順
+    const mk = (id: string) => mkPerson({
+      personId: id,
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', contractEndOn: '2026-11-20' }],
+    })
+    // Act
+    const result = listRenewals([mk('p-c'), mk('p-a'), mk('p-b')], REF)
+    // Assert
+    expect(result.map(i => i.personId)).toEqual(['p-a', 'p-b', 'p-c'])
+    expect(result.every(i => i.daysLeft === 13 && i.urgency === 'soon')).toBe(true)
+  })
+
+  it('sort_期限切れの同日も personId 昇順', () => {
+    // Arrange: 在留期限が全員 2026-11-01（6 日前）
+    const result = listRenewals(
+      [resPerson('p-b', '2026-11-01'), resPerson('p-a', '2026-11-01')],
+      REF,
+    )
+    // Assert
+    expect(result.map(i => [i.personId, i.daysLeft, i.urgency])).toEqual([
+      ['p-a', -6, 'expired'], ['p-b', -6, 'expired'],
+    ])
+  })
+
+  it('sort_期限切れ→近い順→同日は personId 昇順（種別が混在しても全体で並べる）', () => {
+    // Arrange: 入力順はわざと崩す
+    const contract = (id: string, contractEndOn: string) => mkPerson({
+      personId: id,
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', contractEndOn }],
+    })
+    const people = [
+      contract('p-d', '2026-12-07'),         // +30 contract
+      resPerson('p-a', REF),                 // 0 residence
+      contract('p-c', REF),                  // 0 contract
+      resPerson('p-b', '2026-11-06'),        // -1 residence
+      contract('p-z', '2026-10-31'),         // -7 contract
+    ]
+    // Act
+    const result = listRenewals(people, REF)
+    // Assert
+    expect(result).toEqual([
+      item('p-z', 'contract', '2026-10-31', -7, 'expired'),
+      item('p-b', 'residence', '2026-11-06', -1, 'expired'),
+      item('p-a', 'residence', REF, 0, 'soon'),
+      item('p-c', 'contract', REF, 0, 'soon'),
+      item('p-d', 'contract', '2026-12-07', 30, 'soon'),
+    ])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// 契約: listApplicableJobs（入力順を維持・応募できない案件を除く）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-026] listApplicableJobs', () => {
+  const okJob = (id: string) => mkJob({ jobId: id })
+  /** 自社(c-001)の人に対し、別会社のスポット案件は not_registered で不可 */
+  const ngJob = (id: string) => mkJob({ jobId: id, employerCompanyId: 'c-other', form: 'spot', isSecurityWork: false })
+
+  it('listApplicable_空の案件リストなら空配列', () => {
+    expect(listApplicableJobs(mkPerson(), [], [])).toEqual([])
+  })
+
+  it('listApplicable_全て応募できるなら全件を入力順のまま返す（ソートしない）', () => {
+    // Arrange
+    const jobs = [okJob('j-3'), okJob('j-1'), okJob('j-2')]
+    // Act
+    const result = listApplicableJobs(mkPerson(), jobs, [])
+    // Assert
+    expect(result.map(j => j.jobId)).toEqual(['j-3', 'j-1', 'j-2'])
+    expect(result).toEqual(jobs)
+  })
+
+  it('listApplicable_全て応募できないなら空配列', () => {
+    expect(listApplicableJobs(mkPerson(), [ngJob('j-1'), ngJob('j-2')], [])).toEqual([])
+  })
+
+  it('listApplicable_応募できない案件だけを除き残りの順序を保つ', () => {
+    // Arrange
+    const jobs = [okJob('j-4'), ngJob('j-3'), okJob('j-2'), ngJob('j-1'), okJob('j-0')]
+    // Act
+    const result = listApplicableJobs(mkPerson(), jobs, [])
+    // Assert
+    expect(result.map(j => j.jobId)).toEqual(['j-4', 'j-2', 'j-0'])
+  })
+
+  it('listApplicable_既存勤務(busy)と時間が重なる案件は除かれる', () => {
+    // Arrange: j-busy は 12:00-18:00 の既存勤務と重なる、j-free は重ならない
+    const busy: BusyShift[] = [{ companyId: 'c-other', date: '2026-05-01', start: '12:00', end: '18:00' }]
+    const free = mkJob({ jobId: 'j-free', shifts: [{ date: '2026-05-02', start: '09:00', end: '17:00' }] })
+    const overlap = mkJob({ jobId: 'j-busy', shifts: [{ date: '2026-05-01', start: '09:00', end: '17:00' }] })
+    // Act
+    const result = listApplicableJobs(mkPerson(), [overlap, free], busy)
+    // Assert
+    expect(result.map(j => j.jobId)).toEqual(['j-free'])
+  })
+
+  it('listApplicable_同意なしの人はどの案件も応募できず空配列', () => {
+    expect(listApplicableJobs(mkPerson({ consentJointUse: false }), [okJob('j-1'), okJob('j-2')], [])).toEqual([])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// 旧 t1_talent.test.ts 固有ケースの移行
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-030] ageOn（満年齢）', () => {
+  it('ageOn_誕生日の前日は17歳・当日から18歳', () => {
+    expect(ageOn('2008-11-15', '2026-11-14')).toBe(17)
+    expect(ageOn('2008-11-14', '2026-11-14')).toBe(18)
+  })
+
+  it('ageOn_誕生日の翌日以降も満年齢を保つ', () => {
+    expect(ageOn('2008-11-14', '2026-11-15')).toBe(18)
+    expect(ageOn('2008-11-14', '2027-11-13')).toBe(18)
+    expect(ageOn('2008-11-14', '2027-11-14')).toBe(19)
+  })
+})
+
+describe('[REQ-028] fiscalYearOf（4月始まりの年度）', () => {
+  it('fiscalYearOf_3月31日は前年度・4月1日は当年度', () => {
+    expect(fiscalYearOf('2027-03-31')).toBe(2026)
+    expect(fiscalYearOf('2026-04-01')).toBe(2026)
+  })
+
+  it('fiscalYearOf_年内の1月と12月', () => {
+    expect(fiscalYearOf('2026-01-01')).toBe(2025)
+    expect(fiscalYearOf('2026-12-31')).toBe(2026)
+  })
+})
+
+describe('[REQ-031] shiftsOverlap（時間の重なり）', () => {
+  const night = { date: '2026-11-14', start: '22:00', end: '06:00' }
+
+  it('shiftsOverlap_夜勤の日またぎは翌朝 05:00 開始と重なる', () => {
+    expect(shiftsOverlap(night, { date: '2026-11-15', start: '05:00', end: '09:00' })).toBe(true)
+  })
+
+  it('shiftsOverlap_夜勤の終了 06:00 ちょうど開始は重ならない', () => {
+    expect(shiftsOverlap(night, { date: '2026-11-15', start: '06:00', end: '09:00' })).toBe(false)
+  })
+
+  it('shiftsOverlap_引数の順序を入れ替えても結果は同じ', () => {
+    const morning = { date: '2026-11-15', start: '05:00', end: '09:00' }
+    expect(shiftsOverlap(morning, night)).toBe(true)
+  })
+
+  it('shiftsOverlap_同日の部分的な重なりは true・隣接(終了=開始)は false', () => {
+    const a = { date: '2026-11-14', start: '09:00', end: '12:00' }
+    expect(shiftsOverlap(a, { date: '2026-11-14', start: '11:00', end: '15:00' })).toBe(true)
+    expect(shiftsOverlap(a, { date: '2026-11-14', start: '12:00', end: '15:00' })).toBe(false)
+  })
+
+  it('shiftsOverlap_別の日の日中勤務同士は重ならない', () => {
+    const a = { date: '2026-11-14', start: '09:00', end: '17:00' }
+    expect(shiftsOverlap(a, { date: '2026-11-15', start: '09:00', end: '17:00' })).toBe(false)
+  })
+})
+
+describe('[REQ-026] スポット（直接雇用）の登録', () => {
+  const spotJob = (o: Partial<JobPost> = {}) =>
+    mkJob({ employerCompanyId: 'c-spot', form: 'spot', isSecurityWork: false, mode: 'instant', ...o })
+
+  it('spot_その会社に登録済みのスタッフは即応募できる', () => {
+    // Arrange
+    const person = mkPerson({ employments: [{ companyId: 'c-spot', startOn: '2026-01-01' }] })
+    // Act
+    const result = checkEligibility(person, spotJob(), [])
+    // Assert
+    expect(result.eligible).toBe(true)
+    expect(result.reasons).toEqual([])
+  })
+
+  it('spot_その会社に未登録の人は not_registered だけで不可', () => {
+    // Arrange: 雇用は c-001 のみ
+    const result = checkEligibility(mkPerson(), spotJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(result.reasons).toEqual(['not_registered'])
+  })
+
+  it('spot_その会社を退社済みの人は不可', () => {
+    // Arrange: 退社日 2026-03-31 < シフト日 2026-05-01
+    const person = mkPerson({
+      employments: [{ companyId: 'c-spot', startOn: '2025-01-01', endOn: '2026-03-31' }],
+    })
+    // Act
+    const result = checkEligibility(person, spotJob(), [])
+    // Assert
+    expect(result.reasons).toContain('not_registered')
+  })
+})
+
+describe('[REQ-032] 在留期限の更新手続き（旧 t1 移行）', () => {
+  it('residence_期限が24日後なら daysLeft 24 の soon として一覧に出る', () => {
+    // Arrange: 基準日 2026-11-07 → 期限 2026-12-01
+    const p = mkPerson({ residence: { workAllowed: true, expiresOn: '2026-12-01' } })
+    // Act
+    const result = listRenewals([p], '2026-11-07')
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-001', kind: 'residence', dueOn: '2026-12-01', daysLeft: 24, urgency: 'soon' },
+    ])
+  })
+})
+
 
 // ─────────────────────────────────────────────────────────────
 // 純粋性: talent/ 配下が非決定 API・外部依存を持たないことを確認
