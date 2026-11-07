@@ -82,6 +82,8 @@ export type EligibilityReason =
   | 'daily_dispatch_not_allowed'
   | 'time_overlap'
   | 'boundary_not_confirmed'
+  | 'no_shifts'
+  | 'dispatch_exception_invalid'
 
 export interface EligibilityResult {
   eligible: boolean
@@ -89,4 +91,11 @@ export interface EligibilityResult {
   reasons: EligibilityReason[]
   /** 応募はできるが注意が必要なこと */
   warnings: Array<'daily_hours_over_8' | 'residence_expiring'>
+  /** 警告の計測値。警告が出たときだけ付く */
+  details: {
+    /** 在留期限の警告が出たときの、全シフト日の最小日数 */
+    residenceDaysLeft?: number
+    /** 8時間超の警告が出たときの、他社分を含む1日の最大労働時間（時間） */
+    maxDailyHours?: number
+  }
 }

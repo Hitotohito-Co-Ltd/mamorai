@@ -58,6 +58,23 @@ function dailyHours(shifts: JobShift[], date: string): number {
   }, 0)
 }
 
+/** 'YYYY-MM-DD' の形式で、暦に存在する日付か */
+function isRealDate(d: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false
+  const [y, m, dd] = d.split('-').map(Number)
+  const t = new Date(Date.UTC(y!, m! - 1, dd!))
+  return t.getUTCFullYear() === y && t.getUTCMonth() === m! - 1 && t.getUTCDate() === dd
+}
+
+/** 日雇派遣の例外: 確認日が有効でシフト日以前、age60 はシフト日に満60歳以上 */
+function dispatchExceptionValid(p: PersonProfile, shiftDate: string): boolean {
+  const ex = p.dailyDispatchException
+  if (!ex) return false
+  if (!isRealDate(ex.verifiedOn) || ex.verifiedOn > shiftDate) return false
+  if (ex.kind === 'age60' && ageOn(p.birthDate, shiftDate) < 60) return false
+  return true
+}
+
 /** 警備の枠に応募するための教育状態（新任修了＋その年度の現任、または新任をその年度に修了） */
 function securityTraining(p: PersonProfile, onDate: string): EligibilityReason | null {
   const t = p.guardTraining
@@ -95,15 +112,21 @@ export function checkEligibility(
   )
   if (!registered) reasons.add('not_registered')
 
-  // 日雇派遣（30日以内）は例外に当たる人だけ
-  if (job.form === 'dispatch' && job.employmentDays <= DAILY_DISPATCH_MAX_DAYS && !person.dailyDispatchException) {
-    reasons.add('daily_dispatch_not_allowed')
-  }
+  // シフトが1件もない案件には応募できない
+  if (job.shifts.length === 0) reasons.add('no_shifts')
+
+  // 日雇派遣（30日以内）は例外に当たる人だけ。例外は確認日が有効で、区分の条件を満たすこと
+  const dailyDispatch = job.form === 'dispatch' && job.employmentDays <= DAILY_DISPATCH_MAX_DAYS
+  if (dailyDispatch && !person.dailyDispatchException) reasons.add('daily_dispatch_not_allowed')
 
   // 運営と警備の線引きの確認
   if (job.needsBoundaryCheck && !job.boundaryCheck) reasons.add('boundary_not_confirmed')
 
+  let residenceDaysLeft: number | undefined
   for (const s of job.shifts) {
+    if (dailyDispatch && person.dailyDispatchException && !dispatchExceptionValid(person, s.date)) {
+      reasons.add('dispatch_exception_invalid')
+    }
     const age = ageOn(person.birthDate, s.date)
     if (age < 18 && (job.isSecurityWork || job.nightWork)) reasons.add('under_age')
     if (job.isSecurityWork && job.form !== 'dispatch') {
@@ -113,21 +136,33 @@ export function checkEligibility(
     const res = person.residence
     if (res) {
       if (!res.workAllowed || (res.expiresOn && res.expiresOn < s.date)) reasons.add('residence_invalid')
-      else if (res.expiresOn && (utcDay(res.expiresOn) - utcDay(s.date)) / MS_PER_DAY <= RESIDENCE_WARN_DAYS) {
-        warnings.add('residence_expiring')
+      else if (res.expiresOn) {
+        const left = (utcDay(res.expiresOn) - utcDay(s.date)) / MS_PER_DAY
+        if (left <= RESIDENCE_WARN_DAYS) {
+          warnings.add('residence_expiring')
+          residenceDaysLeft = residenceDaysLeft === undefined ? left : Math.min(residenceDaysLeft, left)
+        }
       }
     }
     if (busy.some((b) => shiftsOverlap(b, s))) reasons.add('time_overlap')
   }
 
   // 複数社の労働時間の通算（1日8時間超は警告）
+  let maxDailyHours: number | undefined
   for (const d of new Set(dates)) {
     const total = dailyHours(busy, d) + dailyHours(job.shifts, d)
-    if (total > 8) warnings.add('daily_hours_over_8')
+    if (total > 8) {
+      warnings.add('daily_hours_over_8')
+      maxDailyHours = maxDailyHours === undefined ? total : Math.max(maxDailyHours, total)
+    }
   }
 
+  const details: EligibilityResult['details'] = {}
+  if (residenceDaysLeft !== undefined) details.residenceDaysLeft = residenceDaysLeft
+  if (maxDailyHours !== undefined) details.maxDailyHours = maxDailyHours
+
   const list = [...reasons]
-  return { eligible: list.length === 0, reasons: list, warnings: [...warnings] }
+  return { eligible: list.length === 0, reasons: list, warnings: [...warnings], details }
 }
 
 /** スタッフの「しごと」一覧用: 応募できる案件だけを残す（理由は出さない） */
@@ -140,5 +175,6 @@ export function validateJobForPublish(job: JobPost): EligibilityReason[] {
   const out: EligibilityReason[] = []
   if (job.isSecurityWork && job.form === 'dispatch') out.push('security_dispatch_forbidden')
   if (job.needsBoundaryCheck && !job.boundaryCheck) out.push('boundary_not_confirmed')
+  if (job.shifts.length === 0) out.push('no_shifts')
   return out
 }

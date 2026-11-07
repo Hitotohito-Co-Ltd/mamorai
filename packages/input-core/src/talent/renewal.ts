@@ -34,11 +34,14 @@ export function listRenewals(people: PersonProfile[], referenceDate: string, soo
   const fy = fiscalYearOf(referenceDate)
   const out: RenewalItem[] = []
   for (const p of people) {
+    // 在籍中 = 入社日が基準日以前、かつ退社日がない、または退社日が基準日以後
+    const isActive = (e: PersonProfile['employments'][number]) =>
+      e.startOn <= referenceDate && (!e.endOn || e.endOn >= referenceDate)
     for (const e of p.employments) {
-      if (e.contractEndOn && !e.endOn) out.push(item(p.personId, 'contract', e.contractEndOn, referenceDate, soonDays))
+      if (e.contractEndOn && isActive(e)) out.push(item(p.personId, 'contract', e.contractEndOn, referenceDate, soonDays))
     }
-    // 在籍中の雇用が1件もない人（全雇用が退社済み）は現任教育の対象外
-    const active = p.employments.some((e) => !e.endOn)
+    // 在籍中の雇用が1件もない人は現任教育の対象外
+    const active = p.employments.some(isActive)
     const t = p.guardTraining
     if (active && t.basicDoneOn) {
       const basicThisYear = fiscalYearOf(t.basicDoneOn) === fy
