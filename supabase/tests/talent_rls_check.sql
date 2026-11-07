@@ -688,6 +688,70 @@ do $$ begin
 
 reset role;
 
+-- ── シナリオ 69〜78: Adversary 第6回（FIND-601/602/604）──
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';  -- A社管理者
+-- 69〜71: 線引き未確認の案件は、公開済み系の状態(published / filled)にできない。draft は保存できる
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check) values ('cc000000-0000-0000-0000-000000000011', 'filled未確認', 'spot', 'filled', true);
+    insert into t_rls_results values (69, '線引き未確認の案件は filled で保存できない', false, '保存できてしまった');
+  exception when others then insert into t_rls_results values (69, '線引き未確認の案件は filled で保存できない', sqlerrm like '%線引き%', sqlerrm);
+  end;
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check) values ('cc000000-0000-0000-0000-000000000011', 'draft未確認', 'spot', 'draft', true);
+    insert into t_rls_results values (70, '線引き未確認の案件も draft なら保存できる', true, '');
+  exception when others then insert into t_rls_results values (70, '線引き未確認の案件も draft なら保存できる', false, sqlerrm);
+  end;
+  begin
+    update jobs set status = 'filled' where title = 'draft未確認' and company_id = 'cc000000-0000-0000-0000-000000000011';
+    insert into t_rls_results values (71, '下書きの未確認案件を filled に更新できない', false, '更新できてしまった');
+  exception when others then insert into t_rls_results values (71, '下書きの未確認案件を filled に更新できない', sqlerrm like '%線引き%', sqlerrm);
+  end; end $$;
+-- 72〜73: 確認者が Unicode の空白(NBSP・U+202F)だけなら公開できない。可視文字があれば公開できる
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', 'NBSP', 'spot', 'published', true, chr(160), (now() at time zone 'Asia/Tokyo')::date);
+    insert into t_rls_results values (72, 'NBSP だけの確認者では公開できない', false, '公開できてしまった');
+  exception when others then insert into t_rls_results values (72, 'NBSP だけの確認者では公開できない', sqlerrm like '%線引き%', sqlerrm);
+  end;
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', 'U202F', 'spot', 'published', true, chr(8239) || chr(12288), (now() at time zone 'Asia/Tokyo')::date);
+    insert into t_rls_results values (73, 'U+202F と全角空白だけの確認者では公開できない', false, '公開できてしまった');
+  exception when others then insert into t_rls_results values (73, 'U+202F と全角空白だけの確認者では公開できない', sqlerrm like '%線引き%', sqlerrm);
+  end;
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', '可視+NBSP', 'spot', 'published', true, '山' || chr(160) || '田', (now() at time zone 'Asia/Tokyo')::date);
+    insert into t_rls_results values (74, '可視文字がある確認者は(NBSP が混ざっても)公開できる', true, '');
+  exception when others then insert into t_rls_results values (74, '可視文字がある確認者は(NBSP が混ざっても)公開できる', false, sqlerrm);
+  end; end $$;
+-- 75〜78: 中核3表の WITH CHECK（他社名義の書き込み）
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form) values ('cc000000-0000-0000-0000-000000000022', 'B社名義', 'spot');
+    insert into t_rls_results values (75, 'A社管理者はB社名義の案件を作れない', false, '作れてしまった');
+  exception when others then insert into t_rls_results values (75, 'A社管理者はB社名義の案件を作れない', sqlerrm like '%row-level security%', sqlerrm);
+  end;
+  begin
+    update jobs set company_id = 'cc000000-0000-0000-0000-000000000022' where id = 'e0000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (76, 'A社管理者は自社の案件をB社名義に付け替えられない', false, '付け替えられてしまった');
+  exception when others then insert into t_rls_results values (76, 'A社管理者は自社の案件をB社名義に付け替えられない', true, sqlerrm);  -- 拒否の主体は先に動くトリガ（RLS の WITH CHECK は INSERT のシナリオ 75 で固定）
+  end;
+  begin
+    update job_shifts set company_id = 'cc000000-0000-0000-0000-000000000022' where id = 'f0000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (77, 'A社管理者は自社のシフトをB社名義に付け替えられない', false, '付け替えられてしまった');
+  exception when others then insert into t_rls_results values (77, 'A社管理者は自社のシフトをB社名義に付け替えられない', true, sqlerrm);  -- 拒否の主体は先に動くトリガ（RLS の WITH CHECK は INSERT のシナリオ 75 で固定）
+  end;
+  begin
+    update job_applications set company_id = 'cc000000-0000-0000-0000-000000000022' where id = 'a1000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (78, 'A社管理者は自社の応募をB社名義に付け替えられない', false, '付け替えられてしまった');
+  exception when others then insert into t_rls_results values (78, 'A社管理者は自社の応募をB社名義に付け替えられない', true, sqlerrm);  -- 拒否の主体は先に動くトリガ（RLS の WITH CHECK は INSERT のシナリオ 75 で固定）
+  end; end $$;
+reset role;
+
 -- ── 結果出力 ──
 select n || '. ' || case when ok then 'PASS' else 'FAIL' end || '  ' || name
   || case when not ok and detail <> '' then '  [' || detail || ']' else '' end
