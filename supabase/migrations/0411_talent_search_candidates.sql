@@ -2,7 +2,7 @@
 -- 内容: 呼んだ会社と同じグループで、共同利用に同意した人（consent_joint_use = true）だけを返す関数。
 --   同意のない人は、この関数の結果に出ない（自社の一覧は persons の RLS で別に読める）。
 -- 安全・冪等: 追加のみ（CREATE OR REPLACE FUNCTION）。テーブル・列は変えない。
--- 権限: 呼べるのは、p_company_id が自分の会社のとき（company_admin）か、運営（platform_admin）。
+-- 権限: 呼べるのは、p_company_id が自分の会社のとき（会社に属する認証ユーザー。ロールは見ない。仕様 KR-5）か、運営（platform_admin）。
 -- 依存: 0400（app_is_platform, app_company_id）, 0410（groups, persons, companies.group_id）
 -- p_filter は将来の絞り込み用。今回は使わない（空でよい）。
 
