@@ -521,7 +521,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 ## 既知のリスク（Sprint 9 の REQ-039/040 で解消するまで、機能として公開しない）
 - **KR-1 応募テーブルの直接書き込み:** 会社の管理者が `job_applications` に直接 confirmed の行を作れる（同意なし・定員超過・時間の重なり・決定者の偽装を DB が止めない）。確定済みの応募を直接 DELETE することもでき、その直後に案件を削除できる（削除ガードは応募が存在する間だけ有効）。Sprint 9 で応募・確定を RPC 経由に限り、直接の insert/update の権限を外す。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
-- **KR-4 TRUNCATE 権限:** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
+- **KR-4 TRUNCATE 権限:** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE・TRIGGER・REFERENCES 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
 - **KR-2 マイグレーションの再適用:** 0410 を 0413 の後に単独で再実行すると、強化した関数・ポリシーが旧版に戻る。マイグレーションは番号順に 1 回ずつ適用する前提（ランナーの手順書に明記）。
 - **KR-5 候補検索と個人情報の範囲:** `search_candidates` は、company_admin に限らず company_manager など会社に属する認証ユーザーなら呼べる。会社内の別現場の人の生年月日・電話・メールも `persons` から読める（既存の leave_requests などと同じく、会社全体を指す設計）。ロールごとの制限は Sprint 9 の REQ-040 で決める。
 - **KR-3 警備フラグと職種:** 案件の警備判定は職種マスタの選択に依存する。契約の形が警備（`security`）でも、職種が非警備なら警備の年齢・教育の判定を受けない。非警備の職種を選べば警備の判定を回避できる（職種の選択の統制は OQ-21 と合わせて決める）。
@@ -558,6 +558,10 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - WHEN 応募が存在する案件またはシフトを削除しようとする THE システム SHALL DB で拒否する（応募の成立は労働契約の成立を伴うため、記録を連鎖して消さない。案件は状態を closed にして終了する）（REQ-037・REQ-039）。
 - WHEN 案件の雇用日数（`employment_days`）、時給（`hourly_wage`）、請求単価（`billing_rate`）を保存する THE システム SHALL DB で 0 未満を拒否し、派遣の案件では雇用日数を必須とする（TS の `invalid_input` と同じ基準。REQ-037）。
 - WHEN 案件・シフトが現場（site_id）または勤務枠（slot_id）を指す THE システム SHALL 案件と同じ会社のものだけを許可する（REQ-037）。
+- WHEN 案件が『夜間勤務を含む』かを判定する THE システム SHALL 案件の `nightWork` が true であるか、いずれかのシフトが 22:00〜翌 05:00 にかかる（開始が 05:00 より前、または終了が 22:00 より後、または日をまたぐ）場合に、夜間勤務を含むとする。`nightWork` が false でもシフト時刻が夜間にかかれば夜間勤務を含む（REQ-030）。
+- WHEN `guardTraining.annualFiscalYears` が配列でない（欠落を含む）THE システム SHALL `checkEligibility` で `invalid_input` とし、`listRenewals` ではその人を一覧全体の例外にせず `annual_training` の invalid 項目で返す（REQ-033）。
+- WHEN 線引き確認が必要な案件を保存する THE システム SHALL 状態が published または filled のいずれの場合も、確認者と確認日の記録がなければ DB で拒否する（draft は保存できる。REQ-034）。
+- WHEN 確認者の『空白』を判定する THE システム SHALL ASCII の空白に加え、Unicode の空白（U+00A0、U+1680、U+2000〜U+200A、U+2028、U+2029、U+202F、U+205F、U+3000）とゼロ幅文字（U+200B〜U+200D、U+2060、U+FEFF）を空白として扱い、TS と DB で同じ集合にする（REQ-034）。
 - WHEN 案件にシフトが 1 件もない THE システム SHALL `checkEligibility` で `no_shifts` により応募を拒否し、`validateJobForPublish` で公開を拒否する（REQ-026・REQ-037）。
 - WHEN `listRenewals` の入力の期限日（契約満了日・在留期限）または雇用の入社日・退社日が不正 THE システム SHALL その項目を一覧から消さず、`urgency: 'invalid'`・`daysLeft: null` の項目として先頭に返す（法令上の期限の見落としを防ぐため）。invalid 項目の `kind` と `dueOn` は、契約満了日が不正なら `contract`・入力された値、在留期限が不正なら `residence`・入力された値。雇用の入社日・退社日が不正でその雇用の在籍を判定できない場合は、その雇用に契約満了日があれば `contract`（`dueOn` は契約満了日）の invalid 項目を返す（他の有効な雇用の契約満了日は通常どおり判定する）。現任教育は、入社日・退社日が不正な雇用が 1 件でもある人が今年度未達なら `annual_training`（`dueOn` は年度末）の invalid 項目を返す。invalid 項目同士は `personId` のコードポイント順、同じ `personId` では `contract`、`annual_training`、`residence` の順に並べる。基準日が不正なときは `RangeError` を投げる（REQ-033）。契約満了日が空文字または null の場合も不正として invalid 項目にする（キーが無い＝undefined の場合だけ対象外）。新任教育の修了日が不正な人は、`annual_training` の invalid 項目（`dueOn` は年度末）を返す。`RenewalItem.urgency` に `'invalid'` を、`daysLeft` に `null` を加える。
 - WHEN `listRenewals` が「在籍中」を判定する THE システム SHALL 「入社日が基準日以前、かつ退社日がない、または退社日が基準日以後」の雇用を在籍中とする。契約満了と現任教育（在籍中の雇用が 1 件以上必要）の両方がこの定義を使う。現任教育は、新任教育の修了日が基準日より後の人（基準日時点で未修了）も対象外とする（REQ-033）。
@@ -607,6 +611,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.18: Adversary Sprint 8 第4回 FAIL(D3・D5 の Medium4・Low1。D1/D2/D4 は PASS)を受けて確定。basicDoneOn の検証、契約満了日の空文字・null は invalid、wage と確認日の DB 検証、KR-1 に delete、KR-4(TRUNCATE)を追加。
 - 2026-11-07 v2.19: Adversary Sprint 8 第5回 FAIL(実装に Critical/High なし。High は D5 の1件=中核3表の会社分離を検証するテストの欠落、Medium4、Low6)を受けて確定。確認日の『今日』は日本時間、確認者のゼロ幅文字、契約満了日の invalid の文面を実装に合わせる、KR-5 を追加、KR-3 を補足。
 - 2026-11-07 v2.20: Spec-Validator v2.19 審査 APPROVED 86点(−14)の是正。ヘッダを審査履歴に合わせる、OQ-21 の確定事項を REQ-034/037 の EARS に、REQ-040 の EARS の列挙漏れと KR-5(候補検索の行)、REQ-039 に KR-1 の解消(応募の RPC 化)、REQ-041 の通知対象を REQ-026 の応募可否に、REQ-042 の『本部』を許可表のロールに、契約の Bead を実態に合わせる、REQ-035 の Sprint 属性。OQ-21 は RYUGEN の入力が途切れた解釈なのでヘッダにも再確認待ちを明記。v2.8 審査行の『RYUGEN の確認が必要』な4点は OQ-20 で解決済み。
+- 2026-11-07 v2.21: Adversary Sprint 8 第6回 FAIL(Critical0・High1=中核3表の WITH CHECK の検証欠落・Medium5・Low3)を受けて確定。夜間勤務はシフト時刻から導出、annualFiscalYears の不正、状態が filled でも線引き確認を要求、空白の集合を TS と DB で揃える、KR-4 を TRUNCATE 以外の権限に広げる。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
