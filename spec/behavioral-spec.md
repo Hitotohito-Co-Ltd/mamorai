@@ -532,7 +532,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 **境界の確定（WHEN 形）**
 - WHEN 応募するシフト日から在留期限日までの日数が 0 以上 60 以下 THE システム SHALL `residence_expiring` の警告を返す（60 日は警告、61 日は警告なし）。
 - WHEN 本人が共同利用に同意していない THE システム SHALL 全案件で `no_consent` により応募を拒否する（REQ-035）。
-- WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` の昇順、それも同じなら `contract`、`annual_training`、`residence` の順で並べる。期限切れの項目の `daysLeft` は負の値（期限日が基準日の前日なら -1）とする。同じ `personId` で同日の項目は入力順とする。
+- WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` の昇順、それも同じなら `contract`、`annual_training`、`residence` の順で並べる。期限切れの項目の `daysLeft` は負の値（期限日が基準日の前日なら -1）とする。
 - WHEN 現任教育の更新手続きを作る THE システム SHALL `dueOn` を基準日の年度末（3 月 31 日）にする（REQ-033）。
 - WHEN シフトの終了時刻が開始時刻と同じ THE システム SHALL 24 時間勤務として扱い、翌日に終わる勤務の時間の重なりと通算に使う（REQ-031）。
 - WHEN 案件にシフトが 1 件もない THE システム SHALL `checkEligibility` で `no_shifts` により応募を拒否し、`validateJobForPublish` で公開を拒否する（REQ-026・REQ-037）。
