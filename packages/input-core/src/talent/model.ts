@@ -84,6 +84,7 @@ export type EligibilityReason =
   | 'boundary_not_confirmed'
   | 'no_shifts'
   | 'dispatch_exception_invalid'
+  | 'invalid_input'
 
 export interface EligibilityResult {
   eligible: boolean

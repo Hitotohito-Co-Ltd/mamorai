@@ -58,6 +58,21 @@ function dailyHours(shifts: JobShift[], date: string): number {
   }, 0)
 }
 
+const DISPATCH_EXCEPTION_KINDS: readonly string[] = ['age60', 'day_student', 'side_job', 'household_income']
+
+/** 線引き確認の記録: 確認者が空白でなく、確認日が暦に存在する日付 */
+function boundaryRecorded(job: JobPost): boolean {
+  const b = job.boundaryCheck
+  return !!b && typeof b.confirmedBy === 'string' && b.confirmedBy.trim() !== '' && isRealDate(b.confirmedOn)
+}
+
+/** 日付・期間の入力が不正か（シフト日、派遣の雇用日数。生年月日と在留期限は応募時に別に見る） */
+function jobInputInvalid(job: JobPost): boolean {
+  if (job.shifts.some((s) => !isRealDate(s.date))) return true
+  if (job.form === 'dispatch' && !(Number.isInteger(job.employmentDays) && job.employmentDays >= 0)) return true
+  return false
+}
+
 /** 'YYYY-MM-DD' の形式で、暦に存在する日付か */
 function isRealDate(d: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false
@@ -70,6 +85,7 @@ function isRealDate(d: string): boolean {
 function dispatchExceptionValid(p: PersonProfile, shiftDate: string): boolean {
   const ex = p.dailyDispatchException
   if (!ex) return false
+  if (!DISPATCH_EXCEPTION_KINDS.includes(ex.kind)) return false
   if (!isRealDate(ex.verifiedOn) || ex.verifiedOn > shiftDate) return false
   if (ex.kind === 'age60' && ageOn(p.birthDate, shiftDate) < 60) return false
   return true
@@ -97,6 +113,15 @@ export function checkEligibility(
   const reasons = new Set<EligibilityReason>()
   const warnings = new Set<'daily_hours_over_8' | 'residence_expiring'>()
 
+  // 不正な入力は黙って通さない（法令リスクの高い判定のため、拒否する）
+  if (
+    jobInputInvalid(job) ||
+    !isRealDate(person.birthDate) ||
+    (person.residence?.expiresOn !== undefined && !isRealDate(person.residence.expiresOn))
+  ) {
+    return { eligible: false, reasons: ['invalid_input'], warnings: [], details: {} }
+  }
+
   if (!person.consentJointUse) reasons.add('no_consent')
 
   // 警備業務は派遣にできない
@@ -120,7 +145,7 @@ export function checkEligibility(
   if (dailyDispatch && !person.dailyDispatchException) reasons.add('daily_dispatch_not_allowed')
 
   // 運営と警備の線引きの確認
-  if (job.needsBoundaryCheck && !job.boundaryCheck) reasons.add('boundary_not_confirmed')
+  if (job.needsBoundaryCheck && !boundaryRecorded(job)) reasons.add('boundary_not_confirmed')
 
   let residenceDaysLeft: number | undefined
   for (const s of job.shifts) {
@@ -157,6 +182,12 @@ export function checkEligibility(
     }
   }
 
+  // 在留で拒否するときは、期限の警告を同時に返さない
+  if (reasons.has('residence_invalid')) {
+    warnings.delete('residence_expiring')
+    residenceDaysLeft = undefined
+  }
+
   const details: EligibilityResult['details'] = {}
   if (residenceDaysLeft !== undefined) details.residenceDaysLeft = residenceDaysLeft
   if (maxDailyHours !== undefined) details.maxDailyHours = maxDailyHours
@@ -174,7 +205,8 @@ export function listApplicableJobs(person: PersonProfile, jobs: JobPost[], busy:
 export function validateJobForPublish(job: JobPost): EligibilityReason[] {
   const out: EligibilityReason[] = []
   if (job.isSecurityWork && job.form === 'dispatch') out.push('security_dispatch_forbidden')
-  if (job.needsBoundaryCheck && !job.boundaryCheck) out.push('boundary_not_confirmed')
+  if (job.needsBoundaryCheck && !boundaryRecorded(job)) out.push('boundary_not_confirmed')
   if (job.shifts.length === 0) out.push('no_shifts')
+  if (jobInputInvalid(job)) out.push('invalid_input')
   return out
 }

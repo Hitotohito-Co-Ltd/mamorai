@@ -43,7 +43,8 @@ export function listRenewals(people: PersonProfile[], referenceDate: string, soo
     // 在籍中の雇用が1件もない人は現任教育の対象外
     const active = p.employments.some(isActive)
     const t = p.guardTraining
-    if (active && t.basicDoneOn) {
+    // 新任教育の修了日が基準日より後（基準日時点で未修了）の人は対象外
+    if (active && t.basicDoneOn && t.basicDoneOn <= referenceDate) {
       const basicThisYear = fiscalYearOf(t.basicDoneOn) === fy
       if (!basicThisYear && !t.annualFiscalYears.includes(fy)) {
         out.push(item(p.personId, 'annual_training', `${fy + 1}-03-31`, referenceDate, soonDays))
@@ -54,5 +55,5 @@ export function listRenewals(people: PersonProfile[], referenceDate: string, soo
   const rank = { expired: 0, soon: 1, ok: 2 } as const
   return out
     .filter((i) => i.urgency !== 'ok')
-    .sort((a, b) => rank[a.urgency] - rank[b.urgency] || a.daysLeft - b.daysLeft || a.personId.localeCompare(b.personId))
+    .sort((a, b) => rank[a.urgency] - rank[b.urgency] || a.daysLeft - b.daysLeft || (a.personId < b.personId ? -1 : a.personId > b.personId ? 1 : 0))
 }
