@@ -43,7 +43,9 @@ for f in \
   0414_talent_integrity \
   0414_talent_integrity \
   0415_talent_integrity2 \
-  0415_talent_integrity2; do   # 2回=冪等性確認
+  0415_talent_integrity2 \
+  0416_talent_boundary_jst \
+  0416_talent_boundary_jst; do   # 2回=冪等性確認
   $P -d tln_rls -f "$f.sql" >/dev/null 2>&1 || { echo "FAILED applying $f"; exit 1; }
 done
 # RLS/関数 検証シナリオを実行

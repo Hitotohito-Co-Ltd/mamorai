@@ -539,6 +539,155 @@ reset role;
 insert into t_rls_results select 43, 'anon は app_company_has_person を実行できない',
   not has_function_privilege('anon', 'public.app_company_has_person(uuid)', 'EXECUTE'), 'anon の EXECUTE 権限を確認';
 
+-- ── シナリオ 44〜: Adversary 第5回（FIND-501〜504, 506, 508）──
+reset role;
+-- 同じグループの別会社(A2)にだけ雇用がある同意済みの人
+insert into companies(id, name, code, group_id) values ('cc000000-0000-0000-0000-000000000033', 'A2社', 'RLS-A2', 'aa000000-0000-0000-0000-000000000001');
+insert into persons(id, group_id, name, consent_joint_use, consent_at) values
+  ('0a000000-0000-0000-0000-000000000004', 'aa000000-0000-0000-0000-000000000001', 'A2社の人', true, now());
+insert into staff(id, company_id, person_id, name, staff_no) values
+  ('0b000000-0000-0000-0000-000000000004', 'cc000000-0000-0000-0000-000000000033', '0a000000-0000-0000-0000-000000000004', 'A2社の人', 'A2-001');
+
+-- 44〜45: 中核の関数の属性（SECURITY DEFINER と search_path の固定）
+insert into t_rls_results select 44, 'search_candidates は SECURITY DEFINER で search_path が固定されている',
+  bool_and(prosecdef) and bool_and(proconfig::text like '%search_path=public, pg_temp%'), string_agg(proname || ':' || coalesce(proconfig::text,'null'), ' ')
+  from pg_proc where proname = 'search_candidates' and pronamespace = 'public'::regnamespace;
+insert into t_rls_results select 45, 'app_company_has_person は SECURITY DEFINER で search_path が固定されている',
+  bool_and(prosecdef) and bool_and(proconfig::text like '%search_path=public, pg_temp%'), string_agg(proname || ':' || coalesce(proconfig::text,'null'), ' ')
+  from pg_proc where proname = 'app_company_has_person' and pronamespace = 'public'::regnamespace;
+-- 46: 中核3表と persons の行レベルセキュリティが有効
+insert into t_rls_results select 46, '中核の表は行レベルセキュリティが有効',
+  count(*) = 6 and bool_and(relrowsecurity), string_agg(relname || '=' || relrowsecurity::text, ',')
+  from pg_class where relname in ('jobs','job_shifts','job_applications','persons','job_roles','groups') and relnamespace = 'public'::regnamespace;
+
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';  -- A社管理者
+-- 47: 会社をまたぐ検索(同じグループの別会社の人)ができる
+insert into t_rls_results select 47, 'A社管理者の候補検索は同じグループの別会社の同意済みの人も返す',
+  string_agg(name, ',' order by name) = 'A2社の人,田中 花子', string_agg(name, ',' order by name)
+  from public.search_candidates('cc000000-0000-0000-0000-000000000011'::uuid);
+
+-- 48〜51: 他社(B)の管理者は、A社の jobs / job_shifts / job_applications を読めず、変更・削除もできない
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000022';  -- B社管理者
+insert into t_rls_results select 48, 'B社管理者はA社の案件・シフト・応募を読めない',
+  (select count(*) from jobs where company_id = 'cc000000-0000-0000-0000-000000000011') = 0
+  and (select count(*) from job_shifts where company_id = 'cc000000-0000-0000-0000-000000000011') = 0
+  and (select count(*) from job_applications where company_id = 'cc000000-0000-0000-0000-000000000011') = 0, '他社の行が見えた';
+do $$
+declare n1 int; n2 int; n3 int; d1 int; d2 int; d3 int;
+begin
+  update jobs set title = '改ざん' where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics n1 = row_count;
+  update job_shifts set headcount = 99 where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics n2 = row_count;
+  update job_applications set status = 'rejected' where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics n3 = row_count;
+  insert into t_rls_results values (49, 'B社管理者はA社の案件・シフト・応募を更新できない', n1 + n2 + n3 = 0, n1||','||n2||','||n3);
+  delete from job_applications where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics d3 = row_count;
+  delete from job_shifts where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics d2 = row_count;
+  delete from jobs where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics d1 = row_count;
+  insert into t_rls_results values (50, 'B社管理者はA社の案件・シフト・応募を削除できない', d1 + d2 + d3 = 0, d1||','||d2||','||d3);
+end $$;
+do $$ begin
+  begin
+    insert into job_applications(company_id, job_shift_id, staff_id)
+      values ('cc000000-0000-0000-0000-000000000022', 'f0000000-0000-0000-0000-00000000000a', '0b000000-0000-0000-0000-000000000003');
+    insert into t_rls_results values (51, 'B社管理者はA社のシフトへ自社名義の応募を作れない', false, '作れてしまった');
+  exception when others then insert into t_rls_results values (51, 'B社管理者はA社のシフトへ自社名義の応募を作れない', true, sqlerrm);
+  end; end $$;
+
+-- 52〜55: 更新の経路でも同じ検査が効く
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';  -- A社管理者
+do $$ begin
+  begin
+    insert into jobs(id, company_id, title, form, needs_boundary_check) values ('e0000000-0000-0000-0000-0000000000e1', 'cc000000-0000-0000-0000-000000000011', '下書き', 'spot', true);
+    update jobs set status = 'published' where id = 'e0000000-0000-0000-0000-0000000000e1';
+    insert into t_rls_results values (52, '下書きの案件は、線引き確認なしでは更新でも公開できない', false, '公開できてしまった');
+  exception when others then insert into t_rls_results values (52, '下書きの案件は、線引き確認なしでは更新でも公開できない', sqlerrm like '%線引き%', sqlerrm);
+  end; end $$;
+do $$ begin
+  begin
+    update jobs set role_id = 'd0000000-0000-0000-0000-00000000000b' where id = 'e0000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (53, '案件の職種を他グループのものへ更新できない', false, '更新できてしまった');
+  exception when others then insert into t_rls_results values (53, '案件の職種を他グループのものへ更新できない', sqlerrm like '%職種%', sqlerrm);
+  end; end $$;
+do $$ begin
+  begin
+    update job_applications set staff_id = '0b000000-0000-0000-0000-000000000003' where id = 'a1000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (54, '応募のスタッフを他社のスタッフへ付け替えられない', false, '付け替えられてしまった');
+  exception when others then insert into t_rls_results values (54, '応募のスタッフを他社のスタッフへ付け替えられない', sqlerrm like '%応募の会社%', sqlerrm);
+  end; end $$;
+do $$ begin
+  begin
+    update job_shifts set job_id = 'e0000000-0000-0000-0000-00000000000b' where id = 'f0000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (55, 'シフトを他社の案件へ付け替えられない', false, '付け替えられてしまった');
+  exception when others then insert into t_rls_results values (55, 'シフトを他社の案件へ付け替えられない', sqlerrm like '%シフトの会社%', sqlerrm);
+  end; end $$;
+
+-- 56〜64: 列の制約の負例
+do $$ begin
+  begin insert into jobs(company_id, title, form, employment_days) values ('cc000000-0000-0000-0000-000000000011', 'x', 'spot', -1);
+    insert into t_rls_results values (56, '雇用日数 -1 は登録できない', false, '登録できてしまった');
+  exception when check_violation then insert into t_rls_results values (56, '雇用日数 -1 は登録できない', true, sqlerrm); end;
+  begin insert into jobs(company_id, title, form, hourly_wage) values ('cc000000-0000-0000-0000-000000000011', 'x', 'spot', -1);
+    insert into t_rls_results values (57, '時給 -1 は登録できない', false, '登録できてしまった');
+  exception when check_violation then insert into t_rls_results values (57, '時給 -1 は登録できない', true, sqlerrm); end;
+  begin insert into job_shifts(job_id, company_id, work_date, start_time, end_time, headcount) values ('e0000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', current_date, '09:00', '17:00', 0);
+    insert into t_rls_results values (58, '必要人数 0 のシフトは登録できない', false, '登録できてしまった');
+  exception when check_violation then insert into t_rls_results values (58, '必要人数 0 のシフトは登録できない', true, sqlerrm); end;
+  begin insert into job_shifts(job_id, company_id, work_date, start_time, end_time, headcount) values ('e0000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', current_date, '24:00', '17:00', 1);
+    insert into t_rls_results values (59, '開始時刻 24:00 のシフトは登録できない', false, '登録できてしまった');
+  exception when check_violation then insert into t_rls_results values (59, '開始時刻 24:00 のシフトは登録できない', true, sqlerrm); end;
+  begin insert into job_shifts(job_id, company_id, work_date, start_time, end_time, headcount) values ('e0000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', current_date, '09:00', '24:30', 1);
+    insert into t_rls_results values (60, '終了時刻 24:30 のシフトは登録できない', false, '登録できてしまった');
+  exception when check_violation then insert into t_rls_results values (60, '終了時刻 24:30 のシフトは登録できない', true, sqlerrm); end;
+  begin insert into job_applications(company_id, job_shift_id, staff_id) values ('cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-00000000000a', '0b000000-0000-0000-0000-000000000001');
+    insert into t_rls_results values (61, '同じシフトへ同じスタッフの応募を2件作れない', false, '作れてしまった');
+  exception when unique_violation then insert into t_rls_results values (61, '同じシフトへ同じスタッフの応募を2件作れない', true, sqlerrm); end;
+  begin insert into job_applications(company_id, job_shift_id, staff_id, status) values ('cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-0000000000d1', '0b000000-0000-0000-0000-000000000002', 'bogus');
+    insert into t_rls_results values (62, '応募の状態に未定義の値は入れられない', false, '入ってしまった');
+  exception when check_violation then insert into t_rls_results values (62, '応募の状態に未定義の値は入れられない', true, sqlerrm); end;
+  begin insert into jobs(company_id, title, form) values ('cc000000-0000-0000-0000-000000000011', 'x', 'bogus');
+    insert into t_rls_results values (63, '契約の形に未定義の値は入れられない', false, '入ってしまった');
+  exception when check_violation then insert into t_rls_results values (63, '契約の形に未定義の値は入れられない', true, sqlerrm); end;
+  begin insert into jobs(company_id, title, form, status) values ('cc000000-0000-0000-0000-000000000011', 'x', 'spot', 'bogus');
+    insert into t_rls_results values (64, '案件の状態に未定義の値は入れられない', false, '入ってしまった');
+  exception when check_violation then insert into t_rls_results values (64, '案件の状態に未定義の値は入れられない', true, sqlerrm); end;
+end $$;
+
+-- 65〜66: 線引き確認日の『今日』は日本時間（セッションのタイムゾーンに依存しない）(FIND-506)
+set time zone 'Pacific/Pago_Pago';  -- UTC-11。日本時間より先の日付にはならない
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', 'JST当日', 'spot', 'published', true, '山田', (now() at time zone 'Asia/Tokyo')::date);
+    insert into t_rls_results values (65, '日本時間の当日の確認日は、遅いタイムゾーンのセッションでも公開できる', true, '');
+  exception when others then insert into t_rls_results values (65, '日本時間の当日の確認日は、遅いタイムゾーンのセッションでも公開できる', false, sqlerrm);
+  end; end $$;
+set time zone 'Pacific/Kiritimati';  -- UTC+14。日本時間より先の日付になりうる
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', 'JST翌日', 'spot', 'published', true, '山田', (now() at time zone 'Asia/Tokyo')::date + 1);
+    insert into t_rls_results values (66, '日本時間の翌日の確認日は、進んだタイムゾーンのセッションでも公開できない', false, '公開できてしまった');
+  exception when others then insert into t_rls_results values (66, '日本時間の翌日の確認日は、進んだタイムゾーンのセッションでも公開できない', sqlerrm like '%確認日%', sqlerrm);
+  end; end $$;
+reset time zone;
+
+-- 67〜68: 確認者がゼロ幅文字だけ(FIND-508)
+do $$ begin
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', 'ゼロ幅', 'spot', 'published', true, chr(8203) || chr(65279), (now() at time zone 'Asia/Tokyo')::date);
+    insert into t_rls_results values (67, 'ゼロ幅文字だけの確認者では公開できない', false, '公開できてしまった');
+  exception when others then insert into t_rls_results values (67, 'ゼロ幅文字だけの確認者では公開できない', sqlerrm like '%線引き%', sqlerrm);
+  end;
+  begin
+    insert into jobs(company_id, title, form, status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on)
+      values ('cc000000-0000-0000-0000-000000000011', '可視文字あり', 'spot', 'published', true, '山' || chr(8203) || '田', (now() at time zone 'Asia/Tokyo')::date);
+    insert into t_rls_results values (68, '可視文字がある確認者は(ゼロ幅文字が混ざっても)公開できる', true, '');
+  exception when others then insert into t_rls_results values (68, '可視文字がある確認者は(ゼロ幅文字が混ざっても)公開できる', false, sqlerrm);
+  end; end $$;
+
+reset role;
+
 -- ── 結果出力 ──
 select n || '. ' || case when ok then 'PASS' else 'FAIL' end || '  ' || name
   || case when not ok and detail <> '' then '  [' || detail || ']' else '' end
