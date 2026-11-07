@@ -322,3 +322,161 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 | **MEDIUM-2** | NFR-04 の「実用範囲」を代表データ量（1現場 日報36,000件・50名）での **P95 < 1.5秒** に数値化。 |
 | **HIGH-1/2/3** | REQ-016 に手動編集の保存先 `shift_overrides`、REQ-020 に確定・反映のNode経由限定と write-back を設計注記として追記（詳細はADR-008 / database-design.md）。 |
 | 残課題 | 新REQ（write-back専用REQの正式起票）・MEDIUM-4（REQ-013のSprint2受入範囲明記）・MEDIUM-5（AIシフトPoCゲート化）は Planner 判断のコスト高項目として本是正の対象外＝残課題。 |
+
+---
+
+# 追補 v2.0 — Sprint 8〜10: 人材基盤（スタッフ台帳・案件・応募・更新手続き）
+
+**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** DRAFT（Spec-Validator 審査待ち／RYUGEN 承認待ち）
+**参照:** 「MAMOR-AI 人材プラットフォーム構想」「MAMOR-AI 構成案・設計書（2026年11月版）」「UIデザイン案」「帳票一覧」
+**目的:** 複数のExcelと紙の管理を、MAMOR-AI 1つに置き換える。第一弾の対象は 有休申請・労働条件・更新手続き・現任申込・配置入力・スタッフ台帳・採用・案件・配置・シフト。
+
+> **プロセス逸脱の記録（遡及仕様）:** Sprint 8 の REQ-026〜034 は、仕様より先に `feat/talent-foundation`（コミット 3b711d1）で実装とテストが書かれた。TRAID原則1（Spec Supremacy）・3（Red Before Green）に反する。対処: ①本節で実装済みの振る舞いを仕様として確定する ②REQ-026〜034 は Spec-Validator 承認後に TDD-Writer が仕様からテストを再導出し、既存テストとの差分を Adversary（Fresh Context）が評価する ③それまで当該ブランチはマージしない。
+
+## 用語
+- **人（person）**: ヒトトヒトHDグループで1人1件。**雇用（staff）**: ある会社での雇用。1人が複数の雇用を持てる。
+- **契約の形**: 警備（security）/ 派遣（dispatch）/ スポット直接雇用（spot）/ 職業紹介（referral）。
+- **警備の枠が応募可能**: 警備業務の案件で、新任教育を修了し、かつ応募日の年度に現任教育を満たす（またはその年度に新任を修了した）状態。年度は4月始まり。
+
+## スプリント計画（追補）
+| Sprint | テーマ | REQ | 状態 |
+|---|---|---|---|
+| 8 | 応募可否の判定・更新手続き・台帳/案件/応募のDB土台 | 026〜034 | 実装済み（遡及仕様。再検証待ち） |
+| 9 | スタッフ台帳画面・採用・案件作成と公開・隊員アプリ「しごと」・応募→採否 | 035〜040 | 未着手 |
+| 10 | 応援依頼（未報告コール連動）・会社都合キャンセル・今日やること統合 | 041〜045 | 未着手 |
+
+## 要件定義（EARS形式）
+
+### REQ-026: 応募可否の判定
+**EARS:** WHEN スタッフが案件に応募しようとする、または管理者が候補を検索する THE システム SHALL 契約の形・職種・本人の状態（同意・雇用・教育・在留・年齢・既存勤務）から、案件の全シフト日について応募可否と不可の理由コードを 1 つの純粋関数で返す。理由が 1 つでもあれば不可とする。
+**Verification Type:** HAPPY_PATH / EDGE_CASE　**リスク:** HIGH（法令違反の応募を通す）　**依存:** なし　**Sprint:** 8
+**変更対象:** packages/input-core/src/talent/eligibility.ts, model.ts
+**テスト観点:** 全シフト日の判定、複数理由の同時返却、理由が空なら可、同一入力で同一出力（日時・乱数に非依存）
+**計測要件:** イベント `application_eligibility_checked`（発火: 応募APIの入口で1回）/ プロパティ: job_form, eligible(bool), reason_codes[] / 失敗: `application_eligibility_check_failed`(error_code) / KPI: 不可理由別の件数。PII 不含。
+
+### REQ-027: 警備業務は派遣にできない
+**EARS:** IF 案件が警備業務の職種かつ契約の形が派遣 THEN THE システム SHALL その案件を公開前チェックで拒否し、DB への登録もトリガで拒否する。
+**Verification Type:** ERROR_HANDLING　**リスク:** HIGH（労働者派遣法第4条）　**依存:** REQ-026　**Sprint:** 8
+**変更対象:** talent/eligibility.ts（validateJobForPublish）, supabase/migrations/0410_talent_foundation.sql（jobs_guard_security_dispatch）
+**テスト観点:** 警備×派遣は拒否、警備×直接雇用は登録可、警備でない職種×派遣は登録可、トリガは insert と update の両方
+**計測要件:** `job_publish_rejected`（発火: 公開APIの入口）/ error_code=security_dispatch_forbidden / KPI: 拒否件数。
+
+### REQ-028: 警備の枠への応募資格（教育）
+**EARS:** WHEN 警備業務の案件（直接雇用）へ応募する THE システム SHALL 応募対象の各シフト日において、新任教育の修了日が当日以前であり、かつ（当日の年度の現任教育が満たされている、または新任教育をその年度に修了している）場合に限り応募を許可する。年度は4月1日〜翌3月31日とする。
+**Verification Type:** EDGE_CASE　**リスク:** HIGH　**依存:** REQ-026　**Sprint:** 8
+**テスト観点:** 新任未修了→不可 / 現任未了→不可 / 今年度に新任修了→可 / 3月31日と4月1日の年度境界 / 修了日が未来→不可 / 年度をまたぐ複数日シフトは各日で判定
+**計測要件:** REQ-026 のイベントで代替（計測不要: 重複を避けるため）。
+
+### REQ-029: 日雇派遣（30日以内）の例外
+**EARS:** WHEN 契約の形が派遣で雇用期間が 30 日以内の案件へ応募する THE システム SHALL 本人に、申告かつ証明の確認が済んだ例外区分（60歳以上・昼間学生・副業・世帯収入）がある場合に限り応募を許可する。雇用期間が 31 日以上の場合は例外を要求しない。
+**Verification Type:** EDGE_CASE　**リスク:** HIGH　**依存:** REQ-026　**Sprint:** 8
+**テスト観点:** 30日ちょうど（要例外）/ 31日（不要）/ 例外あり・なし
+**計測要件:** REQ-026 のイベントで代替。
+
+### REQ-030: 年齢制限
+**EARS:** WHEN 案件が警備業務、または夜間勤務を含む THE システム SHALL 各シフト日の満年齢が 18 歳未満の人の応募を拒否する（誕生日当日から 18 歳として扱う）。
+**Verification Type:** EDGE_CASE　**リスク:** HIGH　**依存:** REQ-026　**Sprint:** 8
+**テスト観点:** 18歳の誕生日の前日と当日 / 夜間でも警備でもない案件は年齢で拒否しない（本要件の対象外）
+**計測要件:** REQ-026 で代替。
+
+### REQ-031: 時間の重なりと労働時間の通算
+**EARS:** WHEN スタッフに既存の勤務がある THE システム SHALL 応募するシフトと時間が重なる場合に応募を拒否し（日をまたぐ勤務を含む）、同じ日の他社分を含む合計が 8 時間を超える場合は応募を許可したうえで警告を返す。
+**Verification Type:** EDGE_CASE　**リスク:** MEDIUM　**依存:** REQ-026　**Sprint:** 8
+**テスト観点:** 22:00〜06:00 と翌日 05:00〜09:00 は重なる / 翌日 06:00 開始は重ならない / 合計 8 時間ちょうどは警告なし、8 時間 1 分超は警告
+**計測要件:** `application_daily_hours_warned`（KPI: 警告件数）。
+
+### REQ-032: 在留カードの就労可否と期限
+**EARS:** WHEN 外国籍のスタッフ（在留情報あり）が応募する THE システム SHALL 就労不可、またはシフト日に在留期限が切れている場合は応募を拒否し、期限が 60 日以内に迫る場合は応募を許可したうえで警告を返す。在留情報がない人（日本国籍など）には本要件を適用しない。
+**Verification Type:** EDGE_CASE　**リスク:** HIGH　**依存:** REQ-026　**Sprint:** 8
+**テスト観点:** 期限当日（可）/ 期限の翌日（不可）/ 就労不可 / 60日ちょうどで警告 / 在留情報なし
+**計測要件:** `residence_expiry_warned`（KPI: 期限切れ前の通知件数）。
+
+### REQ-033: 更新手続きの期限一覧
+**EARS:** WHEN 管理者が更新手続き一覧を開く THE システム SHALL 基準日に対し、在籍中の雇用の契約満了日・当年度の現任教育（期限は年度末の 3 月 31 日）・在留期限について、期限切れまたは 30 日以内のものだけを、期限切れ→期限が近い順で返す。退社済みの雇用、新任教育が未修了の人、今年度に新任を修了した人は現任教育の対象外とする。
+**Verification Type:** HAPPY_PATH / EDGE_CASE　**リスク:** MEDIUM　**依存:** なし　**Sprint:** 8
+**一覧の3状態:** 空（対象なし → 空配列を返す）/ 単数 / 大量（1,000 人分を 1 秒以内に返す。→ 検証は PERFORMANCE で別途）
+**変更対象:** talent/renewal.ts
+**計測要件:** `renewal_list_viewed`（発火: 画面表示時 1 回）/ プロパティ: item_count, expired_count / KPI: 期限切れの滞留数。
+
+### REQ-034: 運営枠と警備枠の線引き確認
+**EARS:** IF 案件が「業務内容で判断が必要」とされ、確認者と確認日の記録がない THEN THE システム SHALL 公開を拒否し、その案件への応募も拒否する。確認者は現場責任者または支店とする。
+**Verification Type:** ROLE_ACCESS / ERROR_HANDLING　**リスク:** HIGH（雑踏警備の無資格配置）　**依存:** REQ-027　**Sprint:** 8
+**テスト観点:** 記録なし→拒否 / 記録あり→可 / 確認者が現場責任者・支店以外→拒否（権限判定は REQ-040 で確定）
+**計測要件:** `job_boundary_check_missing`（error_code=boundary_not_confirmed）。
+
+### REQ-035: スタッフ台帳（人と雇用）とグループ共同利用の同意
+**EARS:** THE システム SHALL 人をグループで 1 件、雇用を会社ごとに保持し、会社の管理者には自社に雇用がある人だけを参照させる。WHEN 本人が共同利用に同意していない THE システム SHALL その人の応募・候補検索への表示を拒否する。
+**Verification Type:** AUTH_GATE / DATA_PERSISTENCE　**リスク:** HIGH（個人情報）　**依存:** REQ-026　**Sprint:** 8（DB）/ 9（画面）
+**変更対象:** supabase/migrations/0410_talent_foundation.sql（persons, staff.person_id, RLS）, apps/desktop/src/features/talent/*
+**テスト観点（DB）:** 他社の管理者は他社の雇用の person を読めない / 運営は全件 / 同意なしは応募不可
+**計測要件:** `person_registered`（発火: 登録 RPC の成功時）/ プロパティ: consent_joint_use(bool) / 禁止: 氏名・連絡先。
+
+### REQ-036: 採用応募の取り込みと一覧
+**EARS:** WHEN 応募者が募集ページから応募する、または管理者が求人媒体（エンゲージ・タウンワーク）の応募を登録する THE システム SHALL 応募を 1 つの一覧にまとめ、応募経路を記録し、対応していない応募が 24 時間を超えたら担当者に通知する。
+**Verification Type:** HAPPY_PATH / ERROR_HANDLING　**リスク:** MEDIUM　**依存:** REQ-035　**Sprint:** 9
+**一覧の3状態:** 空（「応募はありません」を表示）/ 単数 / 大量（500 件）
+**計測要件:** `candidate_applied`（source）, `candidate_unhandled_24h_notified`。KPI: 媒体別の採用単価。
+**Open:** 媒体との連携方法は OQ-10。
+
+### REQ-037: 案件の作成と公開
+**EARS:** WHEN 管理者が案件（雇用主・契約の形・職種・必要人数・シフト・公開範囲・配置の決め方・単価）を作成して公開する THE システム SHALL REQ-027 と REQ-034 の公開前チェックを実行し、通った案件だけを公開状態にする。公開範囲は「登録スタッフ全員／その現場で働いた人／指名」の 3 種に限り、一般公開は選べない。
+**Verification Type:** HAPPY_PATH / ERROR_HANDLING / ROLE_ACCESS　**リスク:** HIGH　**依存:** REQ-027, REQ-034　**Sprint:** 9
+**計測要件:** `job_published` / `job_publish_rejected`。
+
+### REQ-038: 隊員アプリ「しごと」タブ
+**EARS:** WHEN スタッフが「しごと」タブを開く THE システム SHALL REQ-026 で応募できる案件だけを表示し、応募できない案件とその理由は表示しない。応募前の画面に雇用主・時給・交通費・持ち物・服装・キャンセル規定を必ず表示する。
+**Verification Type:** HAPPY_PATH / ACCESSIBILITY　**リスク:** MEDIUM　**依存:** REQ-026, REQ-037　**Sprint:** 9
+**一覧の3状態:** 空（「いま応募できるお仕事はありません」）/ 単数 / 大量（200 件）
+**ACCESSIBILITY:** ボタン 44px 以上、文字のコントラスト 4.5:1 以上。
+**計測要件:** `job_list_viewed`, `job_applied`。
+
+### REQ-039: 応募から確定、労働条件通知
+**EARS:** WHEN 配置の決め方が「応募→採否」の案件で管理者が採用する、または「即確定」の案件に応募が成立する THE システム SHALL 応募を確定にし、労働条件通知書を発行して通知時刻を記録し、本人の確認時刻を記録する。会社都合で取り消す場合は REQ-043 に従う。
+**Verification Type:** HAPPY_PATH / DATA_PERSISTENCE　**リスク:** HIGH（応募成立で労働契約が成立する）　**依存:** REQ-037　**Sprint:** 9
+**計測要件:** `application_confirmed`（placement_mode）, `conditions_notice_issued`。
+
+### REQ-040: 権限（誰が何をできるか）
+**EARS:** THE システム SHALL 案件の公開・採否・応援依頼・線引き確認を、現場責任者・管制・支店・本社の役割ごとに許可し、許可のない役割による操作を拒否して `permission_denied` を記録する。
+**Verification Type:** ROLE_ACCESS　**リスク:** HIGH　**依存:** REQ-037　**Sprint:** 9
+**確認が必要:** 応援依頼を出せる人は現場責任者・管制・支店（決定済み）。線引き確認者は現場責任者・支店（決定済み）。
+
+### REQ-041: 応援依頼（未報告コールからの作成）
+**EARS:** WHEN 現場責任者・管制・支店が欠員の枠から応援依頼を作る THE システム SHALL 現場・日時・人数・必要資格を引き継いだ単発案件を作成し、必要な教育・資格を満たし、その時間に他の勤務がないスタッフだけに通知する。キャリアライズだけに登録している人には表示しない。
+**Verification Type:** HAPPY_PATH / ERROR_HANDLING　**リスク:** HIGH　**依存:** REQ-026, REQ-039, REQ-040　**Sprint:** 10
+**計測要件:** `support_request_created`, `support_request_filled`（KPI: 充足までの時間）。
+
+### REQ-042: 補填済みの反映
+**EARS:** WHEN 応援依頼の応募が確定する THE システム SHALL 支店・本部の画面で該当枠を補填済みにし、確定した人の上番報告枠を自動で追加し、未報告コールの対象に含める。
+**Verification Type:** DATA_PERSISTENCE　**リスク:** MEDIUM　**依存:** REQ-041　**Sprint:** 10
+
+### REQ-043: 会社都合キャンセルの休業手当
+**EARS:** WHEN 会社都合で確定済みの応募が取り消される THE システム SHALL 休業手当の要否と金額を算定対象として記録し、月末締めの給与計算に引き渡す。本人都合の取り消しには適用しない。
+**Verification Type:** EDGE_CASE　**リスク:** HIGH　**依存:** REQ-039　**Sprint:** 10
+**Open:** 金額の算定式は社労士の確認後（OQ-11）。
+
+### REQ-044: 「今日やること」への統合
+**EARS:** WHEN 管理者が現場コンソールのホームを開く THE システム SHALL 未処理の有休・現任申込・更新手続き（REQ-033）・応募の採否・応援依頼を 1 つの一覧に、期限の近い順に表示する。
+**Verification Type:** HAPPY_PATH　**リスク:** MEDIUM　**依存:** REQ-033, REQ-036, REQ-039　**Sprint:** 10
+**一覧の3状態:** 空（「今日やることはありません」）/ 単数 / 大量（100 件は先頭 50 件＋件数表示）
+**計測要件:** `todo_item_completed`（kind）/ KPI: 紙・Excel 廃止後の処理時間。
+
+### REQ-045: 同日の複数応募
+**EARS:** WHEN 同じスタッフが時間の重なる複数の案件に同時に応募する THE システム SHALL 先に確定した応募を有効とし、後の応募を REQ-031 に従い拒否する。
+**Verification Type:** EDGE_CASE　**リスク:** MEDIUM　**依存:** REQ-031, REQ-039　**Sprint:** 10
+
+## 追補の Open Questions
+| ID | 内容 | 影響 | 担当 |
+|---|---|---|---|
+| OQ-10 | エンゲージ・タウンワークの応募取り込み方法（API／CSV／メール） | REQ-036 | RYUGEN（媒体との契約確認） |
+| OQ-11 | 休業手当の算定式と対象範囲 | REQ-043 | 社労士 |
+| OQ-12 | 共同利用する項目と、既存スタッフから同意を取り直す方法 | REQ-035 | RYUGEN・弁護士 |
+| OQ-13 | 当日キャンセルのペナルティ | REQ-039, 043 | RYUGEN |
+| OQ-14 | 「欠時間」「約定人数」の定義（UI案の7指標） | 配備状況画面 | RYUGEN |
+
+## REQ 台帳（追補）
+| REQ | 状態 | Sprint |
+|---|---|---|
+| 026〜034 | 実装済み（遡及・再検証待ち） | 8 |
+| 035 | DB のみ実装済み／画面は未着手 | 8・9 |
+| 036〜040 | 未着手 | 9 |
+| 041〜045 | 未着手 | 10 |

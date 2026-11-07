@@ -307,5 +307,11 @@
     "api_gateway": "api.tryangrow.com 等(Node/Express, Claude鍵秘匿)",
     "db": "Supabase managed",
     "dual": "同一Reactコードを Web と Tauri で両出し可能"
+  },
+  "sprint8_talent": {
+    "status": "phase1a_draft",
+    "spec": "spec/behavioral-spec.md (追補 v2.0, REQ-026〜045)",
+    "deviation": "REQ-026〜034 は仕様より先に実装された(3b711d1)。遡及仕様を作成。Spec-Validator承認→TDD再導出→Adversary(Fresh Context)評価まで feat/talent-foundation はマージしない",
+    "next": "④ Spec-Validator 審査(85点以上) → RYUGEN 承認"
   }
 }
