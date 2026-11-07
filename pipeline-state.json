@@ -309,9 +309,9 @@
     "dual": "同一Reactコードを Web と Tauri で両出し可能"
   },
   "sprint8_talent": {
-    "status": "phase1a_draft",
+    "status": "spec_approved_v2.5",
     "spec": "spec/behavioral-spec.md (追補 v2.0, REQ-026〜045)",
     "deviation": "REQ-026〜034 は仕様より先に実装された(3b711d1)。遡及仕様を作成。Spec-Validator承認→TDD再導出→Adversary(Fresh Context)評価まで feat/talent-foundation はマージしない",
-    "next": "④ Spec-Validator 審査(85点以上) → RYUGEN 承認"
+    "next": "⑦ TDD-Writer(REQ-026〜034, 035のDB) → RED確認 → ⑧ Generator → ⑫ Adversary(Fresh Context)。REQ-036/037/039/040 は OQ-15 解決まで凍結"
   }
 }
