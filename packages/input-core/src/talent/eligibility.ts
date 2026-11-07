@@ -86,10 +86,12 @@ export function checkEligibility(
   if (job.isSecurityWork && job.form === 'dispatch') reasons.add('security_dispatch_forbidden')
 
   // 雇用主に登録（在籍）していること
+  // 在籍は全シフト日で確認する（最終シフト日より前に退社する人は不可）
   const dates = job.shifts.map((s) => s.date)
-  const first = dates.slice().sort()[0] ?? ''
-  const registered = person.employments.some(
-    (e) => e.companyId === job.employerCompanyId && e.startOn <= first && (!e.endOn || e.endOn >= first),
+  const registered = dates.every((d) =>
+    person.employments.some(
+      (e) => e.companyId === job.employerCompanyId && e.startOn <= d && (!e.endOn || e.endOn >= d),
+    ),
   )
   if (!registered) reasons.add('not_registered')
 

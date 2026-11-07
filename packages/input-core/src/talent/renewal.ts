@@ -28,7 +28,7 @@ function item(personId: string, kind: RenewalKind, dueOn: string, ref: string, s
 
 /**
  * 更新が必要な項目を、期限が近い順に返す。
- * 現任教育: 今年度が未達で、新任をその年度に修了していない警備員のみ（年度末が期限）。
+ * 現任教育: 在籍中の雇用があり、今年度が未達で、新任をその年度に修了していない警備員のみ（年度末が期限）。
  */
 export function listRenewals(people: PersonProfile[], referenceDate: string, soonDays = 30): RenewalItem[] {
   const fy = fiscalYearOf(referenceDate)
@@ -37,8 +37,10 @@ export function listRenewals(people: PersonProfile[], referenceDate: string, soo
     for (const e of p.employments) {
       if (e.contractEndOn && !e.endOn) out.push(item(p.personId, 'contract', e.contractEndOn, referenceDate, soonDays))
     }
+    // 在籍中の雇用が1件もない人（全雇用が退社済み）は現任教育の対象外
+    const active = p.employments.some((e) => !e.endOn)
     const t = p.guardTraining
-    if (t.basicDoneOn) {
+    if (active && t.basicDoneOn) {
       const basicThisYear = fiscalYearOf(t.basicDoneOn) === fy
       if (!basicThisYear && !t.annualFiscalYears.includes(fy)) {
         out.push(item(p.personId, 'annual_training', `${fy + 1}-03-31`, referenceDate, soonDays))
