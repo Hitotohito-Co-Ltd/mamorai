@@ -1,0 +1,21 @@
+Sprint 8 GREEN Phase Evidence
+実行日: 2026-11-07 / ブランチ: feat/talent-foundation
+RED 記録: spec/evidence/sprint-8-red-phase.log（64件中2件が実装の欠陥で RED）
+
+修正（Generator）:
+  [REQ-026] eligibility.ts  在籍を全シフト日で確認（最終シフト日より前に退社する人は not_registered）
+  [REQ-033] renewal.ts      在籍中の雇用が無い人(全雇用が退社済み)は現任教育の対象外
+  [REQ-035] 0411_talent_search_candidates.sql  search_candidates(p_company_id, p_filter) を追加
+            同じグループで consent_joint_use=true の人だけ。自社(または運営)以外は拒否
+
+結果:
+  input-core:  Test Files 43 passed (43) / Tests 525 passed (525)  ※新規64件(s8) + 既存461件
+  tsc --noEmit: エラー0
+  カバレッジ src/talent: Stmts 100 / Branch 100 / Funcs 100 / Lines 100
+  DB 検証 (supabase/tests/run_talent_rls_check.sh): 9シナリオ all PASS（0410・0411 を各2回適用=冪等）
+    テストデータの UUID が不正(16進数でない)だったため、期待値は変えずシード値だけ直した
+    シナリオ 8 は関数が無くてもエラーで通る空振りだったため、権限エラーの時だけ PASS に締めた
+    シナリオ 7〜9 は関数実装の前に追加し、RED(7,9 が FAIL)を確認してから実装した
+
+未完了: REQ-036/037/039/040 は OQ-15 解決まで凍結。REQ-035 の画面は OQ-12 解決まで着手しない。
+        Adversary(Fresh Context) 評価、Evaluator 判定は未実施。
