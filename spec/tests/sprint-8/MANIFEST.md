@@ -2,9 +2,9 @@
 
 TDD-Writer: 赤松 灯 (⑦)  
 作成日: 2026-11-07  
-仕様バージョン: behavioral-spec.md 追補 v2.13（インターフェース契約・境界の確定を含む）
-再生成: 2026-11-07 第1回（v2.6）と第2回（v2.10。Adversary FIND-004/005/006/007/009）。spec/evidence/sprint-8-test-regeneration.md 参照
-結果（第2回の RED 時点）: s8 は 136 件中 107 PASS / 29 RED。RED は全て第2回で追加した新規テスト（実装が v2.10 に未追随）。第1回の RED 2件（S8-026-03, S8-033-03）は実装修正により PASS 済み
+仕様バージョン: behavioral-spec.md 追補 v2.15（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
+再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）。spec/evidence/sprint-8-test-regeneration.md 参照
+結果（第5回の RED 時点。`pnpm --filter @mamorai/input-core exec vitest run` の実測）: input-core 全体 724 件中 680 PASS / 44 RED。s8 は 292 件中 248 PASS / 44 RED。RED は全て第5回で追加した新規テスト（実装が v2.15 に未追随）。第5回より前の 231 件は全て PASS（回帰 0）
 
 ---
 
@@ -114,7 +114,9 @@ TDD-Writer: 赤松 灯 (⑦)
 | S8-034-04 | boundaryCheck_警備×派遣かつ線引き記録なしは両方の理由コードで拒否される | 複合 | PASS |
 | S8-034-05 | boundaryCheck_eligibility_記録なしの案件への応募も拒否される | checkEligibility 経由 | PASS |
 
-### REQ-035: スタッフ台帳と共同利用の同意（v2.6: 同意なしはどの案件にも応募不可）
+### REQ-035a（Sprint 8）: スタッフ台帳と共同利用の同意（v2.6: 同意なしはどの案件にも応募不可）
+
+035a = 人と雇用の台帳、会社ごとの参照制限、同意フラグ、`search_candidates`、同意の整合 CHECK。035b（登録 RPC・同意送信 RPC・同意の画面。Sprint 9）は未着手でテスト未作成。以下は 035a のみ。
 
 | テスト ID | describe / it | 観点 | 状態 |
 |---|---|---|---|
@@ -208,3 +210,21 @@ TDD-Writer: 赤松 灯 (⑦)
 | F | REQ-033 | 同日・同 daysLeft の並びはコードポイント順 | 3 | 3 |
 | G | REQ-031 | 日またぎ勤務は全時間を始業日に計上 | 4 | 0 |
 | H | REQ-026/028/031/032 | 新任の修了日境界、複数雇用、入社日境界、非警備、警告値の最大/最小 | 11 | 0 |
+
+---
+
+## 追加 第5回（仕様 v2.15。Adversary 第3回 FIND-302/303/304/305/309）
+
+追加 61 件（s8 は 292 件）。うち 44 件が RED（実装が v2.15 に未追随）、17 件は対（有効入力）・ミューテーション対応で PASS。RenewalItem の型は未更新のため、テスト内でキャストしている。
+
+| 区分 | REQ | describe（s8_talent_req026_034.test.ts） | 件数 | RED |
+|---|---|---|---|---|
+| A1 | REQ-026/037 | 時刻の不正は invalid_input（シフトの開始/終了 '25:99','xx','9:00','24:00','' ×checkEligibility/validateJobForPublish、対 '00:00','23:59','09:00'） | 23 | 20 |
+| A2 | REQ-026/037 | 他の勤務(busy)の不正（日付 garbage/2026-02-30、時刻 zz/25:00、対） | 7 | 6 |
+| A3 | REQ-026/037 | 雇用の日付の不正（startOn garbage、endOn garbage/空文字、対 undefined/有効） | 5 | 3 |
+| B | REQ-033 | 期限日が不正な項目は urgency=invalid, daysLeft=null で先頭に返す／基準日不正は RangeError | 10 | 8 |
+| C1 | REQ-033 | personId はコードポイント順（z,é,Ａ,😀。入力順3通り） | 3 | 3 |
+| C2 | REQ-033 | 同一 personId・同日・同 daysLeft の並びは入力順に依らず kind 順 | 6 | 4 |
+| D1 | REQ-028 | 警備×派遣では教育不足の理由を出さない（＋対） | 2 | 0 |
+| D2 | REQ-034 | confirmedBy が数値でも TypeError を出さず boundary_not_confirmed | 3 | 0 |
+| D3 | REQ-033 | 就労不可でも在留期限は一覧に出る（＋対） | 2 | 0 |
