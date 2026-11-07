@@ -341,8 +341,8 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 ## スプリント計画（追補）
 | Sprint | テーマ | REQ | 状態 |
 |---|---|---|---|
-| 8 | 応募可否の判定・更新手続き・台帳/案件/応募のDB土台 | 026〜034 | 実装済み（遡及仕様。再検証待ち） |
-| 9 | スタッフ台帳画面・採用・案件作成と公開・隊員アプリ「しごと」・応募→採否 | 035〜040 | 未着手 |
+| 8 | 応募可否の判定・更新手続き・台帳/案件/応募のDB土台 | 026〜034、035（DBのみ） | 実装済み（遡及仕様。再検証待ち） |
+| 9 | スタッフ台帳画面・採用・案件作成と公開・隊員アプリ「しごと」・応募→採否 | 035（画面）、036〜040 | 未着手 |
 | 10 | 応援依頼（未報告コール連動）・会社都合キャンセル・今日やること統合 | 041〜045 | 未着手 |
 
 ## 要件定義（EARS形式）
@@ -399,26 +399,26 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 ### REQ-033: 更新手続きの期限一覧
 **EARS:** WHEN 管理者が更新手続き一覧を開く THE システム SHALL 基準日に対し、在籍中の雇用の契約満了日・当年度の現任教育（期限は年度末の 3 月 31 日）・在留期限について、期限切れまたは 30 日以内のものだけを、期限切れ→期限が近い順で返す。退社済みの雇用は契約満了の対象外とする。在籍中の雇用が 1 件もない人（全雇用が退社済み）、新任教育が未修了の人、今年度に新任を修了した人は、現任教育の対象外とする。
 **Verification Type:** HAPPY_PATH / EDGE_CASE　**リスク:** MEDIUM　**依存:** なし　**Sprint:** 8
-**一覧の3状態:** 空（対象なし → 空配列を返す）/ 単数 / 大量（1,000 人分を 1 秒以内に返す。→ 検証は PERFORMANCE で別途）
+**一覧の3状態:** 空（対象なし → 空配列を返す）/ 単数 / 大量（1,000 人分を 1 秒以内に返す。→ NFR-05 で検証）
 **変更対象:** packages/input-core/src/talent/renewal.ts
-**計測要件:** `renewal_list_viewed`（発火: 画面表示時 1 回）/ プロパティ: item_count, expired_count / 失敗: `renewal_list_failed`(error_code) / KPI: 期限切れの滞留数。
+**計測要件:** `renewal_list_viewed`（発火: 一覧の取得が成功し描画が完了した直後に 1 回）/ プロパティ: item_count, expired_count / 失敗: `renewal_list_failed`(error_code) / KPI: 期限切れの滞留数。
 
 ### REQ-034: 運営枠と警備枠の線引き確認
 **EARS:** IF 案件が「業務内容で判断が必要」とされ、確認者と確認日の記録がない THEN THE システム SHALL 公開を拒否し、その案件への応募も拒否する。確認者は現場責任者または支店とする。
-**Verification Type:** ROLE_ACCESS / ERROR_HANDLING　**リスク:** HIGH（雑踏警備の無資格配置）　**依存:** REQ-027　**Sprint:** 8
+**Verification Type:** ERROR_HANDLING（確認者のロール判定は REQ-040 で ROLE_ACCESS として検証する）　**リスク:** HIGH（雑踏警備の無資格配置）　**依存:** REQ-027　**Sprint:** 8
 **変更対象:** packages/input-core/src/talent/eligibility.ts（validateJobForPublish）, supabase/migrations/0410_talent_foundation.sql
 **テスト観点:** 記録なし→拒否 / 記録あり→可 / （確認者のロール判定は REQ-040 の受入で検証する。本 REQ は「確認者と確認日が記録されているか」だけを判定する）
 **計測要件:** 公開の拒否は REQ-027 の `job_publish_rejected`（error_code=boundary_not_confirmed）で記録する。応募の拒否は REQ-026 の `application_eligibility_checked`（reason_codes に boundary_not_confirmed）で記録する。単独のイベントは作らない。
 
 ### REQ-035: スタッフ台帳（人と雇用）とグループ共同利用の同意
-**EARS:** THE システム SHALL 人をグループで 1 件、雇用を会社ごとに保持し、会社の管理者には自社に雇用がある人だけを参照させる。WHEN 本人が共同利用に同意していない THE システム SHALL その人を、グループ横断の候補検索と他社の案件への応募の対象から外す（自社の管理者が自社の雇用として参照することは許可する）。候補検索は同意済みの人だけを返すサーバ側の関数で行い、同意の有無で直接のテーブル参照を変えない。
+**EARS:** WHEN 登録 RPC が人を保存する THE システム SHALL 人をグループで 1 件、雇用を会社ごとに保持する。WHEN 会社の管理者が人を参照する THE システム SHALL 自社に雇用がある人だけを返す。WHEN 本人が共同利用に同意していない THE システム SHALL その人を、グループ横断の候補検索と他社の案件への応募の対象から外す（自社の管理者が自社の雇用として参照することは許可する）。候補検索は同意済みの人だけを返すサーバ側の関数で行い、同意の有無で直接のテーブル参照を変えない。
 **Verification Type:** AUTH_GATE / DATA_PERSISTENCE　**リスク:** HIGH（個人情報）　**依存:** REQ-026　**Sprint:** 8（DB）/ 9（画面）
 **変更対象:** supabase/migrations/0410_talent_foundation.sql（persons, staff.person_id, RLS）, apps/desktop/src/features/talent/*
 **テスト観点（DB）:** 他社の管理者は他社の雇用の person を読めない / 運営は全件 / 同意なしは応募不可 / 同意なしは横断の候補検索に出ない（自社の一覧には出る）
 **計測要件:** `person_registered`（発火: 登録 RPC の成功時）/ プロパティ: consent_joint_use(bool) / 失敗: `person_registration_failed`(error_code) / 禁止: 氏名・連絡先。
 
 ### REQ-036: 採用応募の取り込みと一覧
-**EARS:** WHEN 応募者が募集ページから応募する、または管理者が求人媒体（エンゲージ・タウンワーク）の応募を登録する THE システム SHALL 応募を 1 つの一覧にまとめ、応募経路を記録し、対応していない応募が 24 時間を超えたら担当者に通知する。
+**EARS:** WHEN 応募者が募集ページから応募する、または管理者が求人媒体（エンゲージ・タウンワーク）の応募を登録する THE システム SHALL 応募を 1 つの一覧にまとめ、応募経路を記録し、応募の状態（`new`→`contacted`→`interviewed`→`hired`/`declined`）が `new` のまま 24 時間を超えたら、応募を受けた会社の採用担当ロールに通知する（採用担当ロールは REQ-040 の役割に加える）。
 **Verification Type:** HAPPY_PATH / ERROR_HANDLING　**リスク:** MEDIUM　**依存:** REQ-035　**Sprint:** 9
 **一覧の3状態:** 空（「応募はありません」を表示）/ 単数 / 大量（500 件）
 **計測要件:** `candidate_applied`（発火: 応募が一覧に保存された直後に 1 回）/ プロパティ: source, `candidate_unhandled_24h_notified`（発火: 通知の送信が成功した直後に 1 回）/ 失敗: `candidate_import_failed`(source, error_code) / KPI: 媒体別の採用単価。
@@ -446,12 +446,20 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **計測要件:** `application_confirmed`（発火: 確定の DB 更新が成功した直後に 1 回）/ プロパティ: placement_mode, `conditions_notice_issued`（発火: 通知書の発行記録が保存された直後に 1 回）/ 失敗: `application_confirm_failed`(error_code)。
 
 ### REQ-040: 権限（誰が何をできるか）
-**EARS:** WHEN 利用者が案件の公開・採否・応援依頼・線引き確認を実行しようとする THE システム SHALL 利用者の役割（現場責任者・管制・支店・本社）を判定して許可し、許可のない役割の操作を拒否して `permission_denied` を記録する。
+**EARS:** WHEN 利用者が案件の公開・採否・応援依頼・線引き確認・採用応募の対応を実行しようとする THE システム SHALL 次の許可表に従って利用者の役割を判定し、許可のない役割の操作を拒否して `permission_denied` を記録する。
+
+| 操作 | 現場責任者 | 管制 | 支店 | 本社 | 根拠 |
+|---|---|---|---|---|---|
+| 応援依頼を出す | 許可 | 許可 | 許可 | 拒否 | 決定済み |
+| 線引き確認を記録する | 許可 | 拒否 | 許可 | 拒否 | 決定済み |
+| 案件を公開する | 自現場の案件のみ許可 | 拒否 | 自支店の案件のみ許可 | 許可 | **提案（OQ-15で承認）** |
+| 応募の採否を決める | 自現場の案件のみ許可 | 許可 | 自支店の案件のみ許可 | 許可 | **提案（OQ-15で承認）**。応援依頼の採否は依頼した人（決定済み） |
+| 採用応募の対応（REQ-036） | 拒否 | 拒否 | 拒否 | 許可（採用担当ロール） | **提案（OQ-15で承認）** |
+
 **Verification Type:** ROLE_ACCESS　**リスク:** HIGH　**依存:** REQ-027, REQ-034　**Sprint:** 9
 **変更対象:** packages/input-core/src/auth/authz.ts, supabase/migrations（RLS）
 **計測要件:** `permission_denied`（発火: 認可判定の拒否時 1 回）/ プロパティ: action, role / KPI: 拒否件数。
 **受入:** REQ-034 の確認者が現場責任者・支店以外なら拒否されること（本 REQ のテストで検証する）。
-**確認が必要:** 応援依頼を出せる人は現場責任者・管制・支店（決定済み）。線引き確認者は現場責任者・支店（決定済み）。
 
 ### REQ-041: 応援依頼（未報告コールからの作成）
 **EARS:** WHEN 現場責任者・管制・支店が欠員の枠から応援依頼を作る THE システム SHALL 現場・日時・人数・必要資格を引き継いだ単発案件を作成し、必要な教育・資格を満たし、その時間に他の勤務がないスタッフだけに通知する。キャリアライズだけに登録している人には表示しない。
@@ -474,7 +482,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 ### REQ-044: 「今日やること」への統合
 **EARS:** WHEN 管理者が現場コンソールのホームを開く THE システム SHALL 未処理の有休・現任申込・更新手続き（REQ-033）・応募の採否・応援依頼を 1 つの一覧に、期限の近い順に表示する。
-**Verification Type:** HAPPY_PATH　**リスク:** MEDIUM　**依存:** REQ-033, REQ-036, REQ-039　**Sprint:** 10
+**Verification Type:** HAPPY_PATH　**リスク:** MEDIUM　**依存:** REQ-033, REQ-036, REQ-039, REQ-041　**Sprint:** 10
 **一覧の3状態:** 空（「今日やることはありません」）/ 単数 / 大量（100 件は先頭 50 件＋件数表示）
 **変更対象:** apps/desktop/src/features/site/TodayTodo.tsx（新規）, packages/input-core/src/talent/todo.ts（新規）
 **計測要件:** `todo_item_completed`（発火: 各項目の処理 API が成功を返した直後に 1 回）/ プロパティ: kind / 失敗: `todo_item_complete_failed`(kind, error_code) / KPI: 紙・Excel 廃止後の処理時間。
@@ -482,8 +490,11 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 ### REQ-045: 同日の複数応募
 **EARS:** WHEN 同じスタッフが時間の重なる複数の案件に同時に応募する THE システム SHALL 先に確定した応募を有効とし、後の応募を REQ-031 に従い拒否する。
 **Verification Type:** EDGE_CASE　**リスク:** MEDIUM　**依存:** REQ-031, REQ-039　**Sprint:** 10
-**計測要件:** REQ-026 の `application_eligibility_checked`（reason_codes に time_overlap）で記録する。重複を避けるため単独のイベントは作らない。
+**計測要件:** 応募時の拒否は REQ-026 の `application_eligibility_checked`（reason_codes に time_overlap）で記録する。確定時の排他で後の応募が弾かれた場合は REQ-039 の `application_confirm_failed`（error_code=time_overlap）で記録する。単独のイベントは作らない。
 **変更対象:** packages/input-core/src/talent/eligibility.ts（shiftsOverlap）, supabase/migrations（確定の RPC での排他）
+
+## 追補の非機能要件
+- **NFR-05（性能）:** WHEN 1,000 人分の人と雇用を渡して更新手続き一覧（REQ-033）を求める THE システム SHALL 1 秒以内に結果を返す（Vitest で計測）。
 
 ## 追補の Open Questions
 | ID | 内容 | 影響 | 担当 |
@@ -492,10 +503,12 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 | OQ-11 | 休業手当の算定式と対象範囲 | REQ-043 | 社労士 |
 | OQ-12 | 共同利用する項目と、既存スタッフから同意を取り直す方法 | REQ-035 | RYUGEN・弁護士 |
 | OQ-13 | 当日キャンセルのペナルティ | REQ-039, 043 | RYUGEN |
+| OQ-15 | 案件の公開・応募の採否・採用応募の対応を、どの役割に許可するか（REQ-040 の許可表の「提案」行） | REQ-037, 039, 040 | RYUGEN |
 | OQ-14 | 「欠時間」「約定人数」の定義（UI案の7指標） | 配備状況画面 | RYUGEN |
 
 ## 審査履歴
 - 2026-11-07 Spec-Validator 初回: REJECTED（計測要件の欠落3件=REQ-042/043/045、失敗イベント欠落8件、変更対象欠落、REQ-034の依存漏れ）。本版(v2.1)で是正。
+- 2026-11-07 Spec-Validator 第3回: CONDITIONAL 82点(−18: REQ-033の発火点=−5、REQ-044の依存=−2、REQ-035のスプリント不整合=−2・EARS=−3、REQ-036の未定義語=−3、REQ-040の許可表=−3)。本版(v2.3)で是正。許可表の公開・採否は私案のため OQ-15 で RYUGEN の承認を待つ。
 - 2026-11-07 Spec-Validator 再審査: REJECTED 28点(−72: 発火タイミング未特定9件=−45、REQ-034→040 の依存逆流=−10、変更対象欠落7件=−14、REQ-040 の EARS=−3)。本版(v2.2)で是正: 発火点を特定、REQ-034 の依存を REQ-027 のみにして権限テストを REQ-040 の受入へ移動、変更対象を追記、REQ-040 を WHEN 形に、拒否イベントを `job_publish_rejected` に一本化。
 - 遡及実装との食い違い3件を仕様側で確定: ①全雇用が退社済みの人は現任教育の対象外(REQ-033) ②同意なしは横断検索と他社案件の対象外、自社参照は許可(REQ-035) ③在籍は全シフト日で確認(REQ-026)。実装は仕様承認後、先に失敗するテストを書いてから直す。
 
