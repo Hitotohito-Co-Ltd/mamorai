@@ -2,9 +2,9 @@
 
 TDD-Writer: 赤松 灯 (⑦)  
 作成日: 2026-11-07  
-仕様バージョン: behavioral-spec.md 追補 v2.15（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
-再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）。spec/evidence/sprint-8-test-regeneration.md 参照
-結果（第5回の RED 時点。`pnpm --filter @mamorai/input-core exec vitest run` の実測）: input-core 全体 724 件中 680 PASS / 44 RED。s8 は 292 件中 248 PASS / 44 RED。RED は全て第5回で追加した新規テスト（実装が v2.15 に未追随）。第5回より前の 231 件は全て PASS（回帰 0）
+仕様バージョン: behavioral-spec.md 追補 v2.18（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
+再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）、第6回（v2.18。Adversary 第4回 FIND-401/402/403/405）。spec/evidence/sprint-8-test-regeneration.md 参照
+結果（第6回の RED 時点。`pnpm --filter @mamorai/input-core exec vitest run` の実測）: input-core 全体 775 件中 766 PASS / 9 RED。s8 は 343 件中 334 PASS / 9 RED。RED は全て第6回で追加した新規テスト（実装が v2.18 に未追随）。第6回より前の 724 件は全て PASS（回帰 0）。最新の GREEN 実測（第5回分まで）は spec/evidence/sprint-8-green-phase-4.md（724 件 PASS）。第6回分の GREEN は未実施
 
 ---
 
@@ -228,3 +228,18 @@ TDD-Writer: 赤松 灯 (⑦)
 | D1 | REQ-028 | 警備×派遣では教育不足の理由を出さない（＋対） | 2 | 0 |
 | D2 | REQ-034 | confirmedBy が数値でも TypeError を出さず boundary_not_confirmed | 3 | 0 |
 | D3 | REQ-033 | 就労不可でも在留期限は一覧に出る（＋対） | 2 | 0 |
+
+
+---
+
+## 追加 第6回（仕様 v2.18。Adversary 第4回 FIND-401/402/403/405）
+
+追加 51 件（s8 は 343 件）。うち 9 件が RED（RED 時点の記録。実装が v2.18 に未追随）、42 件は対（有効入力）・ミューテーション対応で PASS。純粋性テスト t1_talent_purity.test.ts は禁止パターンを追加（performance.now / crypto.randomUUID / Intl. / toLocale 系 / 引数なし Date()）、talent 配下は違反なしで PASS のまま。RED の詳細は spec/evidence/sprint-8-red-phase-5.md。
+
+| REQ | 内容 | 件数 | RED |
+|---|---|---|---|
+| REQ-033 | FIND-401: contractEndOn が空文字/null は contract の invalid 項目（dueOn は入力値）、undefined は項目なし、residence.expiresOn 空文字 | 7 | 3 |
+| REQ-026/028/033 | FIND-402: basicDoneOn 不正は invalid_input（警備・非警備）、listRenewals は annual_training の invalid 項目（dueOn=年度末）、undefined は invalid でない | 8 | 6 |
+| REQ-026/037 | FIND-403: 時刻（30:00 / 10:60 / 09:00:00 / x09:00 / 09:00x / 先頭空白 / 数値 900 と 00:00・23:59・19:59・20:00 の有効境界）、日付（T 付き / 末尾・先頭文字 / 先頭空白） | 22 | 0 |
+| REQ-029 | FIND-403: 日雇派遣判定は派遣のときだけ（spot / referral / security で 30 日以下） | 7 | 0 |
+| REQ-033 | FIND-403: 退社日が空文字の雇用の invalid 項目（contract / annual_training の dueOn）、personId 接頭辞の並び（ab/abc、''/a） | 7 | 0 |
