@@ -168,7 +168,130 @@ begin
   end;
 end $$;
 
+-- ── シナリオ 10〜16: Adversary 指摘（FIND-001/002/003/008）の越境・権限の負の経路 ──
 reset role;
+-- 他グループ(B)の警備職種、自グループ(A)の警備職種、B社の案件
+insert into job_roles(id, group_id, name, is_security) values
+  ('d0000000-0000-0000-0000-00000000000b', 'bb000000-0000-0000-0000-000000000002', '警備員B', true),
+  ('d0000000-0000-0000-0000-00000000000a', 'aa000000-0000-0000-0000-000000000001', '警備員A', true);
+insert into jobs(id, company_id, role_id, title, form) values
+  ('e0000000-0000-0000-0000-00000000000b', 'cc000000-0000-0000-0000-000000000022', 'd0000000-0000-0000-0000-00000000000b', 'B社の案件', 'security');
+grant select, insert, update on jobs, job_shifts, job_applications, job_roles to authenticated;
+grant select on staff to authenticated;
+
+set role authenticated;
+-- 10: 会社に属さない認証ユーザー(app_profiles なし)は search_candidates を呼べない(FIND-001)
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-0000000000aa';
+do $$
+begin
+  begin
+    perform * from public.search_candidates('cc000000-0000-0000-0000-000000000011'::uuid, '{}'::jsonb);
+    insert into t_rls_results values (10, '会社に属さない認証ユーザーの候補検索は拒否される', false, '拒否されなかった');
+  exception when others then
+    insert into t_rls_results values (10, '会社に属さない認証ユーザーの候補検索は拒否される', sqlerrm like '%権限%', sqlerrm);
+  end;
+end $$;
+
+-- 11: 他グループの警備職種を指定した 警備×派遣 の案件は登録できない(FIND-002)
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';  -- A社管理者
+do $$
+begin
+  begin
+    insert into jobs(company_id, role_id, title, form)
+      values ('cc000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-00000000000b', '越境', 'dispatch');
+    insert into t_rls_results values (11, '他グループの警備職種を使った警備×派遣は登録できない', false, '登録できてしまった');
+  exception when others then
+    insert into t_rls_results values (11, '他グループの警備職種を使った警備×派遣は登録できない', true, sqlerrm);
+  end;
+end $$;
+
+-- 12: 自グループの警備職種でも 警備×派遣 は登録できない(REQ-027 のトリガ)
+do $$
+begin
+  begin
+    insert into jobs(company_id, role_id, title, form)
+      values ('cc000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-00000000000a', '警備×派遣', 'dispatch');
+    insert into t_rls_results values (12, '自グループの警備職種の警備×派遣は登録できない', false, '登録できてしまった');
+  exception when others then
+    insert into t_rls_results values (12, '自グループの警備職種の警備×派遣は登録できない', sqlerrm like '%派遣%', sqlerrm);
+  end;
+end $$;
+
+-- 13: 他社の案件にシフトを入れられない(FIND-003)
+do $$
+begin
+  begin
+    insert into job_shifts(job_id, company_id, work_date, start_time, end_time, headcount)
+      values ('e0000000-0000-0000-0000-00000000000b', 'cc000000-0000-0000-0000-000000000011', current_date, '09:00', '17:00', 1);
+    insert into t_rls_results values (13, '他社の案件にシフトを入れられない', false, '入ってしまった');
+  exception when others then
+    insert into t_rls_results values (13, '他社の案件にシフトを入れられない', true, sqlerrm);
+  end;
+end $$;
+
+-- 14: 他社のスタッフで応募を作れない(FIND-003)
+reset role;
+insert into jobs(id, company_id, role_id, title, form) values
+  ('e0000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', 'd0000000-0000-0000-0000-00000000000a', 'A社の案件', 'security');
+insert into job_shifts(id, job_id, company_id, work_date, start_time, end_time, headcount) values
+  ('f0000000-0000-0000-0000-00000000000a', 'e0000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', current_date, '09:00', '17:00', 1);
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';
+do $$
+begin
+  begin
+    insert into job_applications(company_id, job_shift_id, staff_id)
+      values ('cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-00000000000a', '0b000000-0000-0000-0000-000000000003');  -- B社のスタッフ
+    insert into t_rls_results values (14, '他社のスタッフで応募を作れない', false, '作れてしまった');
+  exception when others then
+    insert into t_rls_results values (14, '他社のスタッフで応募を作れない', true, sqlerrm);
+  end;
+end $$;
+
+-- 15: 会社管理者は persons を作れない(登録は RPC 経由)
+do $$
+begin
+  begin
+    insert into persons(group_id, name) values ('aa000000-0000-0000-0000-000000000001', '直接登録');
+    insert into t_rls_results values (15, '会社管理者は persons を直接登録できない', false, '登録できてしまった');
+  exception when others then
+    insert into t_rls_results values (15, '会社管理者は persons を直接登録できない', true, sqlerrm);
+  end;
+end $$;
+
+-- 16: anon は search_candidates を実行できない(FIND-001 の anon 付与)
+reset role;
+insert into t_rls_results
+  select 16, 'anon は search_candidates を実行できない',
+    not has_function_privilege('anon', 'public.search_candidates(uuid, jsonb)', 'EXECUTE'),
+    'anon の EXECUTE 権限を確認';
+
+-- 17: 境界の確認が必要な案件は、記録なしでは公開(published)にできない(REQ-034 の DB 保証)
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';
+do $$
+begin
+  begin
+    insert into jobs(company_id, role_id, title, form, status, needs_boundary_check)
+      values ('cc000000-0000-0000-0000-000000000011', null, '整理員', 'spot', 'published', true);
+    insert into t_rls_results values (17, '線引き未確認の案件は published にできない', false, '公開できてしまった');
+  exception when others then
+    insert into t_rls_results values (17, '線引き未確認の案件は published にできない', sqlerrm like '%線引き%', sqlerrm);
+  end;
+end $$;
+
+-- 18: 公開範囲に『一般公開』は選べない(制約 jobs_audience_check)
+reset role;
+do $$
+begin
+  begin
+    insert into jobs(company_id, title, form, audience)
+      values ('cc000000-0000-0000-0000-000000000011', '一般公開', 'spot', 'public');
+    insert into t_rls_results values (18, '公開範囲に一般公開は選べない', false, '登録できてしまった');
+  exception when check_violation then
+    insert into t_rls_results values (18, '公開範囲に一般公開は選べない', sqlerrm like '%audience%', sqlerrm);
+  end;
+end $$;
 
 -- ── 結果出力 ──
 select n || '. ' || case when ok then 'PASS' else 'FAIL' end || '  ' || name

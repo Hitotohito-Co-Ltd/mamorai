@@ -24,7 +24,9 @@ for f in \
   0410_talent_foundation \
   0410_talent_foundation \
   0411_talent_search_candidates \
-  0411_talent_search_candidates; do   # 2回=冪等性確認
+  0411_talent_search_candidates \
+  0412_talent_hardening \
+  0412_talent_hardening; do   # 2回=冪等性確認
   $P -d tln_rls -f "$f.sql" >/dev/null 2>&1 || { echo "FAILED applying $f"; exit 1; }
 done
 # RLS/関数 検証シナリオを実行
