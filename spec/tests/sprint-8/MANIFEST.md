@@ -4,7 +4,7 @@ TDD-Writer: 赤松 灯 (⑦)
 作成日: 2026-11-07  
 仕様バージョン: behavioral-spec.md 追補 v2.21（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
 再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）、第6回（v2.18。Adversary 第4回 FIND-401/402/403/405）、第7回（v2.19。Adversary 第5回 FIND-505/507/508）、第8回（v2.21。Adversary 第6回 FIND-602/603/606/608/610）。spec/evidence/sprint-8-test-regeneration.md 参照
-結果（第8回の RED 時点。`pnpm --filter @mamorai/input-core exec vitest run` の実測）: input-core 全体 1005 件中 973 PASS / 32 RED。s8 は 573 件中 541 PASS / 32 RED。RED は全て第8回で追加した新規テスト（夜間勤務の導出 10、annualFiscalYears 不正 19、古い年の日付 3。実装が v2.21 に未追随）。第8回より前の 868 件は全て PASS（回帰 0）。詳細は spec/evidence/sprint-8-red-phase-7.md。第6〜8回分の GREEN は未実施（最新の GREEN 実測は sprint-8-green-phase-4.md の 724 件）
+結果（最新の GREEN 実測、2026-11-07。`pnpm --filter @mamorai/input-core exec vitest run`）: input-core 全体 42 ファイル 1005 件 全 PASS（s8 は 573 件）。tsc エラー 0。`src/talent` のカバレッジは Stmts 100 / Branch 99.51 / Funcs 100 / Lines 100。DB 検証 `supabase/tests/run_talent_rls_check.sh` は 77 シナリオ all PASS（番号 1〜78、32 は欠番）。各回の RED 時点の件数は spec/evidence/sprint-8-red-phase*.md、GREEN は sprint-8-green-phase*.md を参照
 
 ---
 
