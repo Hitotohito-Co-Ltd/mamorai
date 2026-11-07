@@ -553,7 +553,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - WHEN 案件の雇用日数（`employment_days`）、時給（`hourly_wage`）、請求単価（`billing_rate`）を保存する THE システム SHALL DB で 0 未満を拒否し、派遣の案件では雇用日数を必須とする（TS の `invalid_input` と同じ基準。REQ-037）。
 - WHEN 案件・シフトが現場（site_id）または勤務枠（slot_id）を指す THE システム SHALL 案件と同じ会社のものだけを許可する（REQ-037）。
 - WHEN 案件にシフトが 1 件もない THE システム SHALL `checkEligibility` で `no_shifts` により応募を拒否し、`validateJobForPublish` で公開を拒否する（REQ-026・REQ-037）。
-- WHEN `listRenewals` の入力の期限日（契約満了日・在留期限）または雇用の入社日・退社日が不正 THE システム SHALL その項目を一覧から消さず、`urgency: 'invalid'`・`daysLeft: null` の項目として先頭に返す（法令上の期限の見落としを防ぐため）。基準日が不正なときは `RangeError` を投げる（REQ-033）。`RenewalItem.urgency` に `'invalid'` を、`daysLeft` に `null` を加える。
+- WHEN `listRenewals` の入力の期限日（契約満了日・在留期限）または雇用の入社日・退社日が不正 THE システム SHALL その項目を一覧から消さず、`urgency: 'invalid'`・`daysLeft: null` の項目として先頭に返す（法令上の期限の見落としを防ぐため）。invalid 項目の `kind` と `dueOn` は、契約満了日が不正なら `contract`・入力された値、在留期限が不正なら `residence`・入力された値。雇用の入社日・退社日が不正で在籍を判定できない人は、契約満了日がある雇用ごとに `contract`（`dueOn` は契約満了日）、現任教育が未了なら `annual_training`（`dueOn` は年度末）の invalid 項目を返す。invalid 項目同士は `personId` のコードポイント順、同じ `personId` では `contract`、`annual_training`、`residence` の順に並べる。基準日が不正なときは `RangeError` を投げる（REQ-033）。`RenewalItem.urgency` に `'invalid'` を、`daysLeft` に `null` を加える。
 - WHEN `listRenewals` が「在籍中」を判定する THE システム SHALL 「入社日が基準日以前、かつ退社日がない、または退社日が基準日以後」の雇用を在籍中とする。契約満了と現任教育（在籍中の雇用が 1 件以上必要）の両方がこの定義を使う。現任教育は、新任教育の修了日が基準日より後の人（基準日時点で未修了）も対象外とする（REQ-033）。
 - WHEN 日雇派遣（30 日以内）に例外区分で応募する THE システム SHALL 確認日 `verifiedOn` が暦に存在する `YYYY-MM-DD` の日付（`2026-13-45` などは不可）で、かつシフト日以前であり、区分が `age60` の場合は本人がシフト日に満 60 歳以上である場合に限り例外を認め、満たさなければ `dispatch_exception_invalid` で拒否する。複数のシフト日があるときは、すべてのシフト日でこの条件を満たすこと（REQ-029）。
 
@@ -596,6 +596,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.13: Adversary Sprint 8 第2回 FAIL(High2・Medium5・Low3)を受けて仕様判断が要る点を確定。invalid_input、例外区分の列挙、拒否時は警告を返さない、日またぎ通算は始業日、線引き記録の中身、派遣は職種必須、site_id/slot_id の会社一致、新任の未来日、並びはコードポイント順。OQ-21 を追加。
 - 2026-11-07 v2.14: TDD-Writer の差し戻しを受け、確認日の不正は invalid_input にせず dispatch_exception_invalid / boundary_not_confirmed とすると確定(v2.13 の invalid_input の対象に確認日を含めていたのは矛盾)。
 - 2026-11-07 v2.15: Adversary Sprint 8 第3回 FAIL(High1・Medium6・Low3)と RYUGEN の『直して続行』を受けて確定。REQ-035 を 035a/035b に分割、invalid_input を時刻・他の勤務・雇用日に拡張、listRenewals は不正な期限を消さず invalid 項目で返す、並びはコードポイント(サロゲート対)、応募のある案件・シフトは削除不可、金額と日数の CHECK、既知のリスク KR-1〜3 を明記。
+- 2026-11-07 v2.16: TDD-Writer の差し戻し3点(invalid 項目の kind・dueOn・並び)を確定。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |

@@ -66,15 +66,20 @@ function boundaryRecorded(job: JobPost): boolean {
   return !!b && typeof b.confirmedBy === 'string' && b.confirmedBy.trim() !== '' && isRealDate(b.confirmedOn)
 }
 
-/** 日付・期間の入力が不正か（シフト日、派遣の雇用日数。生年月日と在留期限は応募時に別に見る） */
+/** 'HH:MM'（00:00〜23:59）か */
+function isRealTime(t: string): boolean {
+  return typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)
+}
+
+/** 案件の日付・時刻・期間の入力が不正か（シフト日と時刻、派遣の雇用日数） */
 function jobInputInvalid(job: JobPost): boolean {
-  if (job.shifts.some((s) => !isRealDate(s.date))) return true
+  if (job.shifts.some((s) => !isRealDate(s.date) || !isRealTime(s.start) || !isRealTime(s.end))) return true
   if (job.form === 'dispatch' && !(Number.isInteger(job.employmentDays) && job.employmentDays >= 0)) return true
   return false
 }
 
 /** 'YYYY-MM-DD' の形式で、暦に存在する日付か */
-function isRealDate(d: string): boolean {
+export function isRealDate(d: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false
   const [y, m, dd] = d.split('-').map(Number)
   const t = new Date(Date.UTC(y!, m! - 1, dd!))
@@ -116,6 +121,8 @@ export function checkEligibility(
   // 不正な入力は黙って通さない（法令リスクの高い判定のため、拒否する）
   if (
     jobInputInvalid(job) ||
+    busy.some((b) => !isRealDate(b.date) || !isRealTime(b.start) || !isRealTime(b.end)) ||
+    person.employments.some((e) => !isRealDate(e.startOn) || (e.endOn !== undefined && !isRealDate(e.endOn))) ||
     !isRealDate(person.birthDate) ||
     (person.residence?.expiresOn !== undefined && !isRealDate(person.residence.expiresOn))
   ) {
