@@ -4725,3 +4725,349 @@ describe('[REQ-026][REQ-037] 古い年でも暦に存在する日付は有効', 
     expect(reasonsOf(result)).toContain('invalid_input')
   })
 })
+
+// ═════════════════════════════════════════════════════════════
+// 第9回（仕様 v2.24。セキュリティ監査 SEC-004/007、Adversary 第7回 FIND-004/007）
+// 型・件数の上限（invalid_input ⑤⑥）、古い年の listRenewals、夜間勤務のシフト単位の判定
+// ═════════════════════════════════════════════════════════════
+const addDaysIso = (base: string, n: number): string => {
+  const [y, m, d] = base.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}
+/** 日付が有効で互いに重ならない勤務を n 件（毎日 1 件） */
+const dailyShifts = (base: string, n: number) =>
+  Array.from({ length: n }, (_, i) => day(addDaysIso(base, i)))
+const dailyBusy = (base: string, n: number): BusyShift[] =>
+  Array.from({ length: n }, (_, i) => ({ ...day(addDaysIso(base, i), '08:00', '09:00'), companyId: 'c-002' }))
+
+// ─────────────────────────────────────────────────────────────
+// A. 型の検証（SEC-007 / REQ-026・REQ-037）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-026] 型の検証 consentJointUse（SEC-007）', () => {
+  it.each([
+    ['文字列 "false"', 'false'],
+    ['文字列 "true"', 'true'],
+    ['数値 0', 0],
+    ['数値 1', 1],
+    ['null', null],
+    ['undefined', undefined],
+    ['空オブジェクト {}', {}],
+  ])('consentType_%s は invalid_input のみ（例外を投げない）', (_label, value) => {
+    // Arrange
+    const person = asPerson({ consentJointUse: value })
+    // Act
+    const act = () => checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(act).not.toThrow()
+    const result = act()
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+  })
+
+  it('consentType_boolean true は従来どおり可否判定へ進み eligible=true', () => {
+    // Arrange / Act
+    const result = checkEligibility(asPerson({ consentJointUse: true }), mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).toEqual([])
+    expect(result.eligible).toBe(true)
+  })
+
+  it('consentType_boolean false は従来どおり no_consent のみ（invalid_input ではない）', () => {
+    // Arrange / Act
+    const result = checkEligibility(asPerson({ consentJointUse: false }), mkJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['no_consent'])
+  })
+})
+
+describe('[REQ-026] 型の検証 residence.workAllowed（SEC-007）', () => {
+  const withResidence = (workAllowed: unknown) =>
+    asPerson({ residence: { workAllowed, expiresOn: '2030-01-01' } })
+
+  it.each([
+    ['文字列 "true"', 'true'],
+    ['文字列 "false"', 'false'],
+    ['数値 0', 0],
+    ['数値 1', 1],
+    ['null', null],
+    ['undefined', undefined],
+  ])('workAllowedType_%s は invalid_input のみ（例外を投げない）', (_label, value) => {
+    // Arrange
+    const person = withResidence(value)
+    // Act
+    const act = () => checkEligibility(person, mkJob(), [])
+    // Assert
+    expect(act).not.toThrow()
+    const result = act()
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+  })
+
+  it('workAllowedType_boolean true は従来どおり eligible=true', () => {
+    // Arrange / Act
+    const result = checkEligibility(withResidence(true), mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).toEqual([])
+    expect(result.eligible).toBe(true)
+  })
+
+  it('workAllowedType_boolean false は従来どおり residence_invalid のみ（invalid_input ではない）', () => {
+    // Arrange / Act
+    const result = checkEligibility(withResidence(false), mkJob(), [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['residence_invalid'])
+  })
+
+  it('workAllowedType_residence 自体が無い人は影響を受けない', () => {
+    // Arrange: mkPerson は residence を持たない
+    const result = checkEligibility(mkPerson(), mkJob(), [])
+    // Assert
+    expect(reasonsOf(result)).toEqual([])
+    expect(result.eligible).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// B. 入力件数の上限（SEC-004 / REQ-026・REQ-037）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-026] 入力件数の上限（SEC-004）', () => {
+  it('limitShifts_案件のシフト 367 件は invalid_input のみ', () => {
+    // Arrange
+    const job = nonSec(dailyShifts('2026-05-01', 367))
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+  })
+
+  it('limitShifts_案件のシフト 366 件は上限内（invalid_input ではなく eligible=true）', () => {
+    // Arrange
+    const job = nonSec(dailyShifts('2026-05-01', 366))
+    // Act
+    const result = checkEligibility(mkPerson(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('limitBusy_他の勤務 1,001 件は invalid_input のみ', () => {
+    // Arrange
+    const busy = dailyBusy('2020-01-01', 1001)
+    // Act
+    const result = checkEligibility(mkPerson(), nonSec([day('2026-05-01')]), busy)
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+  })
+
+  it('limitBusy_他の勤務 1,000 件は上限内（invalid_input ではなく eligible=true）', () => {
+    // Arrange
+    const busy = dailyBusy('2020-01-01', 1000)
+    // Act
+    const result = checkEligibility(mkPerson(), nonSec([day('2026-05-01')]), busy)
+    // Assert
+    expect(reasonsOf(result)).not.toContain('invalid_input')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('limitPublish_validateJobForPublish はシフト 367 件で invalid_input', () => {
+    // Arrange / Act
+    const reasons = pubReasons(nonSec(dailyShifts('2026-05-01', 367)))
+    // Assert
+    expect(reasons).toContain('invalid_input')
+  })
+
+  it('limitPublish_validateJobForPublish はシフト 366 件なら問題なし（空配列）', () => {
+    // Arrange / Act
+    const reasons = pubReasons(nonSec(dailyShifts('2026-05-01', 366)))
+    // Assert
+    expect(reasons).toEqual([])
+  })
+})
+
+describe('[REQ-026] 上限超過の入力でも処理が速く返る（SEC-004）', () => {
+  const LIMIT_MS = 500
+  // 全件が同じ日時で重なる巨大入力（重なり判定を件数の積で行うと遅くなる形）
+  const sameSlot = (n: number) => Array.from({ length: n }, () => day('2026-05-01'))
+  const sameBusy = (n: number): BusyShift[] =>
+    Array.from({ length: n }, () => ({ ...day('2026-05-01'), companyId: 'c-002' }))
+
+  it('time_シフト 20,000 件の checkEligibility は 500ms 以内に invalid_input を返す', () => {
+    // Arrange
+    const job = nonSec(sameSlot(20000))
+    // Act
+    const t0 = performance.now()
+    const result = checkEligibility(mkPerson(), job, [])
+    const elapsed = performance.now() - t0
+    // Assert
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+    expect(elapsed).toBeLessThan(LIMIT_MS)
+  })
+
+  it('time_他の勤務 20,000 件の checkEligibility は 500ms 以内に invalid_input を返す', () => {
+    // Arrange
+    const job = nonSec([day('2026-05-01')])
+    const busy = sameBusy(20000)
+    // Act
+    const t0 = performance.now()
+    const result = checkEligibility(mkPerson(), job, busy)
+    const elapsed = performance.now() - t0
+    // Assert
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+    expect(elapsed).toBeLessThan(LIMIT_MS)
+  })
+
+  it('time_シフトと他の勤務が各 20,000 件（積が 4 億）でも 500ms 以内に invalid_input', () => {
+    // Arrange
+    const job = nonSec(sameSlot(20000))
+    const busy = sameBusy(20000)
+    // Act
+    const t0 = performance.now()
+    const result = checkEligibility(mkPerson(), job, busy)
+    const elapsed = performance.now() - t0
+    // Assert
+    expect(reasonsOf(result)).toEqual(['invalid_input'])
+    expect(elapsed).toBeLessThan(LIMIT_MS)
+  })
+
+  it('time_validateJobForPublish はシフト 20,000 件でも 500ms 以内に invalid_input', () => {
+    // Arrange
+    const job = nonSec(sameSlot(20000))
+    // Act
+    const t0 = performance.now()
+    const reasons = pubReasons(job)
+    const elapsed = performance.now() - t0
+    // Assert
+    expect(reasons).toContain('invalid_input')
+    expect(elapsed).toBeLessThan(LIMIT_MS)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// C. listRenewals の古い年（FIND-007 / REQ-033）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-033] listRenewals の古い年（FIND-007）', () => {
+  const REF = '2026-06-01'
+  /** Date の setUTCFullYear で独立に求める暦日数（年 0〜99 を 1900 年代に読み替えない） */
+  const epochDay = (iso: string): number => {
+    const [y, m, d] = iso.split('-').map(Number)
+    const t = new Date(0)
+    t.setUTCFullYear(y, m - 1, d)
+    t.setUTCHours(0, 0, 0, 0)
+    return Math.round(t.getTime() / 86400000)
+  }
+  const contractPerson = (contractEndOn: string) =>
+    mkPerson({
+      personId: 'p-old',
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', contractEndOn }],
+      guardTraining: { basicDoneOn: '2020-06-01', annualFiscalYears: [2025, 2026] },
+    })
+  const contractItem = (due: string) =>
+    listRenewals([contractPerson(due)], REF).filter((i) => i.kind === 'contract')
+
+  it.each([['0099-12-31'], ['0100-01-01'], ['0001-01-01'], ['0050-06-15'], ['0101-01-01']])(
+    'oldYear_契約満了日 %s の daysLeft は独立計算の符号付き整数・urgency は expired',
+    (due) => {
+      // Arrange
+      const expected = epochDay(due) - epochDay(REF)
+      // Act
+      const items = contractItem(due)
+      // Assert
+      expect(items).toEqual([
+        { personId: 'p-old', kind: 'contract', dueOn: due, daysLeft: expected, urgency: 'expired' },
+      ])
+      expect(Number.isInteger(expected)).toBe(true)
+    },
+  )
+
+  it('oldYear_0099-12-31 の daysLeft は約 -70 万日台の負の整数（1927 年 × 365.24 日）', () => {
+    // Arrange / Act
+    const [item] = contractItem('0099-12-31')
+    // Assert
+    expect(item.daysLeft).toBe(epochDay('0099-12-31') - epochDay(REF))
+    expect(item.daysLeft as number).toBeLessThan(-703000)
+    expect(item.daysLeft as number).toBeGreaterThan(-704000)
+    expect(item.urgency).toBe('expired')
+  })
+
+  it('oldYear_年 99 と年 100 で計算方法が揃う（隣り合う日付は daysLeft がちょうど 1 違う）', () => {
+    // Arrange / Act
+    const [a] = contractItem('0099-12-31')
+    const [b] = contractItem('0100-01-01')
+    // Assert: 1900 年代に読み替えられていれば約 1 世紀分ずれる
+    expect((b.daysLeft as number) - (a.daysLeft as number)).toBe(1)
+  })
+
+  it('oldYear_在留期限 0099-12-31 も同じ計算で expired（residence）', () => {
+    // Arrange
+    const person = mkPerson({
+      personId: 'p-res',
+      residence: { workAllowed: true, expiresOn: '0099-12-31' },
+    })
+    // Act
+    const items = listRenewals([person], REF).filter((i) => i.kind === 'residence')
+    // Assert
+    expect(items).toEqual([
+      {
+        personId: 'p-res',
+        kind: 'residence',
+        dueOn: '0099-12-31',
+        daysLeft: epochDay('0099-12-31') - epochDay(REF),
+        urgency: 'expired',
+      },
+    ])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────
+// D. 夜間勤務はシフト単位で判定する（FIND-004 / REQ-030）
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-030] 夜間勤務の判定はシフト単位（FIND-004）', () => {
+  // 2008-05-15 生まれ: 2026-05-01 / 02 は 17 歳
+  const minor = () => mkPerson({ birthDate: '2008-05-15' })
+  const dayShift = day('2026-05-01', '09:00', '17:00')
+  const lateShift = day('2026-05-02', '23:00', '23:30')
+
+  it('nightShift_2 つ目のシフトだけが夜間（23:00-23:30）にかかる 17 歳は under_age', () => {
+    // Arrange
+    const job = nonSec([dayShift, lateShift])
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toContain('under_age')
+  })
+
+  it('nightShift_1 つ目のシフトだけが夜間（23:00-23:30）にかかる 17 歳は under_age', () => {
+    // Arrange
+    const job = nonSec([day('2026-05-01', '23:00', '23:30'), day('2026-05-02', '09:00', '17:00')])
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(result.eligible).toBe(false)
+    expect(reasonsOf(result)).toContain('under_age')
+  })
+
+  it('nightShift_どちらのシフトも夜間にかからない 17 歳は under_age にならない', () => {
+    // Arrange
+    const job = nonSec([dayShift, day('2026-05-02', '09:00', '17:00')])
+    // Act
+    const result = checkEligibility(minor(), job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('under_age')
+    expect(result.eligible).toBe(true)
+  })
+
+  it('nightShift_夜間にかかるシフトがある案件を 18 歳の人は under_age にならない（対）', () => {
+    // Arrange: 2008-05-01 生まれは 2026-05-01 に 18 歳
+    const adult = mkPerson({ birthDate: '2008-05-01' })
+    const job = nonSec([dayShift, lateShift])
+    // Act
+    const result = checkEligibility(adult, job, [])
+    // Assert
+    expect(reasonsOf(result)).not.toContain('under_age')
+  })
+})

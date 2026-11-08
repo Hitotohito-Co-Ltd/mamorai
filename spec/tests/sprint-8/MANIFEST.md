@@ -2,9 +2,9 @@
 
 TDD-Writer: 赤松 灯 (⑦)  
 作成日: 2026-11-07  
-仕様バージョン: behavioral-spec.md 追補 v2.21（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
-再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）、第6回（v2.18。Adversary 第4回 FIND-401/402/403/405）、第7回（v2.19。Adversary 第5回 FIND-505/507/508）、第8回（v2.21。Adversary 第6回 FIND-602/603/606/608/610）。spec/evidence/sprint-8-test-regeneration.md 参照
-結果（最新の GREEN 実測、2026-11-07。`pnpm --filter @mamorai/input-core exec vitest run`）: input-core 全体 42 ファイル 1005 件 全 PASS（s8 は 573 件）。tsc エラー 0。`src/talent` のカバレッジは Stmts 100 / Branch 99.51 / Funcs 100 / Lines 100。DB 検証 `supabase/tests/run_talent_rls_check.sh` は 77 シナリオ all PASS（番号 1〜78、32 は欠番）。各回の RED 時点の件数は spec/evidence/sprint-8-red-phase*.md、GREEN は sprint-8-green-phase*.md を参照
+仕様バージョン: behavioral-spec.md 追補 v2.24（インターフェース契約・境界の確定を含む。REQ-035 は 035a=Sprint 8 / 035b=Sprint 9 に分割）
+再生成: 2026-11-07 第1回（v2.6）、第2回（v2.10。FIND-004/005/006/007/009）、第3回（v2.11）、第4回（v2.13。FIND-104〜111）、第5回（v2.15。Adversary 第3回 FIND-302/303/304/305/309）、第6回（v2.18。Adversary 第4回 FIND-401/402/403/405）、第7回（v2.19。Adversary 第5回 FIND-505/507/508）、第8回（v2.21。Adversary 第6回 FIND-602/603/606/608/610）、第9回（v2.24。セキュリティ監査 SEC-004/007、Adversary 第7回 FIND-004/007）。spec/evidence/sprint-8-test-regeneration.md 参照
+結果（最新の GREEN 実測、2026-11-07。`pnpm --filter @mamorai/input-core exec vitest run`）: 第8回までの GREEN は input-core 1005 件 全 PASS（s8 573 件）。第9回追加後の RED 実測（2026-11-08）: input-core 全体 1045 件中 26 FAIL・1019 PASS（s8 は 613 件。新規 40 のうち 26 RED・14 PASS）。第9回の GREEN は未実測。tsc エラー 0。`src/talent` のカバレッジは Stmts 100 / Branch 99.51 / Funcs 100 / Lines 100。DB 検証 `supabase/tests/run_talent_rls_check.sh` は 77 シナリオ all PASS（番号 1〜78、32 は欠番）。各回の RED 時点の件数は spec/evidence/sprint-8-red-phase*.md、GREEN は sprint-8-green-phase*.md を参照
 
 ---
 
@@ -286,3 +286,20 @@ TDD-Writer: 赤松 灯 (⑦)
 | REQ-026/037 | 日付の前後空白・改行（生年月日・シフト日・在留期限・新任修了日・busy・入社日）、古い年（0099/0000 は有効 → 3 件 RED、'0000-00-00' ほかは invalid） | 18＋9 | 0＋3 |
 
 注: 件数は同一 describe 内の it.each 展開を含む実測値。FIND-610 は MANIFEST を最新（仕様 v2.21、DB 77 シナリオ・欠番 32）に更新することで対応した。
+
+
+---
+
+## 第9回追加（仕様 v2.24。s8_talent_req026_034.test.ts 末尾）
+
+| 区分 | REQ / 根拠 | テスト | 件数 | RED |
+|---|---|---|---|---|
+| A. consentJointUse の型 | REQ-026・SEC-007 | 7 値(invalid_input のみ)＋true/false の対 | 9 | 7 |
+| A. workAllowed の型 | REQ-026・SEC-007 | 6 値＋true/false＋residence 無しの対 | 9 | 6 |
+| B. 件数の上限 | REQ-026/037・SEC-004 | シフト 367/366、busy 1,001/1,000、validateJobForPublish 367/366 | 6 | 3 |
+| B. 上限超過の処理時間(500ms) | SEC-004 | 4 入力形（別の it） | 4 | 4 |
+| C. listRenewals の古い年 | REQ-033・FIND-007 | 0001/0050/0099-12-31/0100-01-01/0101 の daysLeft（独立計算）、99/100 の連続性、約 -70 万日の範囲、在留期限 | 8 | 6 |
+| D. 夜間勤務のシフト単位 | REQ-030・FIND-004 | 2 つ目のみ・1 つ目のみ・どちらもなし・18 歳の対 | 4 | 0 |
+| 合計 | | | 40 | 26 |
+
+注: 依頼文の「約 -738,000 日台」は 2026-06-01 − 0099-12-31 の実際の日数（-703,609）と合わない。テストは独立計算値（-703,609）で厳密比較し、範囲は -704,000〜-703,000 とした。Planner に確認を依頼済み。
