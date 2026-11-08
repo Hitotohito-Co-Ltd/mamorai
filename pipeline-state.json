@@ -309,9 +309,9 @@
     "dual": "同一Reactコードを Web と Tauri で両出し可能"
   },
   "sprint8_talent": {
-    "status": "Sprint 8: 技術ゲート(テスト/Adversary第8回PASS/セキュリティGate3合格/性能)は満たした。RYUGEN が Gate4/5 適用外と Medium の受容を承認(2026-11-08)。Evaluator の最終再判定待ち。マージ可否は RYUGEN が決める。Sprint 9 の入口条件は spec/behavioral-spec.md 審査履歴 v2.30",
+    "status": "Sprint 8 完了(Evaluator 第4回 PASS 2026-11-08)。✅: REQ-026〜033, 034a, 035a, NFR-05。Gate4/5 は RYUGEN 承認の適用外(Sprint 8 限り)。マージ可否は RYUGEN が決める。Sprint 9 の入口ゲートは spec/behavioral-spec.md 審査履歴 v2.30・v2.31",
     "spec": "spec/behavioral-spec.md (追補 v2.0, REQ-026〜045)",
-    "deviation": "REQ-026〜034 は仕様より先に実装された(3b711d1)。遡及仕様を作成。Spec-Validator承認→TDD再導出→Adversary(Fresh Context)評価まで feat/talent-foundation はマージしない",
-    "next": "⑦ TDD-Writer(REQ-026〜034, 035のDB) → RED確認 → ⑧ Generator → ⑫ Adversary(Fresh Context)。OQ-15 は解決済み(2026-11-07)。REQ-036/037/039/040 のテスト生成を解除。OQ-12 は項目と取り直し方法が未決"
+    "deviation": "REQ-026〜034 は仕様より先に実装された(3b711d1)。遡及仕様とし、その後は仕様確定→実装を読まない TDD-Writer がテスト作成→RED確認→実装修正。再生成10回を記録(spec/evidence/sprint-8-test-regeneration.md)。レトロ(⑰)で扱う: 仕様先行の逸脱、Adversary の判定基準の揺れ、画面なし Sprint の Gate 4/5 の扱い",
+    "next": "Sprint 9: 入口ゲート(a)〜(h)を満たす。034b(要否変更の権限)、035b(登録・同意送信 RPC)、036〜040(案件・応募・権限)。OQ-12a/b/c と OQ-19・22 の決定が前提"
   }
 }
