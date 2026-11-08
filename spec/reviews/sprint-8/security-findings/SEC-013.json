@@ -1,0 +1,26 @@
+{
+  "id": "SEC-013",
+  "title": "マイグレーションの再適用で強化済みの関数・ポリシーが旧版に戻り、グループ越境の職種が通る（KR-2 の実測）",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.3,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:L/I:L/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A05:2021 Security Misconfiguration",
+  "file": "supabase/migrations/0410_talent_foundation.sql",
+  "lines": "122-136,159-162",
+  "related": [
+    "KR-2"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "0410 は CREATE OR REPLACE FUNCTION で jobs_guard_security_dispatch を旧版（SECURITY DEFINER でなく、グループ・サイト検査なし）に戻し、persons_company_read も旧版に戻す。ランナーが番号順 1 回の前提を守らないと、他グループの職種を使う案件が通り、persons が会社に見えなくなる。",
+    "reproduction": "psql -f 0410_talent_foundation.sql   （0418 適用後に再実行）\nselect prosecdef from pg_proc where proname='jobs_guard_security_dispatch';   -- => f\nset role authenticated; (B1社管理者)\ninsert into jobs(company_id,title,form,role_id) values ('<B1>','x','spot','<A群の警備職種>');   -- => OK rows=1（再適用前は 職種が自社のグループに属していません）\nselect count(*) from persons;   -- => 0（自社の 1 件が見えなくなる）"
+  },
+  "remediation": "適用済みバージョンを記録するマイグレーションランナー（supabase migration の履歴表）を必須にし、番号の飛び越し・再実行を CI で拒否する。関数の最終形を 1 つの「現行版」ファイルに寄せる。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "SEC-012",
+  "title": "input-core の devDependencies の推移的依存に High の既知脆弱性（brace-expansion）が残る（Gate 3 の「High 0 件」に抵触）",
+  "severity": "Medium",
+  "cvss": {
+    "score": 4.7,
+    "vector": "CVSS:3.1/AV:L/AC:H/PR:N/UI:R/S:U/C:N/I:N/A:H",
+    "version": "3.1"
+  },
+  "owasp": "A06:2021 Vulnerable and Outdated Components",
+  "file": "pnpm-lock.yaml",
+  "lines": "(@vitest/coverage-v8 → test-exclude → minimatch → brace-expansion)",
+  "related": [],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "`pnpm audit` はリポジトリ全体で 32 件（critical 4 / high 9 / moderate 18 / low 1）。packages/input-core に届くのは @vitest/coverage-v8>test-exclude 経由の brace-expansion（GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p: high。GHSA-q2hr-2g5m-vwhr, glob, minimatch: moderate）のみで、すべて開発時のみ・攻撃者が glob パターンを渡す経路が無いため CVSS は環境値で 4.7 とした。ただし TRAID の Gate は推移的依存の High を 0 件と定めるため、判定は Evaluator に委ねる。Sprint 8 は package.json / pnpm-lock.yaml を変更しておらず（差分 0）、既存の負債。critical 4 件は apps/ 側で本監査の対象外。",
+    "reproduction": "pnpm audit --json | node -e '...'   （packages__input-core で始まる path のみ抽出）\nhigh brace-expansion >=2.0.0 <2.1.6 -> >=2.1.6 GHSA-qhr7-859c-m2p7 packages__input-core>@vitest/coverage-v8>test-exclude>glob>minimatch>brace-expansion\nhigh brace-expansion >=4.0.0 <5.0.10 -> >=5.0.10 GHSA-6j4f-fj2g-mc7p packages__input-core>@vitest/coverage-v8>test-exclude>minimatch>brace-expansion\nmoderate glob >=9.0.0 <=14.0.1 -> >=14.0.2 GHSA-3g3m-2fjr-6pw4 ..."
+  },
+  "remediation": "`pnpm.overrides` で brace-expansion を ≥2.1.7 / ≥5.0.12、glob ≥14.0.2、minimatch ≥11.0.1 に固定するか、@vitest/coverage-v8 を更新する。`--force` 系の握り潰しはしない。apps/ の critical 4 件は別 Finding として DevOps に回す。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "SEC-009",
+  "title": "共同利用の同意の記録が仕様に足りず、改ざん・前倒し・代理記録が DB で止まらない（OQ-12a/b/c、個人情報保護法 第27条第5項第3号）",
+  "severity": "Medium",
+  "cvss": {
+    "score": 4.9,
+    "vector": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:H/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A04:2021 Insecure Design / A09:2021",
+  "file": "supabase/migrations/0410_talent_foundation.sql",
+  "lines": "29-31",
+  "related": [
+    "OQ-12a",
+    "OQ-12b",
+    "OQ-12c",
+    "REQ-035",
+    "REQ-035b"
+  ],
+  "mustFixBeforePublish": true,
+  "evidence": {
+    "summary": "REQ-035 は「同意・取得日時・取得主体・通知文の版」を本人の送信で保存し、管理者の代理記録はしないとするが、persons には consent_joint_use と consent_at しか無い。運営ロールは consent を true にでき、consent_at に未来日（2099）も入る。撤回後も consent_at が残り撤回時刻が無い。共同利用に必要な公表事項（項目・利用者の範囲・利用目的・責任者の氏名または名称）の保存先が無く、OQ-12a（項目一覧）と OQ-12c（通知文と版）が未決のため、同意が何に対するものか証明できない。",
+    "reproduction": "set role authenticated; set request.jwt.claim.sub='<platform_admin>';\nupdate persons set consent_joint_use=true, consent_at='2099-01-01' where id='<同意なしの人>';   -- => OK（本人送信を伴わず、未来日も許可）\nupdate persons set consent_joint_use=false where id='<同じ人>';                                  -- => OK。consent_at は 2099-01-01 のまま残る（撤回時刻・理由・版なし）"
+  },
+  "remediation": "consent_events（person_id, action=grant|withdraw, notice_version, items_snapshot, collector, collected_at, channel=app|paper, recorded_by）を append-only で新設し、persons.consent_* は RPC のみが更新する。consent_at <= now() の CHECK。通知文の版テーブルに、共同利用する項目・利用者の範囲・目的・責任者を持たせる。OQ-12a/b/c は弁護士の確認後に確定し、本人が通知を読んだ版でなければ同意を有効にしない。公開前に責任者の公表場所を決める。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

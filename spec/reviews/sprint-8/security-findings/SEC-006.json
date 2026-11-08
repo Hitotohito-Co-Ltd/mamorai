@@ -1,0 +1,27 @@
+{
+  "id": "SEC-006",
+  "title": "監査証跡が無い: 同意の変更・PII の参照・候補検索が記録されず、created_by / decided_by / boundary_confirmed_by は自己申告の文字列",
+  "severity": "Medium",
+  "cvss": {
+    "score": 5.4,
+    "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:L/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A09:2021 Security Logging and Monitoring Failures",
+  "file": "supabase/migrations/0410_talent_foundation.sql",
+  "lines": "21-36,68-88,104-118",
+  "related": [
+    "REQ-035",
+    "REQ-039"
+  ],
+  "mustFixBeforePublish": true,
+  "evidence": {
+    "summary": "0410〜0418 に監査テーブル・監査トリガが無く（`pg_tables` で audit|history|log に一致する表が 0 件、persons のトリガも 0 件）、「誰がいつ同意を変えたか」「誰がどの人の PII を見たか」「誰が候補検索で何件取得したか」を後から示せない。jobs.created_by / job_applications.decided_by / boundary_confirmed_by は text で、auth.uid() と結び付かず偽装できる（SEC-002 の実測）。",
+    "reproduction": "select string_agg(tablename,',') from pg_tables where schemaname='public' and tablename ~* 'audit|history|log';   -- => none\nselect string_agg(tgname,',') from pg_trigger where tgrelid='persons'::regclass and not tgisinternal;               -- => none\ninsert into jobs(company_id,title,form,status,created_by) values ('<A1>','x','security','published','偽装 太郎');  -- => OK（created_by は検証されない）"
+  },
+  "remediation": "persons / job_applications / jobs に対する変更履歴テーブルとトリガ（旧値・新値・auth.uid()・時刻）。同意の変更は append-only の consent_events に分離。search_candidates と PII 参照の RPC は呼出者・会社・件数を access_log に記録する。*_by 列は uuid（auth.uid()）に置き換え、サーバ側で設定する。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

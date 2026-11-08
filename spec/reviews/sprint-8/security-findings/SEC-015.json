@@ -1,0 +1,24 @@
+{
+  "id": "SEC-015",
+  "title": "退職者の個人情報が会社から永久に読め、削除・匿名化の手段が無い",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.1,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:L/I:N/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A04:2021 Insecure Design（個人情報保護法 第22条 データ内容の正確性・利用する必要が無くなった時の消去）",
+  "file": "supabase/migrations/0418_talent_persons_rls_perf.sql",
+  "lines": "289-300",
+  "related": [],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "persons_company_read は staff 行が存在すれば足り、is_active=false・left_on が過去でも可視。persons の削除は staff.person_id の外部キー（ON DELETE 指定なし）で阻まれ、匿名化の仕組みも無い。開示・利用停止・消去の請求（法第33〜35条）への対応手段が DB に無い。",
+    "reproduction": "update staff set left_on='2020-01-01', is_active=false where id='<A1の元社員>';\nselect count(*) from persons where id='<その人>';   -- A1管理者 => 1（退職後も全項目が読める）"
+  },
+  "remediation": "保存期間（例: 退職から N 年）を決め、満了後は PII 列を NULL 化する匿名化 RPC と、本人請求の処理手順を用意する。退職者の可視範囲は人事担当ロールに限る。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

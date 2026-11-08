@@ -1,0 +1,27 @@
+{
+  "id": "SEC-008",
+  "title": "staff.person_id が雇用先の会社のグループと一致するかを DB が検査せず、候補検索の id で他人の PII 全項目を読める経路になる",
+  "severity": "Medium",
+  "cvss": {
+    "score": 5.3,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:H/I:N/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A01:2021 Broken Access Control / A04:2021 Insecure Design",
+  "file": "supabase/migrations/0413_talent_hardening2.sql",
+  "lines": "10-23",
+  "related": [
+    "REQ-035",
+    "REQ-035b"
+  ],
+  "mustFixBeforePublish": true,
+  "evidence": {
+    "summary": "persons を読める条件は「自社に staff.person_id で結ばれていること」だけ。staff.person_id にグループ一致の制約・トリガが無く、別グループの person や、同グループの同意なし・未雇用の person を結べば、その人の birth_date・phone・email・在留期限まで読める。今は staff に company の書込ポリシーが無いため会社は直接結べないが、Sprint 9 の登録 RPC が呼出元の渡す person_id を受けると、search_candidates が返す id（名前だけに絞った設計）が PII 全項目への鍵になる。",
+    "reproduction": "-- 特権側（Sprint 9 の RPC を想定して postgres で挿入）: B1社(別グループ)の staff に A グループの person(同意なし)を結ぶ\ninsert into staff(id,company_id,person_id,name,staff_no) values (..., '<B1>', '<A群 同意なし person>', 'link','LINK');\nset role authenticated; set request.jwt.claim.sub='<B1社 company_admin>';\nselect name, birth_date, phone, email, residence_expires_on from persons where group_id='<A群>';\n-- => A1雇用・同意なし 1985-05-05 09033334444 a2@example.com res=2027-01-01\n-- 不整合の検出: select count(*) from staff s join persons p on p.id=s.person_id join companies c on c.id=s.company_id where c.group_id is distinct from p.group_id;  -- => 1"
+  },
+  "remediation": "staff の person_id 設定時に `persons.group_id = companies.group_id` を検査するトリガ（SECURITY DEFINER）。候補から雇用へ進む RPC は、同意済みであること・同グループであることを内部で再検証し、PII 列は雇用成立後にだけ可視にする。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

@@ -1,0 +1,24 @@
+{
+  "id": "SEC-014",
+  "title": "DB・TS ともに文字列長・件数の上限が無い（3,000,000 文字のタイトル、50MB の確認者、長い personId の整列）",
+  "severity": "Medium",
+  "cvss": {
+    "score": 4.3,
+    "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:L",
+    "version": "3.1"
+  },
+  "owasp": "A04:2021 Insecure Design（資源消費）",
+  "file": "packages/input-core/src/talent/renewal.ts",
+  "lines": "38-50,95-101",
+  "related": [],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "compareCodePoints は比較のたびに Array.from で両文字列を配列化するため、長い personId の整列が極端に遅い（200 人 × 20 万文字で 8.3 秒）。boundaryRecorded の正規表現は線形だが 50MB で 1.7 秒。DB は jobs.title に 300 万文字を受け付けた。ReDoS（破滅的バックトラック）は、全 6 つの正規表現が固定長または文字クラスの 1 回繰り返しで、10MB の入力でも 5 ms のため該当なし。",
+    "reproduction": "listRenewals(200 人, personId=あ×200000+i) -> 8259 ms\ncheckEligibility(... confirmedBy=' '×50,000,000+'x') -> 1677 ms\nlistRenewals(200000 人) -> 853 ms（許容）\nisRealDate('1'×10,000,000) -> 5 ms（ReDoS なし）\ninsert into jobs(company_id,title,form) values (..., repeat('あ',3000000), 'spot');  -- => OK"
+  },
+  "remediation": "compareCodePoints を `for (let i=0;;)` で codePointAt を使う非割当の実装にするか、`a < b` が UTF-16 順になることを避けたいなら長さの上限（personId ≤ 64 文字）を入口で検証。DB は text 列に `check (length(title) <= 200)` など上限を置く。API 層でリクエスト本文の上限（例: 1MB）。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

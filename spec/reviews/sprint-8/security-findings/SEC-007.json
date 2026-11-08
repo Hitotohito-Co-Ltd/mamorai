@@ -1,0 +1,27 @@
+{
+  "id": "SEC-007",
+  "title": "checkEligibility / listRenewals が実行時に型を検証せず、\"false\"（文字列）の同意・在留可否が真として扱われ、null で TypeError になる",
+  "severity": "Medium",
+  "cvss": {
+    "score": 5.3,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:H/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A03:2021 Injection（型混同）/ A04:2021",
+  "file": "packages/input-core/src/talent/eligibility.ts",
+  "lines": "145-156,193",
+  "related": [
+    "REQ-026",
+    "REQ-035"
+  ],
+  "mustFixBeforePublish": true,
+  "evidence": {
+    "summary": "日付は isRealDate で検証しているが、consentJointUse と residence.workAllowed は真偽値の型を確認せず `!person.consentJointUse` / `!res.workAllowed` で評価する。API が JSON や DB のテキスト列から値を渡すと、\"false\" が eligible=true を生む。guardTraining や employments が null/undefined の入力は不明な TypeError で落ち、検証済みの invalid_input にならない。",
+    "reproduction": "checkEligibility(person({consentJointUse:'false'}), job())          -> {\"eligible\":true,\"reasons\":[]}      ← 同意なしが通る\ncheckEligibility(person({residence:{workAllowed:'false'}}), job())  -> {\"eligible\":true,\"reasons\":[]}\ncheckEligibility(person({consentJointUse:0}), job()).reasons         -> [\"no_consent\"]\ncheckEligibility(person({guardTraining:null}), job())                -> THROWS TypeError: Cannot read properties of null (reading 'annualFiscalYears')\ncheckEligibility(person({employments:undefined}), job())             -> THROWS TypeError: Cannot read properties of undefined (reading 'some')\ncheckEligibility(person(), job({shifts:null}))                       -> THROWS TypeError\nlistRenewals([null], '2026-11-08')                                   -> THROWS TypeError"
+  },
+  "remediation": "境界（API/RPC の入口）で Zod により PersonProfile / JobPost / BusyShift をパースし、純粋関数側でも `typeof x === \"boolean\"` と配列・オブジェクトの存在を確認して invalid_input を返す。判定は fail-closed（真偽値でなければ拒否）。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

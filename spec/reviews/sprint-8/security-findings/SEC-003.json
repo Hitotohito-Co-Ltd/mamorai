@@ -1,0 +1,30 @@
+{
+  "id": "SEC-003",
+  "title": "会社に属する全ロールが、自社の全員の生年月日・電話・メール・在留情報を読め、候補検索も呼べる（KR-5 / OQ-22 / OQ-19 / OQ-20）",
+  "severity": "Medium",
+  "cvss": {
+    "score": 6.5,
+    "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A01:2021 Broken Access Control",
+  "file": "supabase/migrations/0418_talent_persons_rls_perf.sql",
+  "lines": "289-300",
+  "related": [
+    "KR-5",
+    "OQ-22",
+    "OQ-19",
+    "OQ-20",
+    "REQ-040"
+  ],
+  "mustFixBeforePublish": true,
+  "evidence": {
+    "summary": "app_company_id() はロールを見ない。app_profiles.role が company_manager（0300 の CHECK で許可）の利用者は、自社の全 persons 行の birth_date・phone・email・residence_* を読め、search_candidates も呼べる。他社・他グループは越境できない（PASS）が、REQ-040 の許可表（現場責任者は自現場のみ、管制は拒否）と DB の実態が一致しない。",
+    "reproduction": "set role authenticated; set request.jwt.claim.sub='<A1社の app_profiles に載る company_admin 以外のロール。試験環境では role=staff、本番は 0300 の CHECK で company_manager>';\nselect count(*), string_agg(birth_date||' '||phone||' '||email, ' | ') from persons;   -- => 2 件 '1990-01-01 09011112222 a1@example.com | 1985-05-05 09033334444 a2@example.com'\nselect count(*) from search_candidates('<A1社>');                                        -- => 3"
+  },
+  "remediation": "REQ-040 の許可表に合わせ、persons の参照を「ロール × 範囲（現場・支店・自社）」で絞る。birth_date・phone・email は列単位で分け（別テーブルまたはビュー＋列権限）、一覧用の最小列（id, name）と PII 列を分離する。OQ-22 が決まるまで画面・API に persons を出さない。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

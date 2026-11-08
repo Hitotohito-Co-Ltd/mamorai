@@ -1,0 +1,26 @@
+{
+  "id": "SEC-017",
+  "title": "最小権限の不足: SECURITY DEFINER のトリガ関数に既定の EXECUTE、新テーブルに GRANT ALL と FORCE RLS なし",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.1,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:L/I:N/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A05:2021 Security Misconfiguration",
+  "file": "supabase/migrations/0414_talent_integrity.sql",
+  "lines": "89-115",
+  "related": [
+    "KR-4"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "jobs_guard_* / job_*_guard_* の 5 関数は SECURITY DEFINER で、PUBLIC・anon・authenticated に EXECUTE が付く。trigger 関数は直接呼べないため（実測: \"trigger functions can only be called as triggers\"）今は悪用できないが、将来 SECURITY DEFINER の通常関数を同じ書き方で足すと anon に漏れる。persons ほか 6 表は FORCE RLS なし（所有者は RLS を素通り。Supabase の postgres/service_role は元から素通りのため影響は限定）。app_company_has_person は 0418 で不要になったが authenticated に残る。",
+    "reproduction": "set role authenticated; select jobs_guard_security_dispatch();   -- => ERR: trigger functions can only be called as triggers\nselect proacl from pg_proc where proname='job_shifts_guard_company';   -- => =X/postgres,anon=X/postgres,authenticated=X/postgres\nselect relname, relforcerowsecurity from pg_class where relname in ('persons','jobs','job_shifts','job_applications','groups','job_roles');   -- => すべて f"
+  },
+  "remediation": "トリガ関数に `revoke execute ... from public, anon, authenticated`。未使用の app_company_has_person を drop。新テーブルは `force row level security`。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

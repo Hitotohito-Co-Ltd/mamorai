@@ -1,0 +1,26 @@
+{
+  "id": "SEC-010",
+  "title": "search_candidates が件数・頻度の制限なしにグループ全員の氏名と person_id を一括取得させる",
+  "severity": "Medium",
+  "cvss": {
+    "score": 4.3,
+    "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:N/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A04:2021 Insecure Design",
+  "file": "supabase/migrations/0412_talent_hardening.sql",
+  "lines": "208-228",
+  "related": [
+    "REQ-035"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "ページング・limit・p_filter の実装・呼出回数制限・ログが無い。会社のどのロールでも 1 回の呼出でグループの同意済み全員を取得でき（10 万件を 127 ms）、他子会社の人材を引き抜き目的で列挙する用途や、スクレイピングを防げない。",
+    "reproduction": "-- persons に同意済み 100,002 件を投入\nset role authenticated; set request.jwt.claim.sub='<A1社 company_admin>';\nselect count(*) from search_candidates('<A1>');   -- => 100002 （Time: 126.958 ms）"
+  },
+  "remediation": "limit/offset（上限 50）とカーソル、呼出元・件数の access_log、ユーザーごとのレート制限。ロールを絞る（SEC-003）。氏名の返却は部分一致の検索語を必須にし、無条件一覧を禁止する。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

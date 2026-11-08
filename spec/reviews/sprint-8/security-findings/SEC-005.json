@@ -1,0 +1,29 @@
+{
+  "id": "SEC-005",
+  "title": "警備・線引き・派遣の統制が、案件を作る会社自身の自己申告（職種の選択・needs_boundary_check・確認者の文字列）で回避できる（KR-3 / OQ-21）",
+  "severity": "Medium",
+  "cvss": {
+    "score": 6.5,
+    "vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A04:2021 Insecure Design",
+  "file": "supabase/migrations/0417_talent_boundary_status_space.sql",
+  "lines": "244-278",
+  "related": [
+    "KR-3",
+    "OQ-21",
+    "REQ-034",
+    "REQ-027"
+  ],
+  "mustFixBeforePublish": true,
+  "evidence": {
+    "summary": "契約の形が security でも職種が非警備（または role_id が NULL）なら公開でき、TS 側も `isSecurityWork` だけを見て form を見ないため、警備の年齢・教育の判定を受けない。needs_boundary_check は案件作成者が false にでき、boundary_confirmed_by は任意の文字列（「だれか」）で通る。警備業法・派遣法の統制が会社の自己申告に依存する。",
+    "reproduction": "-- DB（authenticated, A1社管理者）\ninsert into jobs(company_id,title,form,role_id,status) values ('<A1>','警備だが職種なし','security',null,'published');             -- => OK\ninsert into jobs(...,form,role_id,status) values (...,'security','<軽作業(is_security=false)>','published');                    -- => OK\ninsert into jobs(...,form,role_id,employment_days,status) values (...,'dispatch','<軽作業>',10,'published');                    -- => OK（実は警備の派遣でも通る）\ninsert into jobs(...,needs_boundary_check,status) values (...,false,'published');                                                -- => OK\ninsert into jobs(...,needs_boundary_check,status,boundary_confirmed_by,boundary_confirmed_on) values (...,true,'published','だれか',current_date); -- => OK\n-- TS\ncheckEligibility(person(教育なし), job({form:'security', isSecurityWork:false})) -> {\"eligible\":true,\"reasons\":[]}"
+  },
+  "remediation": "form=security の案件は is_security=true の職種を必須にする CHECK/トリガ（逆に is_security=true の職種で form=security 以外は拒否）。TS は `isSecurityWork || form===\"security\"` で判定。needs_boundary_check は職種マスタの既定値を DB で強制し、変更は本社ロールの RPC に限る（REQ-034b/037）。確認者は app_profiles の user_id と確認時刻をサーバ側で記録し、自由記述にしない。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

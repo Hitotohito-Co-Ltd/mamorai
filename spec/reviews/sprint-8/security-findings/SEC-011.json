@@ -1,0 +1,26 @@
+{
+  "id": "SEC-011",
+  "title": "PII（氏名・生年月日・電話・メール・在留情報）が平文の列で、persons と staff に重複して持たれる",
+  "severity": "Medium",
+  "cvss": {
+    "score": 4.4,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:H/I:N/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A02:2021 Cryptographic Failures",
+  "file": "supabase/migrations/0410_talent_foundation.sql",
+  "lines": "21-36",
+  "related": [
+    "NFR"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "Supabase はディスクと通信を暗号化するが、列は平文のため、論理ダンプ・バックアップ・service_role の誤用・SQL ログへの引数出力・pg_stat_statements で全項目が読める。persons と staff（dob, phone, pin_current）に同じ種類の情報が別の RLS で重複し、片方だけ修正されるずれが起きる。persons の email・phone・birth_date に形式の CHECK も無い（staff には staff_phone_fmt がある）。",
+    "reproduction": "select column_name, data_type from information_schema.columns where table_name='persons';   -- => name,name_kana,birth_date,phone,email... すべて text/date の平文\ninsert into persons(group_id,name,email,phone,birth_date) values ('<A>','x','not-an-email','<script>','2999-01-01');   -- => OK（platform_admin）"
+  },
+  "remediation": "birth_date・phone・email を pgcrypto/pgsodium（Supabase Vault の鍵）で列暗号化するか、少なくとも別テーブル（persons_pii）に分け、列権限で一覧用と分離する。persons を正とし、staff の重複列は移行後に削除する。形式の CHECK と birth_date <= current_date を追加。DB ログに RPC 引数を出さない設定を確認する。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}

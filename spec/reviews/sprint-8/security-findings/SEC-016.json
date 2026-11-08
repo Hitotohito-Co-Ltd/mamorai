@@ -1,0 +1,24 @@
+{
+  "id": "SEC-016",
+  "title": "例外メッセージが入力値を反映し、内部の型エラー文言がそのまま上位に出る",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.1,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:L/I:N/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A09:2021 / A05:2021",
+  "file": "packages/input-core/src/talent/renewal.ts",
+  "lines": "55",
+  "related": [],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "listRenewals は不正な基準日を `RangeError(基準日が不正です: ${referenceDate})` と入力そのままで投げる。上位が例外メッセージを応答に載せると、任意文字列が反射される（HTML として出すと XSS の足場）。null 入力では \"Cannot read properties of null (reading employments)\" など実装の内部構造が出る（SEC-007）。",
+    "reproduction": "listRenewals([], '<img src=x onerror=alert(1)>') -> THROWS RangeError: 基準日が不正です: <img src=x onerror=alert(1)>"
+  },
+  "remediation": "メッセージに入力値を含めず固定文言＋エラーコードにする。API 層で例外をログに記録し、クライアントへは汎用エラーを返す。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08"
+}
