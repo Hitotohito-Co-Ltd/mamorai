@@ -13,4 +13,5 @@
 | v2.24 | 91 | APPROVED | 状態ヘッダ、0419/0420 の契約への反映、KR-1 と REQ-039 の整合、listRenewals の null（v2.25 で是正） |
 | v2.25 | 96 | APPROVED | 状態ヘッダの版の記述、契約の RenewalItem の型（v2.26 で是正。文面のみ） |
 
-人間（RYUGEN）の決定: v2.7 の再承認、OQ-12（一部）、OQ-15、OQ-20、OQ-21、Sprint 8 の『直して続行』と『正規ルート』。
+人間（RYUGEN）の決定: v2.7 の再承認、OQ-12（一部）、OQ-15、OQ-20、OQ-21、OQ-23（取り消すマイグレーションを追加）、Sprint 8 の『直して続行』と『正規ルート』。
+未承認（RYUGEN の明示的な承認待ち）: Gate 4/5 の適用外宣言（Sprint 8 限り）、Sprint 9 以降に送る Medium の受容。v2.26〜v2.29 は Spec-Validator の審査が未了。
