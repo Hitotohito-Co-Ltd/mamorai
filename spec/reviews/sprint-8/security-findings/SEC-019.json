@@ -1,0 +1,28 @@
+{
+  "id": "SEC-019",
+  "title": "null・非配列の入力が TypeError になり、job のフラグの型・値を検証しない",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.1,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:L/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A03:2021 / A04:2021",
+  "file": "packages/input-core/src/talent/eligibility.ts",
+  "lines": "134-159",
+  "related": [
+    "REQ-026",
+    "SEC-007"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "person.employments/guardTraining/residence、job.shifts、busy の null・非配列で TypeError（fail-closed）。isSecurityWork・needsBoundaryCheck・form は型・値を検証せず、undefined・0・null は「該当なし」で通る。",
+    "reproduction": "checkEligibility(person({residence:null}), job()) -> THROWS TypeError\ncheckEligibility(person(), job({shifts:null})) -> THROWS TypeError\ncheckEligibility(person(), job({isSecurityWork:undefined})) -> eligible:true\ncheckEligibility(person(), job({needsBoundaryCheck:0})) -> eligible:true"
+  },
+  "remediation": "入口で構造体の存在と型を検証し invalid_input にする。job のフラグは boolean、form は列挙値、employerCompanyId は文字列を検査。needs_boundary_check を NOT NULL default false に。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08",
+  "discoveredIn": "re-audit (HEAD 3063bae)"
+}

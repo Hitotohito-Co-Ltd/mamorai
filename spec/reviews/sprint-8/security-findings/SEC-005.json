@@ -25,5 +25,11 @@
   "status": "open",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
-  "date": "2026-11-08"
+  "date": "2026-11-08",
+  "reaudit": {
+    "date": "2026-11-08",
+    "auditor": "⑪ Security Engineer（鍵山 剛）",
+    "head": "3063bae",
+    "result": "open"
+  }
 }

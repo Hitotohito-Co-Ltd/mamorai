@@ -17,9 +17,16 @@
     "reproduction": "pnpm audit --json | node -e '...'   （packages__input-core で始まる path のみ抽出）\nhigh brace-expansion >=2.0.0 <2.1.6 -> >=2.1.6 GHSA-qhr7-859c-m2p7 packages__input-core>@vitest/coverage-v8>test-exclude>glob>minimatch>brace-expansion\nhigh brace-expansion >=4.0.0 <5.0.10 -> >=5.0.10 GHSA-6j4f-fj2g-mc7p packages__input-core>@vitest/coverage-v8>test-exclude>minimatch>brace-expansion\nmoderate glob >=9.0.0 <=14.0.1 -> >=14.0.2 GHSA-3g3m-2fjr-6pw4 ..."
   },
   "remediation": "`pnpm.overrides` で brace-expansion を ≥2.1.7 / ≥5.0.12、glob ≥14.0.2、minimatch ≥11.0.1 に固定するか、@vitest/coverage-v8 を更新する。`--force` 系の握り潰しはしない。apps/ の critical 4 件は別 Finding として DevOps に回す。",
-  "status": "fixed_pending_reaudit",
+  "status": "closed",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
   "date": "2026-11-08",
-  "fix": "package.json の pnpm.overrides（brace-expansion を 2.1.7 / 5.0.12 に）"
+  "fix": "package.json の pnpm.overrides（brace-expansion を 2.1.7 / 5.0.12 に）",
+  "reaudit": {
+    "date": "2026-11-08",
+    "auditor": "⑪ Security Engineer（鍵山 剛）",
+    "head": "3063bae",
+    "result": "closed",
+    "basis": "pnpm audit に brace-expansion の助言 0 件。input-core に届く High/Critical は 0 件（glob・minimatch の moderate 3 件、開発時のみ）。"
+  }
 }

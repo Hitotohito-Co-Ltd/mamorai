@@ -1,0 +1,28 @@
+{
+  "id": "SEC-021",
+  "title": "線引き確認者の空白判定が不完全（見えない文字で「確認者あり」にできる）",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.1,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:L/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A04:2021 Insecure Design",
+  "file": "supabase/migrations/0417_talent_boundary_status_space.sql; packages/input-core/src/talent/eligibility.ts",
+  "lines": "32-34; 76-83",
+  "related": [
+    "REQ-034a",
+    "SEC-005"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "ブラックリスト方式のため U+2800（点字空白）、U+3164（ハングル填字）、U+00AD、U+115F、U+180E、U+200E/F は「確認者あり」になる（DB と TS の両方）。NBSP・EM SPACE・ゼロ幅は拒否される。",
+    "reproduction": "insert into jobs(..., status, needs_boundary_check, boundary_confirmed_by, boundary_confirmed_on) values (..., 'published', true, E'\\u2800', '2026-11-01');  -- => INSERT 0 1\ncheckEligibility(person(), job({needsBoundaryCheck:true, boundaryCheck:{confirmedBy:'\\u2800', confirmedOn:'2026-01-01'}})) -> eligible:true"
+  },
+  "remediation": "確認者に文字・数字（Unicode の L / N）が 1 文字以上あることを要求する（ホワイトリスト）。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08",
+  "discoveredIn": "re-audit (HEAD 3063bae)"
+}

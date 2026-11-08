@@ -1,0 +1,28 @@
+{
+  "id": "SEC-020",
+  "title": "0420 は既存行を遡及して検査せず、persons / companies のグループ変更後の不整合を検出しない",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.1,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:L/I:N/A:N",
+    "version": "3.1"
+  },
+  "owasp": "A01:2021 / A04:2021",
+  "file": "supabase/migrations/0420_talent_staff_person_group.sql",
+  "lines": "22-24",
+  "related": [
+    "SEC-008",
+    "REQ-035"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "検査は staff の person_id・company_id の変更時のみ。適用前の不整合な行は無関係な列の更新で通り、運営が persons.group_id / companies.group_id を後で変えると不整合ができる。",
+    "reproduction": "update persons set group_id='<別グループ>' where id='<A1 に雇用されている人>';  -- 運営権限: UPDATE 1\nselect count(*) from staff s join persons p on p.id=s.person_id join companies c on c.id=s.company_id where c.group_id is distinct from p.group_id;  -- => 1"
+  },
+  "remediation": "適用前に検出クエリで 0 件を確認し、運用で定期実行。雇用が紐づく間は persons.group_id / companies.group_id の更新を拒否するトリガ。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08",
+  "discoveredIn": "re-audit (HEAD 3063bae)"
+}

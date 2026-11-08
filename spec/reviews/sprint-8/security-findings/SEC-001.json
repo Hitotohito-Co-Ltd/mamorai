@@ -1,10 +1,10 @@
 {
   "id": "SEC-001",
-  "title": "TRUNCATE ... CASCADE で全テナントの人・雇用・案件を一括消去できる（KR-4 の実測。影響は想定より広い）",
+  "title": "TRUNCATE・TRIGGER・REFERENCES の既定の権限が既存 40 表に残り、全テナントのデータ消去と他会社の操作中のコード実行ができる（KR-4。新6表は 0419 で解消）",
   "severity": "High",
   "cvss": {
-    "score": 8.2,
-    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:C/C:N/I:H/A:H",
+    "score": 8.3,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:C/C:H/I:H/A:H",
     "version": "3.1"
   },
   "owasp": "A05:2021 Security Misconfiguration",
@@ -19,9 +19,18 @@
     "reproduction": "-- 環境: Supabase 既定相当（alter default privileges ... grant all on tables to anon, authenticated）\nset role authenticated; set request.jwt.claim.sub='<A1社 company_admin>';\ntruncate job_applications;            -- => OK（RLS・0414 の削除ガードは TRUNCATE を見ない）\ntruncate persons cascade;             -- => OK。NOTICE: truncate cascades to table \"staff\",\"shifts\",\"staff_sites\",\"jyoban_reports\",\"jyoban_devices\",\"jyoban_slot_staff\",\"jyoban_push_subscriptions\",\"jyoban_notifications\",\"job_applications\"\nselect count(*) from persons;         -- => 0（staff も 0。他社 B1 の行も消えた）\n-- 修正の検証\nrevoke truncate, references, trigger on all tables in schema public from anon, authenticated;\ntruncate job_applications;            -- => ERR: permission denied for table job_applications\ntruncate persons cascade;             -- => ERR: permission denied for table persons"
   },
   "remediation": "マイグレーションに `revoke truncate, references, trigger on public.<新テーブル> from anon, authenticated;` を明記し、`alter default privileges in schema public revoke truncate, references, trigger on tables from anon, authenticated;` を運用手順に入れる。PostgREST 経由では実行できないため直接接続の経路（接続情報の配布先）も棚卸しする。新テーブルには `force row level security` も付ける。",
-  "status": "fixed_pending_reaudit",
+  "status": "open",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
   "date": "2026-11-08",
-  "fix": "0419_talent_revoke_privileges.sql"
+  "fix": "0419_talent_revoke_privileges.sql",
+  "reaudit": {
+    "date": "2026-11-08",
+    "auditor": "⑪ Security Engineer（鍵山 剛）",
+    "head": "3063bae",
+    "result": "open（範囲を拡大して再評価）",
+    "basis": "新6表（groups, persons, job_roles, jobs, job_shifts, job_applications）は TRUNCATE・TRIGGER が拒否され、truncate persons/staff/companies/sites cascade も job_applications / jobs への権限不足で失敗（防げた）。しかし既存 40 表は anon/authenticated に TRUNCATE・TRIGGER・REFERENCES が残る。pg_default_acl も未変更。",
+    "reproduction": "set role authenticated;  -- anon でも同じ\ntruncate shifts;          -- => OK（count=0）。leave_requests / daily_reports / jyoban_reports / notices / app_profiles も OK\ncreate trigger evil before insert on staff for each row execute function public.jobs_guard_delete();   -- => CREATE TRIGGER\ncreate function pg_temp.tf() returns trigger language plpgsql as $$ begin raise warning 'RUNS AS %', current_user; return new; end $$;\ncreate trigger evil_x before update on staff for each row execute function pg_temp.tf();\n-- 別セッション: B1 社管理者が select company_set_staff_phone('<staff>','09011112222');\n-- => WARNING: TRIGGER FN RUNS AS postgres (session_user postgres)",
+    "remediation": "0421 で `revoke truncate, references, trigger on all tables in schema public from anon, authenticated, public;`（既存表を含む）と `alter default privileges in schema public revoke truncate, references, trigger on tables from anon, authenticated;` を追加。仕様 KR-4 の「既存のテーブルは対象外」を削除。"
+  }
 }

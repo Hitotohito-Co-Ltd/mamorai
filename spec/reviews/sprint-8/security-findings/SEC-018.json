@@ -1,0 +1,28 @@
+{
+  "id": "SEC-018",
+  "title": "件数の上限内でも合計の負荷に上限が無い（listApplicableJobs の案件数、employments の件数）",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.7,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:N/A:L",
+    "version": "3.1"
+  },
+  "owasp": "A04:2021 Insecure Design",
+  "file": "packages/input-core/src/talent/eligibility.ts",
+  "lines": "170-176,241-243",
+  "related": [
+    "REQ-026",
+    "SEC-004"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "上限いっぱい（366 シフト×1,000 件）で 1 呼び出し 0.7〜0.9 秒、listApplicableJobs は案件数に比例（20 件で 16 秒）、employments 100 万件×366 シフトで 1.1 秒。",
+    "reproduction": "checkEligibility(minor, job(366 shifts), busy(1000)) -> 0.73〜0.94 s\nlistApplicableJobs(adult, 20 jobs x 366 shifts, busy(1000)) -> 16.2 s\ncheckEligibility(person(employments=1e6), job(366 shifts)) -> 1.1 s"
+  },
+  "remediation": "busy を日付ごとの Map に前処理。span() を 1 回だけ計算。listApplicableJobs・employments・annualFiscalYears に件数の上限を置く。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08",
+  "discoveredIn": "re-audit (HEAD 3063bae)"
+}

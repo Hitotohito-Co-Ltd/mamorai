@@ -19,9 +19,16 @@
     "reproduction": "node ts_atk3.mjs（tsc で JS 化した checkEligibility を直接実行。成人、他日付の busy で重なりなし）\nshifts=1000, busy=1000 -> 1734 ms\nshifts=2000, busy=2000 -> 5876 ms\nshifts=4000, busy=4000 -> 24476 ms        （2 倍で約 4 倍）\n18 歳未満・日中シフト: shifts=5000 -> 9498 ms, shifts=10000 -> 35622 ms"
   },
   "remediation": "(1) shiftIsNight の結果を 1 回だけ計算してループ外に出す。(2) busy を日付ごとの配列（Map）に前処理し、同日分とだけ重なりを比べる。(3) 入力件数の上限（例: shifts ≤ 200、busy ≤ 500）を超えたら invalid_input。(4) DB 側でも案件あたりのシフト数に上限を置く（トリガ）。",
-  "status": "fixed_pending_reaudit",
+  "status": "closed",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
   "date": "2026-11-08",
-  "fix": "eligibility.ts の入力件数の上限（シフト366・他の勤務1,000）"
+  "fix": "eligibility.ts の入力件数の上限（シフト366・他の勤務1,000）",
+  "reaudit": {
+    "date": "2026-11-08",
+    "auditor": "⑪ Security Engineer（鍵山 剛）",
+    "head": "3063bae",
+    "result": "closed",
+    "basis": "シフト 367・他の勤務 1,001 件で invalid_input。上限での最悪値は 0.7〜0.9 秒/回（初回は 4,000 件で 24 秒）。残余は SEC-018。"
+  }
 }
