@@ -49,7 +49,9 @@ for f in \
   0417_talent_boundary_status_space \
   0417_talent_boundary_status_space \
   0418_talent_persons_rls_perf \
-  0418_talent_persons_rls_perf; do   # 2回=冪等性確認
+  0418_talent_persons_rls_perf \
+  0419_talent_revoke_privileges \
+  0419_talent_revoke_privileges; do   # 2回=冪等性確認
   $P -d tln_rls -f "$f.sql" >/dev/null 2>&1 || { echo "FAILED applying $f"; exit 1; }
 done
 # RLS/関数 検証シナリオを実行

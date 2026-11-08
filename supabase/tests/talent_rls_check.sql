@@ -43,7 +43,7 @@ insert into app_profiles(user_id, role, company_id) values
   ('0c000000-0000-0000-0000-000000000099', 'platform_admin', null);
 
 -- Supabase の既定に合わせ、anon / authenticated に全権限を付与する。以降の拒否は RLS とトリガだけで成り立つこと(権限の未付与で通ったように見せない)
-grant all on all tables in schema public to anon, authenticated;
+-- (権限はハーネスが設定する Supabase 既定の ALTER DEFAULT PRIVILEGES に任せる。ここで付け直すとマイグレーションの revoke を打ち消すため付与しない)
 create table t_rls_results(n int, name text, ok boolean, detail text);
 grant insert, select on t_rls_results to authenticated, anon;
 
@@ -177,8 +177,8 @@ insert into job_roles(id, group_id, name, is_security) values
   ('d0000000-0000-0000-0000-00000000000a', 'aa000000-0000-0000-0000-000000000001', '警備員A', true);
 insert into jobs(id, company_id, role_id, title, form) values
   ('e0000000-0000-0000-0000-00000000000b', 'cc000000-0000-0000-0000-000000000022', 'd0000000-0000-0000-0000-00000000000b', 'B社の案件', 'security');
-grant select, insert, update on jobs, job_shifts, job_applications, job_roles to authenticated;
-grant select on staff to authenticated;
+-- (権限はハーネスが設定する Supabase 既定の ALTER DEFAULT PRIVILEGES に任せる。ここで付け直すとマイグレーションの revoke を打ち消すため付与しない)
+-- (権限はハーネスが設定する Supabase 既定の ALTER DEFAULT PRIVILEGES に任せる。ここで付け直すとマイグレーションの revoke を打ち消すため付与しない)
 
 set role authenticated;
 -- 10: 会社に属さない認証ユーザー(app_profiles なし)は search_candidates を呼べない(FIND-001)
@@ -240,6 +240,7 @@ set role authenticated;
 set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';
 do $$
 begin
+  set local role postgres;  -- トリガの検査は所有者の立場で確かめる（authenticated には応募への書き込み権限が無い）
   begin
     insert into job_applications(company_id, job_shift_id, staff_id)
       values ('cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-00000000000a', '0b000000-0000-0000-0000-000000000003');  -- B社のスタッフ
@@ -301,7 +302,7 @@ insert into sites(id, name, code, company_id) values
   ('50000000-0000-0000-0000-00000000000b', 'B社の現場', 'S-B', 'cc000000-0000-0000-0000-000000000022');
 insert into jyoban_slots(id, company_id, site_id, name, work_start, work_end, departure_required, departure_due, onduty_required, grace_min, weekdays, is_active, sort_order) values
   ('51000000-0000-0000-0000-00000000000b', 'cc000000-0000-0000-0000-000000000022', '50000000-0000-0000-0000-00000000000b', 'B社の枠', '09:00', '17:00', true, '08:00', false, 5, '{1,2,3,4,5}', true, 1);
-grant select, insert, update on sites, jyoban_slots to authenticated;
+-- (権限はハーネスが設定する Supabase 既定の ALTER DEFAULT PRIVILEGES に任せる。ここで付け直すとマイグレーションの revoke を打ち消すため付与しない)
 set role authenticated;
 set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';  -- A社管理者
 
@@ -504,6 +505,7 @@ do $$ begin
   end; end $$;
 -- 37: 自社のスタッフでも、他社のシフトへの応募は作れない
 do $$ begin
+  set local role postgres;  -- トリガの検査は所有者の立場で確かめる
   begin
     insert into job_applications(company_id, job_shift_id, staff_id)
       values ('cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-00000000000c', '0b000000-0000-0000-0000-000000000002');
@@ -578,9 +580,11 @@ declare n1 int; n2 int; n3 int; d1 int; d2 int; d3 int;
 begin
   update jobs set title = '改ざん' where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics n1 = row_count;
   update job_shifts set headcount = 99 where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics n2 = row_count;
-  update job_applications set status = 'rejected' where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics n3 = row_count;
+  begin update job_applications set status = 'rejected' where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics n3 = row_count;
+  exception when insufficient_privilege then n3 := 0; end;  -- 応募への直接書き込み権限が無い（0419）
   insert into t_rls_results values (49, 'B社管理者はA社の案件・シフト・応募を更新できない', n1 + n2 + n3 = 0, n1||','||n2||','||n3);
-  delete from job_applications where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics d3 = row_count;
+  begin delete from job_applications where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics d3 = row_count;
+  exception when insufficient_privilege then d3 := 0; end;
   delete from job_shifts where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics d2 = row_count;
   delete from jobs where company_id = 'cc000000-0000-0000-0000-000000000011'; get diagnostics d1 = row_count;
   insert into t_rls_results values (50, 'B社管理者はA社の案件・シフト・応募を削除できない', d1 + d2 + d3 = 0, d1||','||d2||','||d3);
@@ -609,6 +613,7 @@ do $$ begin
   exception when others then insert into t_rls_results values (53, '案件の職種を他グループのものへ更新できない', sqlerrm like '%職種%', sqlerrm);
   end; end $$;
 do $$ begin
+  set local role postgres;  -- トリガの検査は所有者の立場で確かめる
   begin
     update job_applications set staff_id = '0b000000-0000-0000-0000-000000000003' where id = 'a1000000-0000-0000-0000-00000000000a';
     insert into t_rls_results values (54, '応募のスタッフを他社のスタッフへ付け替えられない', false, '付け替えられてしまった');
@@ -638,6 +643,7 @@ do $$ begin
   begin insert into job_shifts(job_id, company_id, work_date, start_time, end_time, headcount) values ('e0000000-0000-0000-0000-00000000000a', 'cc000000-0000-0000-0000-000000000011', current_date, '09:00', '24:30', 1);
     insert into t_rls_results values (60, '終了時刻 24:30 のシフトは登録できない', false, '登録できてしまった');
   exception when check_violation then insert into t_rls_results values (60, '終了時刻 24:30 のシフトは登録できない', true, sqlerrm); end;
+  set local role postgres;  -- 制約の検査は所有者の立場で確かめる（authenticated には応募への書き込み権限が無い）
   begin insert into job_applications(company_id, job_shift_id, staff_id) values ('cc000000-0000-0000-0000-000000000011', 'f0000000-0000-0000-0000-00000000000a', '0b000000-0000-0000-0000-000000000001');
     insert into t_rls_results values (61, '同じシフトへ同じスタッフの応募を2件作れない', false, '作れてしまった');
   exception when unique_violation then insert into t_rls_results values (61, '同じシフトへ同じスタッフの応募を2件作れない', true, sqlerrm); end;
@@ -745,10 +751,53 @@ do $$ begin
     insert into t_rls_results values (77, 'A社管理者は自社のシフトをB社名義に付け替えられない', false, '付け替えられてしまった');
   exception when others then insert into t_rls_results values (77, 'A社管理者は自社のシフトをB社名義に付け替えられない', true, sqlerrm);  -- 拒否の主体は先に動くトリガ（RLS の WITH CHECK は INSERT のシナリオ 75 で固定）
   end;
+  set local role postgres;  -- トリガの検査は所有者の立場で確かめる
   begin
     update job_applications set company_id = 'cc000000-0000-0000-0000-000000000022' where id = 'a1000000-0000-0000-0000-00000000000a';
     insert into t_rls_results values (78, 'A社管理者は自社の応募をB社名義に付け替えられない', false, '付け替えられてしまった');
   exception when others then insert into t_rls_results values (78, 'A社管理者は自社の応募をB社名義に付け替えられない', true, sqlerrm);  -- 拒否の主体は先に動くトリガ（RLS の WITH CHECK は INSERT のシナリオ 75 で固定）
+  end; end $$;
+reset role;
+
+-- ── シナリオ 79〜86: セキュリティ監査 SEC-001 / SEC-002（権限）──
+reset role;
+-- 79: 新しい6表に TRUNCATE / REFERENCES / TRIGGER の権限を anon・authenticated に与えない（全テナントの一括消去を防ぐ）
+insert into t_rls_results select 79, '新テーブルの TRUNCATE・REFERENCES・TRIGGER 権限は anon/authenticated に無い',
+  count(*) = 0, string_agg(r || ':' || t || ':' || p, ', ')
+  from (select r, t, p from unnest(array['anon','authenticated']) r,
+        unnest(array['groups','persons','job_roles','jobs','job_shifts','job_applications']) t,
+        unnest(array['TRUNCATE','REFERENCES','TRIGGER']) p
+        where has_table_privilege(r, 'public.' || t, p)) x;
+-- 80: 応募テーブルは RPC 経由でしか書けない（anon・authenticated の INSERT/UPDATE/DELETE 権限が無い）。読み取りは RLS の下で可能
+insert into t_rls_results select 80, '応募テーブルへの直接の INSERT/UPDATE/DELETE 権限は anon/authenticated に無い',
+  count(*) = 0, string_agg(r || ':' || p, ', ')
+  from (select r, p from unnest(array['anon','authenticated']) r, unnest(array['INSERT','UPDATE','DELETE']) p
+        where has_table_privilege(r, 'public.job_applications', p)) x;
+insert into t_rls_results select 81, '応募テーブルの SELECT は authenticated に残る（RLS で会社内に限る）',
+  has_table_privilege('authenticated', 'public.job_applications', 'SELECT'), 'SELECT 権限';
+-- 82: 実際に TRUNCATE を試みると拒否される
+set role authenticated;
+set request.jwt.claim.sub = '0c000000-0000-0000-0000-000000000011';
+do $$ begin
+  begin
+    truncate public.persons cascade;
+    insert into t_rls_results values (82, 'authenticated は persons を TRUNCATE できない', false, 'TRUNCATE できてしまった');
+  exception when insufficient_privilege then insert into t_rls_results values (82, 'authenticated は persons を TRUNCATE できない', true, sqlerrm);
+  end; end $$;
+-- 83: 実際に応募を直接書き換えようとすると拒否される（同意なしのスタッフを確定にする攻撃）
+do $$ begin
+  begin
+    update public.job_applications set status = 'confirmed', decided_by = 'CEO' where id = 'a1000000-0000-0000-0000-00000000000a';
+    insert into t_rls_results values (83, 'A社管理者は応募を直接 confirmed に書き換えられない', false, '書き換えられてしまった');
+  exception when insufficient_privilege then insert into t_rls_results values (83, 'A社管理者は応募を直接 confirmed に書き換えられない', true, sqlerrm);
+  end; end $$;
+reset role;
+set role anon;
+do $$ begin
+  begin
+    truncate public.jobs cascade;
+    insert into t_rls_results values (84, 'anon は jobs を TRUNCATE できない', false, 'TRUNCATE できてしまった');
+  exception when insufficient_privilege then insert into t_rls_results values (84, 'anon は jobs を TRUNCATE できない', true, sqlerrm);
   end; end $$;
 reset role;
 
