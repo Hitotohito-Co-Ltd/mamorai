@@ -327,7 +327,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 # 追補 v2.0 — Sprint 8〜10: 人材基盤（スタッフ台帳・案件・応募・更新手続き）
 
-**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** v2.23。審査の履歴: v2.5=96点 APPROVED、v2.6=78点、v2.8=70点、v2.11=71点（いずれも是正済み）、v2.19=86点 APPROVED。v2.21=84点、v2.22=87点 APPROVED。v2.23 は v2.22 審査の指摘の是正（未審査）。RYUGEN は Sprint 8 の『正規ルート』を選択。RYUGEN が確認済みなのは v2.7 の再承認、OQ-15、OQ-12 の一部（同意の取得主体はホールディングス、アプリで取得、同意なしは全案件で応募不可）、OQ-20（6点の承認）、OQ-21（推奨案の採用。途中で切れていた入力を『推奨案をお願いします』と解釈したが、RYUGEN が再確認して確定）、Sprint 8 の Adversary 3回 FAIL 後の『直して続行』。OQ-12a/b/c が残るため REQ-035b の同意の画面は着手しない
+**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** v2.25。審査の履歴: v2.5=96点 APPROVED、v2.6=78点、v2.8=70点、v2.11=71点（いずれも是正済み）、v2.19=86点 APPROVED。v2.21=84点、v2.22=87点 APPROVED。v2.23〜v2.24 は 91点 APPROVED（Spec-Validator）。v2.25 は v2.24 審査の指摘の是正（未審査）。RYUGEN は Sprint 8 の『正規ルート』を選択。RYUGEN が確認済みなのは v2.7 の再承認、OQ-15、OQ-12 の一部（同意の取得主体はホールディングス、アプリで取得、同意なしは全案件で応募不可）、OQ-20（6点の承認）、OQ-21（推奨案の採用。途中で切れていた入力を『推奨案をお願いします』と解釈したが、RYUGEN が再確認して確定）、Sprint 8 の Adversary 3回 FAIL 後の『直して続行』。OQ-12a/b/c が残るため REQ-035b の同意の画面は着手しない
 **参照:** 「MAMOR-AI 人材プラットフォーム構想」「MAMOR-AI 構成案・設計書（2026年11月版）」「UIデザイン案」「帳票一覧」
 **目的:** 複数のExcelと紙の管理を、MAMOR-AI 1つに置き換える。第一弾の対象は 有休申請・労働条件・更新手続き・現任申込・配置入力・スタッフ台帳・採用・案件・配置・シフト。
 
@@ -447,7 +447,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **計測要件:** `job_list_viewed`（発火: 一覧の取得が成功し描画が完了した時に 1 回）/ プロパティ: item_count, `job_applied`（発火: 応募 API が受理を返した直後に 1 回）/ 失敗: `job_apply_failed`(error_code)。
 
 ### REQ-039: 応募から確定、労働条件通知
-**EARS:** WHEN 配置の決め方が「応募→採否」の案件で、許可表で採否を許可された役割が採用する、または「即確定」の案件に応募が成立する THE システム SHALL 応募を確定にし、労働条件通知書を発行して通知時刻を記録する。WHEN 本人が労働条件通知を確認した THE システム SHALL 確認時刻を記録する。WHEN 応募を作る・確定する・取り消す THE システム SHALL RPC 経由に限り、会社の管理者による `job_applications` への直接の insert/update/delete を権限で禁止する（既知のリスク KR-1 の解消。同意なし・定員超過・時間の重なり・決定者の偽装を RPC で検査する）。
+**EARS:** WHEN 配置の決め方が「応募→採否」の案件で、許可表で採否を許可された役割が採用する、または「即確定」の案件に応募が成立する THE システム SHALL 応募を確定にし、労働条件通知書を発行して通知時刻を記録する。WHEN 本人が労働条件通知を確認した THE システム SHALL 確認時刻を記録する。WHEN 応募を作る・確定する・取り消す THE システム SHALL RPC 経由で行い、同意なし・定員超過・時間の重なり・決定者の偽装を RPC の内部で検査する（直接の insert/update/delete の権限は 0419 で取り消し済み。既知のリスク KR-1 の解消）。
 **Verification Type:** HAPPY_PATH / DATA_PERSISTENCE　**リスク:** HIGH（応募成立で労働契約が成立する）　**依存:** REQ-037, REQ-040　**Sprint:** 9
 **変更対象:** server/routes/applications.ts（新規）, supabase/migrations（確定の RPC）, packages/input-core/src/talent/eligibility.ts
 **計測要件:** `application_confirmed`（発火: 確定の DB 更新が成功した直後に 1 回）/ プロパティ: placement_mode, `conditions_notice_issued`（発火: 通知書の発行記録が保存された直後に 1 回）/ 失敗: `application_confirm_failed`(error_code)。
@@ -523,7 +523,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **変更対象:** packages/input-core/src/talent/eligibility.ts（shiftsOverlap）, supabase/migrations（確定の RPC での排他）
 
 ## 既知のリスク（Sprint 9 の REQ-039/040 で解消するまで、機能として公開しない）
-- **KR-1 応募テーブルの直接書き込み（直接の INSERT/UPDATE/DELETE 権限は 0419 で取り消し済み。応募の RPC は Sprint 9 の REQ-039 で提供するまで書き込み手段が無い）:** 会社の管理者が `job_applications` に直接 confirmed の行を作れる（同意なし・定員超過・時間の重なり・決定者の偽装を DB が止めない）。確定済みの応募を直接 DELETE することもでき、その直後に案件を削除できる（削除ガードは応募が存在する間だけ有効）。Sprint 9 で応募・確定を RPC 経由に限り、直接の insert/update の権限を外す。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
+- **KR-1 応募テーブルの直接書き込み（0419 で解消済み。残るのは Sprint 9 の RPC の提供）:** 会社の管理者・anon・authenticated による `job_applications` への直接の INSERT/UPDATE/DELETE の権限は 0419 で取り消した。応募の作成・確定・取消の書き込み手段は現在どこにも無い。Sprint 9 の REQ-039 で RPC を提供し、同意・定員・時間の重なり・決定者を RPC の内部で検査する。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
 - **KR-4 TRUNCATE 権限（人材基盤の新6テーブルは 0419 で解消済み。既存のテーブルは対象外）:** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE・TRIGGER・REFERENCES 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
 - **KR-2 マイグレーションの再適用:** 0410 を 0413 の後に単独で再実行すると、強化した関数・ポリシーが旧版に戻る。マイグレーションは番号順に 1 回ずつ適用する前提（ランナーの手順書に明記）。
 - **KR-5 候補検索と個人情報の範囲:** `search_candidates` は、company_admin に限らず company_manager など会社に属する認証ユーザーなら呼べる。会社内の別現場の人の生年月日・電話・メールも `persons` から読める（既存の leave_requests などと同じく、会社全体を指す設計）。ロールごとの制限は Sprint 9 の REQ-040 で決める。
@@ -560,12 +560,15 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - WHEN 警備の枠が派遣で作られる、または派遣の案件に職種がない THE システム SHALL DB でも拒否する。派遣の案件は職種の指定を必須とする（REQ-027）。
 - WHEN 応募が存在する案件またはシフトを削除しようとする THE システム SHALL DB で拒否する（応募の成立は労働契約の成立を伴うため、記録を連鎖して消さない。案件は状態を closed にして終了する）（REQ-037・REQ-039）。
 - WHEN 案件の雇用日数（`employment_days`）、時給（`hourly_wage`）、請求単価（`billing_rate`）を保存する THE システム SHALL DB で 0 未満を拒否し、派遣の案件では雇用日数を必須とする（TS の `invalid_input` と同じ基準。REQ-037）。
+- WHEN `staff` に `person_id` を保存する THE システム SHALL 雇用先の会社と人が同じグループに属していなければ DB で拒否する（会社の group_id が未設定の場合も拒否。`person_id` が NULL の雇用は検査しない。他グループの人の個人情報を引く経路の防止。0420、REQ-035）。
+- WHEN 人材基盤の新テーブル（groups, persons, job_roles, jobs, job_shifts, job_applications）が作られる THE システム SHALL anon と authenticated から TRUNCATE・REFERENCES・TRIGGER の権限を取り消し、`job_applications` は INSERT・UPDATE・DELETE の権限も取り消す（0419。全テナントの一括消去と応募の偽装の防止、REQ-035・REQ-039）。
 - WHEN 案件・シフトが現場（site_id）または勤務枠（slot_id）を指す THE システム SHALL 案件と同じ会社のものだけを許可する（REQ-037）。
 - WHEN 案件が『夜間勤務を含む』かを判定する THE システム SHALL 案件の `nightWork` が true であるか、いずれかのシフトが 22:00〜翌 05:00 にかかる（開始が 05:00 より前、または終了が 22:00 より後、または日をまたぐ）場合に、夜間勤務を含むとする。`nightWork` が false でもシフト時刻が夜間にかかれば夜間勤務を含む（REQ-030）。
 - WHEN `guardTraining.annualFiscalYears` が配列でない（欠落を含む）THE システム SHALL `checkEligibility` で `invalid_input` とし、`listRenewals` ではその人を一覧全体の例外にせず `annual_training` の invalid 項目で返す（REQ-033）。
 - WHEN 線引き確認が必要な案件を保存する THE システム SHALL 状態が published または filled のいずれの場合も、確認者と確認日の記録がなければ DB で拒否する（draft は保存できる。REQ-034）。
 - WHEN 確認者の『空白』を判定する THE システム SHALL ASCII の空白に加え、Unicode の空白（U+00A0、U+1680、U+2000〜U+200A、U+2028、U+2029、U+202F、U+205F、U+3000）とゼロ幅文字（U+200B〜U+200D、U+2060、U+FEFF）を空白として扱い、TS と DB で同じ集合にする（REQ-034）。
 - WHEN 案件にシフトが 1 件もない THE システム SHALL `checkEligibility` で `no_shifts` により応募を拒否し、`validateJobForPublish` で公開を拒否する（REQ-026・REQ-037）。
+- WHEN `listRenewals` の人が null、または `PersonProfile` の形でない（`employments` が配列でない、`guardTraining` が欠落している等）THE システム SHALL `TypeError` を投げる（個人を特定できず invalid 項目にできないため。呼び出し側の契約違反として一覧全体を失敗させる。個人を特定できる範囲の不正な値は、後述の invalid 項目で返す。REQ-033）。
 - WHEN `listRenewals` の入力の期限日（契約満了日・在留期限）または雇用の入社日・退社日が不正 THE システム SHALL その項目を一覧から消さず、`urgency: 'invalid'`・`daysLeft: null` の項目として先頭に返す（法令上の期限の見落としを防ぐため）。invalid 項目の `kind` と `dueOn` は、契約満了日が不正なら `contract`・入力された値、在留期限が不正なら `residence`・入力された値。雇用の入社日・退社日が不正でその雇用の在籍を判定できない場合は、その雇用に契約満了日があれば `contract`（`dueOn` は契約満了日）の invalid 項目を返す（他の有効な雇用の契約満了日は通常どおり判定する）。現任教育は、入社日・退社日が不正な雇用が 1 件でもある人が今年度未達なら `annual_training`（`dueOn` は年度末）の invalid 項目を返す。invalid 項目同士は `personId` のコードポイント順、同じ `personId` では `contract`、`annual_training`、`residence` の順に並べる。基準日が不正なときは `RangeError` を投げる（REQ-033）。契約満了日が空文字または null の場合も不正として invalid 項目にする（キーが無い＝undefined の場合だけ対象外）。新任教育の修了日が不正な人は、`annual_training` の invalid 項目（`dueOn` は年度末）を返す。`RenewalItem.urgency` に `'invalid'` を、`daysLeft` に `null` を加える。
 - WHEN `listRenewals` が「在籍中」を判定する THE システム SHALL 「入社日が基準日以前、かつ退社日がない、または退社日が基準日以後」の雇用を在籍中とする。契約満了と現任教育（在籍中の雇用が 1 件以上必要）の両方がこの定義を使う。現任教育は、新任教育の修了日が基準日より後の人（基準日時点で未修了）も対象外とする（REQ-033）。
 - WHEN 日雇派遣（30 日以内）に例外区分で応募する THE システム SHALL 確認日 `verifiedOn` が暦に存在する `YYYY-MM-DD` の日付（`2026-13-45` などは不可）で、かつシフト日以前であり、区分が `age60` の場合は本人がシフト日に満 60 歳以上である場合に限り例外を認め、満たさなければ `dispatch_exception_invalid` で拒否する。複数のシフト日があるときは、すべてのシフト日でこの条件を満たすこと（REQ-029）。
@@ -619,6 +622,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.22: Spec-Validator v2.21 審査 CONDITIONAL 84点(−16)の是正。ヘッダ、REQ-034 を 034a/034b に分割（034b は要否変更の権限で Sprint 9）、要否の変更は true・false いずれも本社のみ、人に対する範囲（自現場の人・自支店の人・自社の応募者）の判定材料、OQ-22（候補検索の個人情報）の起票、契約の Bead と見出し、invalid_input の列挙に annualFiscalYears を追加。
 - 2026-11-08 v2.23: Spec-Validator v2.22 審査 APPROVED 87点(−13)の是正。REQ-034 の属性(Sprint・依存・変更対象)を 034a/034b に分け、孤立していた『確認者は現場責任者または支店とする』を 034b の EARS に、034b のテスト観点、REQ-037/040 の依存を 034a に書き分け、契約の Bead に REQ-028。RYUGEN は正規ルートを選択(evidence/sprint-8-gate-applicability.md)。
 - 2026-11-08 v2.24: セキュリティ監査(Critical0・High2・Medium11・Low4)と Adversary 第7回 PASS(Critical0・High0)を受けて確定。invalid_input に型(consentJointUse・workAllowed が boolean)と件数の上限(シフト366・他の勤務1,000)を追加。DB は 0419(権限の取り消し)・0420(雇用先の会社と人のグループの一致)を追加。
+- 2026-11-08 v2.25: Spec-Validator v2.24 審査 APPROVED 91点(−9)の是正。ヘッダ、契約に 0419/0420 の WHEN 文、KR-1 と REQ-039 の整合(解消済みと Sprint 9 の RPC)、listRenewals の null の扱い(TypeError)。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
