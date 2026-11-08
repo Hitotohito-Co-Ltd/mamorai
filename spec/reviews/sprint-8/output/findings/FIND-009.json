@@ -1,0 +1,15 @@
+{
+  "id": "FIND-009",
+  "severity": "LOW",
+  "dimension": "D4 Structural Integrity",
+  "file": "packages/input-core/src/talent/renewal.ts",
+  "lines": "92-100",
+  "evidence": {
+    "filePath": "packages/input-core/src/talent/renewal.ts",
+    "lineRange": "92-100",
+    "snippet": "const rank = { invalid: -1, expired: 0, soon: 1, ok: 2 } as const  // filter((i) => i.urgency !== 'ok') の後で sort",
+    "reproduction": "変異テストで生存した同値変異から判明した冗長コード: (1) 'ok' は直前の filter で除かれるので rank.ok は到達不能、(2) expired/soon の rank は daysLeft の符号と重複(expired=0,soon=1 を同値にしても全テスト PASS)、(3) KIND_RANK.residence の値は大小比較にしか使われず任意。さらに app_company_has_person は 0418 で policy から使われなくなったが EXECUTE 付きで残る(0418 のコメント『他で使われる可能性』。参照元なし)、BusyShift.companyId は判定に使われない。"
+  },
+  "expected": "不要な rank を整理し、未使用の DB 関数は Sprint 9 の参照元が決まるまで公開しない(または削除)。",
+  "routeToPhase": "Phase 2b-r (Refactor)"
+}

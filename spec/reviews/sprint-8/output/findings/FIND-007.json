@@ -1,0 +1,15 @@
+{
+  "id": "FIND-007",
+  "severity": "LOW",
+  "dimension": "D3 Implementation Correctness",
+  "file": "packages/input-core/src/talent/renewal.ts",
+  "lines": "19-22",
+  "evidence": {
+    "filePath": "packages/input-core/src/talent/renewal.ts",
+    "lineRange": "19-22",
+    "snippet": "function utcDay(d) { const [y, m, dd] = d.split('-').map(Number); return Date.UTC(y!, m! - 1, dd!) }  // eligibility.ts の utcMs は『Date.UTC は 0〜99 年を 1900 年代に読み替える』ため setUTCFullYear を使う",
+    "reproduction": "isRealDate は '0099-12-31' を有効とする(v2.21)が、listRenewals の daysLeft は Date.UTC で計算するため 0〜99 年がずれる。実測(probe2.test.ts): 契約満了日 '1998-12-31' と '0099-12-31'、基準日 2026-01-01 -> 返却順 a(1998, daysLeft -9863) の次に b(0099, daysLeft -9498)。正しい daysLeft は b が約 -709000 で b が先頭のはず。urgency は expired のまま(符号は正しい)。変異 `Date.UTC(y!, ...)` の `!` 以外は検出されるが、0〜99 年の daysLeft を固定するテストが無い。入力の典型は『0026-03-31』のような年の入力ミス。"
+  },
+  "expected": "renewal.ts も eligibility.ts と同じ日付計算(0〜99 年を正しく扱う)を使うか、共通化する。0〜99 年の daysLeft を固定するテストを追加する。",
+  "routeToPhase": "Phase 2b (Generator)"
+}

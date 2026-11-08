@@ -1,0 +1,143 @@
+{
+  "sprint": 8,
+  "evaluator": "⑫ Adversary 鵜飼 玄(第7回, Fresh Context)",
+  "evaluatedAt": "2026-11-08",
+  "scope": "REQ-026〜033, 034a, 035a, インターフェース契約(境界の確定を含む), KR-1〜5(記述と実態の照合のみ), NFR-05。034b/035b/036以降と OQ-12a/b/c, OQ-16〜22 は対象外。",
+  "verdictRule": "Critical または High が 1 件でもあれば FAIL、Medium と Low のみなら PASS(Medium は次スプリントへ登録)。各次元の PASS/FAIL も同じ基準(次元内に Critical/High があれば FAIL)。",
+  "dimensions": {
+    "D1_SpecFidelity": {
+      "result": "PASS",
+      "note": "Critical/High なし。Medium 1 件 FIND-005(REQ-034a の応募の DB 拒否が KR-1 の列挙に無い)、Low 1 件(FIND-010 計測要件)。",
+      "findings": [
+        "FIND-005",
+        "FIND-010"
+      ]
+    },
+    "D2_EdgeCaseCoverage": {
+      "result": "PASS",
+      "note": "境界値(18歳・60/61日・8時間・3/31-4/1・30/31日)・不正入力・空データを TS 574 件と変異 461 件で確認。Low 1 件 FIND-008。",
+      "findings": [
+        "FIND-008"
+      ]
+    },
+    "D3_ImplementationCorrectness": {
+      "result": "PASS",
+      "note": "仕様の REQ を破る実装の穴は再現できず。DB は越境・権限昇格・情報漏えいの攻撃シナリオ(約 60 本)を全て防いだ。Low 1 件 FIND-007(renewal.ts の 0〜99 年)。",
+      "findings": [
+        "FIND-007"
+      ]
+    },
+    "D4_StructuralIntegrity": {
+      "result": "PASS",
+      "note": "追加のみ方針は守られている(既存ファイルの変更は index.ts への export 追加、vitest.config の coverage 対象追加、pipeline-state、spec のみ)。Low 1 件 FIND-009(冗長コード)。",
+      "findings": [
+        "FIND-009"
+      ]
+    },
+    "D5_VerificationReadiness": {
+      "result": "PASS",
+      "note": "High 以上なし。TS テストの変異耐性は高い(461 変異中、同値を除く生存は 1 件: FIND-004)。DB テストは変異 110 件中 41 件が生存し、同値・重複防御を除いた実質の穴を Medium 3 件(FIND-001/002/003)と Low 2 件(FIND-006/010)で登録。次スプリントへ登録。",
+      "findings": [
+        "FIND-001",
+        "FIND-002",
+        "FIND-003",
+        "FIND-004",
+        "FIND-006",
+        "FIND-010"
+      ]
+    },
+    "D6_AIOutputQuality": {
+      "result": "N/A",
+      "note": "LLM 機能なし(packages/input-core/src/talent と migrations 0410-0418 に LLM 呼出しなし)。",
+      "findings": []
+    }
+  },
+  "verdict": "PASS",
+  "findingCounts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 5,
+    "LOW": 5
+  },
+  "findings": [
+    {
+      "id": "FIND-001",
+      "severity": "MEDIUM",
+      "dimension": "D5 Verification Readiness",
+      "file": "supabase/tests/talent_rls_check.sql",
+      "lines": "252-262"
+    },
+    {
+      "id": "FIND-002",
+      "severity": "MEDIUM",
+      "dimension": "D5 Verification Readiness",
+      "file": "supabase/migrations/0417_talent_boundary_status_space.sql",
+      "lines": "22-24"
+    },
+    {
+      "id": "FIND-003",
+      "severity": "MEDIUM",
+      "dimension": "D5 Verification Readiness",
+      "file": "supabase/migrations/0418_talent_persons_rls_perf.sql",
+      "lines": "8-19"
+    },
+    {
+      "id": "FIND-004",
+      "severity": "MEDIUM",
+      "dimension": "D5 Verification Readiness",
+      "file": "packages/input-core/src/talent/eligibility.ts",
+      "lines": "186"
+    },
+    {
+      "id": "FIND-005",
+      "severity": "MEDIUM",
+      "dimension": "D1 Spec Fidelity",
+      "file": "supabase/migrations/0412_talent_hardening.sql",
+      "lines": "61-89"
+    },
+    {
+      "id": "FIND-006",
+      "severity": "LOW",
+      "dimension": "D5 Verification Readiness",
+      "file": "supabase/migrations/0410_talent_foundation.sql",
+      "lines": "21-55"
+    },
+    {
+      "id": "FIND-007",
+      "severity": "LOW",
+      "dimension": "D3 Implementation Correctness",
+      "file": "packages/input-core/src/talent/renewal.ts",
+      "lines": "19-22"
+    },
+    {
+      "id": "FIND-008",
+      "severity": "LOW",
+      "dimension": "D2 Edge Case Coverage",
+      "file": "packages/input-core/src/talent/renewal.ts",
+      "lines": "66-67"
+    },
+    {
+      "id": "FIND-009",
+      "severity": "LOW",
+      "dimension": "D4 Structural Integrity",
+      "file": "packages/input-core/src/talent/renewal.ts",
+      "lines": "92-100"
+    },
+    {
+      "id": "FIND-010",
+      "severity": "LOW",
+      "dimension": "D5 Verification Readiness",
+      "file": "spec/tests/sprint-8/MANIFEST.md",
+      "lines": "5,126,175"
+    }
+  ],
+  "carryOverToNextSprint": [
+    "FIND-001",
+    "FIND-002",
+    "FIND-003",
+    "FIND-004",
+    "FIND-005"
+  ],
+  "searchLog": "searchLog.md",
+  "contextAttestation": "builder(⑧⑨⑩)の会話・過去の Adversary 評価は参照していない。入力はディスク上の成果物のみ(spec/behavioral-spec.md 追補、packages/input-core/src/talent、supabase/migrations 0410-0418、テスト、spec/evidence、MANIFEST)。spec/security-report.md は評価の途中で出現したため、DB 攻撃・変異は自分で先に実行し、同報告の内容には結論を依存させていない。リポジトリの編集は spec/reviews/sprint-8/output/ 配下のみ。"
+}

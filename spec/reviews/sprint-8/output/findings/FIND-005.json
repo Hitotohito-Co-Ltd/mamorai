@@ -1,0 +1,15 @@
+{
+  "id": "FIND-005",
+  "severity": "MEDIUM",
+  "dimension": "D1 Spec Fidelity",
+  "file": "supabase/migrations/0412_talent_hardening.sql",
+  "lines": "61-89",
+  "evidence": {
+    "filePath": "supabase/migrations/0412_talent_hardening.sql",
+    "lineRange": "61-89",
+    "snippet": "create trigger trg_job_applications_guard_company before insert or update on public.job_applications ... (応募トリガは会社の一致だけを検査し、案件の状態・線引き確認の記録を見ない)",
+    "reproduction": "REQ-034a は『記録がない案件の公開と応募の拒否(TS と DB、published・filled を含む)』と定める。DB では案件の保存(公開・filled)しか止めず、応募は止めない。実測(attack3.sql): A社管理者が needs_boundary_check=true・記録なしの draft 案件に shift を作り、confirmed の応募を INSERT -> 'INSERT 0 1' で成功。同案件を closed にしても別スタッフの confirmed 応募を INSERT できた。KR-1 は『直接 confirmed の行を作れる(同意なし・定員超過・時間の重なり・決定者の偽装)』と述べるが、線引き未確認・draft/closed の案件への応募は列挙されていない(KR の記述と実態の差)。Sprint 9 の RPC 化で解消する性質だが、REQ-034a を『実装済み』とする台帳と食い違う。"
+  },
+  "expected": "いずれかを行う: (a) 仕様 REQ-034a/KR-1 に『応募の DB 拒否は Sprint 9 の応募 RPC で実装。それまで直接 INSERT は線引き未確認の案件にも通る』と明記し台帳の状態を直す、(b) job_applications に案件の状態と記録を検査するトリガを足してテストする。",
+  "routeToPhase": "Phase 1a (Planner: 仕様の範囲/KR-1 の明記)"
+}

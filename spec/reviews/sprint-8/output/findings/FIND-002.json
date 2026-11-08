@@ -1,0 +1,15 @@
+{
+  "id": "FIND-002",
+  "severity": "MEDIUM",
+  "dimension": "D5 Verification Readiness",
+  "file": "supabase/migrations/0417_talent_boundary_status_space.sql",
+  "lines": "22-24",
+  "evidence": {
+    "filePath": "supabase/migrations/0417_talent_boundary_status_space.sql",
+    "lineRange": "22-24",
+    "snippet": "if coalesce(v_sec, false) and new.form = 'dispatch' then raise exception '警備業務は派遣にできません…'",
+    "reproduction": "変異: この条件に `and tg_op = 'INSERT'` を足す(UPDATE 経路での 警備×派遣 禁止を無効化)。run_talent_rls_check.sh 相当の結果: 78 行すべて PASS で SURVIVED。DB テストの UPDATE 系は #19(role_id を null にして dispatch へ)・#52(draft の公開)・#53(職種を他グループへ)のみで、『既存の警備職種の案件の form を dispatch に更新』『派遣案件の職種を警備職種に更新』が無い。本物では拒否される(attack2.sql: 警備×派遣への UPDATE は '警備業務は派遣にできません' で拒否)ため欠陥ではなく検証の穴。"
+  },
+  "expected": "REQ-027 のテスト観点『トリガは insert と update の両方』を満たすため、UPDATE で form を dispatch にする / role_id を警備職種にする、の 2 経路を DB テストに追加する。",
+  "routeToPhase": "Phase 1a (Planner) -> 2a"
+}

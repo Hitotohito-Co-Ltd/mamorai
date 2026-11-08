@@ -1,0 +1,15 @@
+{
+  "id": "FIND-008",
+  "severity": "LOW",
+  "dimension": "D2 Edge Case Coverage",
+  "file": "packages/input-core/src/talent/renewal.ts",
+  "lines": "66-67",
+  "evidence": {
+    "filePath": "packages/input-core/src/talent/renewal.ts",
+    "lineRange": "66-67",
+    "snippet": "if (!isRealDate(e.contractEndOn) || empInvalid(e)) out.push(invalidItem(p.personId, 'contract', e.contractEndOn))  // 在籍判定(isActive)より前に評価される",
+    "reproduction": "REQ-033『退社済みの雇用は契約満了の対象外』と『契約満了日が不正なら消さず invalid 項目』が重なる入力(退社済みの雇用に不正な契約満了日)の優先順位が仕様にも実装テストにも無い。実測: employments [{startOn:'2020-01-01', endOn:'2021-01-01', contractEndOn:'2021-13-40'}]、基準日 2026-11-08 -> invalid の contract 項目が先頭に返る(退社済みの人の不正な日付が一覧の先頭に出る)。s8 に退社済み×不正日付のケースは無い。"
+  },
+  "expected": "仕様に優先順位(退社済みなら対象外 / 不正は常に返す)を明記し、どちらかをテストで固定する。",
+  "routeToPhase": "Phase 1a (Planner)"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "FIND-001",
+  "severity": "MEDIUM",
+  "dimension": "D5 Verification Readiness",
+  "file": "supabase/tests/talent_rls_check.sql",
+  "lines": "252-262",
+  "evidence": {
+    "filePath": "supabase/tests/talent_rls_check.sql",
+    "lineRange": "252-262",
+    "snippet": "-- 15: 会社管理者は persons を作れない(登録は RPC 経由) / insert into persons(group_id, name) ...  (書込拒否の検証は persons の INSERT 1 件のみ)",
+    "reproduction": "最終状態への変異を 0418 の後に足して run_talent_rls_check.sh 相当を実行(scratch: sqlmut/rerun.py)。いずれも FAIL 行もエラーも出ず SURVIVED: (a) create policy on persons for update using(自社の person) with check(true) (会社管理者が同意フラグ・PII を書換) (b) persons の delete ポリシー追加 (c) staff の update ポリシー追加 (staff.person_id の付替え=他人の persons を自社の雇用として読む経路) (d) job_roles の insert/update ポリシー追加 (job_roles.is_security を false に書換えると REQ-027 の判定基盤が崩れる) (e) groups の insert ポリシー追加 (f) companies の update ポリシー追加。(f) は影響を実測: 変異状態で A社管理者が companies.group_id を別グループへ UPDATE すると search_candidates が別グループの『p5B』を返した(越境)。現状の本物の DB では全て拒否されることを攻撃で確認済み(attack1.sql)なので欠陥ではなく、回帰を検出できない検証の穴。"
+  },
+  "expected": "company 管理者による persons の UPDATE/DELETE、groups・job_roles の INSERT/UPDATE、companies.group_id の UPDATE、staff.person_id の UPDATE が拒否されること(REQ-035a の会社ごとの参照制限・REQ-027 の職種の信頼性)を、既存の『B社管理者は…更新できない』と同じ形のシナリオで検証する。",
+  "routeToPhase": "Phase 1a (Planner: テスト観点追加) -> 2a"
+}

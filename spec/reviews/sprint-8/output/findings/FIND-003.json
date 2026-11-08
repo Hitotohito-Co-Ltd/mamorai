@@ -1,0 +1,15 @@
+{
+  "id": "FIND-003",
+  "severity": "MEDIUM",
+  "dimension": "D5 Verification Readiness",
+  "file": "supabase/migrations/0418_talent_persons_rls_perf.sql",
+  "lines": "8-19",
+  "evidence": {
+    "filePath": "supabase/migrations/0418_talent_persons_rls_perf.sql",
+    "lineRange": "8-19",
+    "snippet": "create or replace function public.app_company_person_ids() returns setof uuid language sql stable security definer set search_path = public, pg_temp ... revoke all ... from public; revoke all ... from anon; grant execute ... to authenticated;",
+    "reproduction": "0418 の新関数 app_company_person_ids の属性を直接検証するシナリオが無い(関数名は talent_rls_check.sql に出現しない。#16/#43/#44/#45 は search_candidates と app_company_has_person のみ)。変異: (1) `revoke ... from anon` 削除 (2) `revoke ... from public` 削除(anon が PUBLIC 経由で EXECUTE) (3) `set search_path = public, pg_temp` 削除 -> 3 件とも SURVIVED。(SECURITY DEFINER 削除は #2 で検出される)。実害は今は無い(anon が呼ぶと空集合)が、0412/0413 で Adversary が繰り返し指摘した同種の検証が新関数だけ抜けている。runner のコメントは『マイグレーションの revoke を消しても検証が通ってしまう』を防ぐと述べているが 0418 には当てはまらない。"
+  },
+  "expected": "app_company_person_ids について #43/#44/#45 と同じ検証(anon の EXECUTE なし、SECURITY DEFINER、search_path 固定)を追加する。",
+  "routeToPhase": "Phase 1a (Planner) -> 2a"
+}

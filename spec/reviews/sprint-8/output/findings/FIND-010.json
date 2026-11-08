@@ -1,0 +1,15 @@
+{
+  "id": "FIND-010",
+  "severity": "LOW",
+  "dimension": "D5 Verification Readiness",
+  "file": "spec/tests/sprint-8/MANIFEST.md",
+  "lines": "5,126,175",
+  "evidence": {
+    "filePath": "spec/tests/sprint-8/MANIFEST.md",
+    "lineRange": "5,126,175",
+    "snippet": "仕様バージョン: behavioral-spec.md 追補 v2.21 ... | S8-035-DB | ...77シナリオ（本番と同じ連鎖 0000〜0413 で実行 ... | Vitest ユニットテスト（231 テスト）",
+    "reproduction": "ドキュメントと実態の食い違い: (1) MANIFEST は仕様 v2.21 を参照(現行 v2.23。REQ-034 の 034a/034b 分割が MANIFEST の REQ-034 節に反映されていない) (2) S8-035-DB 行が連鎖『0000〜0413』(実際は 0418 まで) (3) 『作成ファイル』の s8 件数 231(実測 573) (4) KR-4 は『新テーブルの権限を取り消す』が対策だが、TRUNCATE persons CASCADE の影響が既存表に及ぶことは書かれていない(実測 attack: authenticated で `truncate persons cascade` -> staff・shifts・staff_sites・jyoban_reports・jyoban_devices・jyoban_slot_staff・jyoban_push_subscriptions・jyoban_notifications・job_applications が連鎖で空に、staff 6 件 -> 0 件。security-report.md SEC-001 も同旨) (5) 計測要件(application_eligibility_checked 等 REQ-026/027/031/032/033 のイベント)は実装もテストもなく、台帳は『実装済み』のまま(発火点は Sprint 9 以降の API。台帳に注記が無い) (6) security-report.md の SEC-003/SEC-015 の場所『0418_talent_persons_rls_perf.sql:289-300』は実ファイル(19 行)に存在しない。"
+  },
+  "expected": "MANIFEST の版・連鎖・件数を現行に更新し、KR-4 に連鎖範囲を追記し、台帳に『計測要件は API 実装時(Sprint 9)』と注記し、security-report.md の行番号を直す。",
+  "routeToPhase": "Phase 1a (Planner) / ドキュメント"
+}

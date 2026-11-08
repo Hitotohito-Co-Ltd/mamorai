@@ -1,0 +1,15 @@
+{
+  "id": "FIND-004",
+  "severity": "MEDIUM",
+  "dimension": "D5 Verification Readiness",
+  "file": "packages/input-core/src/talent/eligibility.ts",
+  "lines": "186",
+  "evidence": {
+    "filePath": "packages/input-core/src/talent/eligibility.ts",
+    "lineRange": "186",
+    "snippet": "if (age < 18 && (job.isSecurityWork || job.nightWork || job.shifts.some(shiftIsNight))) reasons.add('under_age')",
+    "reproduction": "変異: `job.shifts.some(shiftIsNight)` を `shiftIsNight(s)`(夜間判定をシフト単位に)に変えても s8 574 件が全 PASS(SURVIVED, scratch: mut/ の mutate2.py 'age night this shift only')。実装の挙動(正): 誕生日が 2008-12-05 の人が、12/01 09:00-17:00 と 12/10 22:00-23:00 の 2 シフトの案件に応募 -> under_age で拒否(仕様『案件が夜間勤務を含む -> 各シフト日の満年齢が 18 歳未満の人を拒否』)。変異版は 12/01(17歳・昼)を通し eligible=true にする。MANIFEST の『REQ-030 年齢は各シフト日で判定』は nightWork=true または警備案件で固定されており、シフト時刻から導出した夜間かつ『昼のシフトの日に 17 歳・夜のシフトの日に 18 歳』の組合せが無い。"
+  },
+  "expected": "夜間勤務を含むかは案件単位(いずれかのシフトが 22:00-翌05:00 にかかる)で判定し、その案件の全シフト日で年齢を見る、という契約(『夜間勤務を含む』の WHEN 形)を固定するテストを追加する(昼シフト日に 17 歳・夜シフト日に 18 歳のケース)。",
+  "routeToPhase": "Phase 1a (Planner) -> 2a"
+}

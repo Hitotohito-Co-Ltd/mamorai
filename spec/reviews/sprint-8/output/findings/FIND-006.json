@@ -1,0 +1,15 @@
+{
+  "id": "FIND-006",
+  "severity": "LOW",
+  "dimension": "D5 Verification Readiness",
+  "file": "supabase/migrations/0410_talent_foundation.sql",
+  "lines": "21-55",
+  "evidence": {
+    "filePath": "supabase/migrations/0410_talent_foundation.sql",
+    "lineRange": "21-55",
+    "snippet": "consent_joint_use boolean not null default false / group_id uuid not null references public.groups(id) / check (form in ('security','dispatch','spot','referral')) / staff_left_after_hired / staff_employment_type_chk",
+    "reproduction": "SURVIVED になった変異(いずれも DB テスト 78 行が全 PASS): persons.consent_joint_use の既定を true に(OQ-12『既存スタッフの同意の初期値は なし』。CHECK persons_consent_needs_at が同時に効くため単独では挿入エラーになるが、検証ではなく偶然の防御)、persons.group_id を NULL 許容に(『人をグループで 1 件』)、jobs.form から 'referral' を除外(DB テストは referral の案件を一度も作らない)、placement_mode の CHECK を true に、unique(group_id,name) を unique(id) に、staff_left_after_hired / staff_employment_type_chk を check(true) に、jobs_employment_days_nonneg を `> 0` に(TS は employmentDays=0 の派遣を日雇派遣として有効とするが DB の 0 の境界は未検証)、jobs_guard の対象状態に 'closed' を足す(案件は closed にして終了する契約に反するが未検証)。"
+  },
+  "expected": "各制約の正例(境界値 0、referral、closed で記録なし)と負例を DB テストに加える。特に同意の既定値が false であること。",
+  "routeToPhase": "Phase 1a (Planner) -> 2a"
+}
