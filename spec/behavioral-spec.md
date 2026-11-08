@@ -523,8 +523,8 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 **変更対象:** packages/input-core/src/talent/eligibility.ts（shiftsOverlap）, supabase/migrations（確定の RPC での排他）
 
 ## 既知のリスク（Sprint 9 の REQ-039/040 で解消するまで、機能として公開しない）
-- **KR-1 応募テーブルの直接書き込み:** 会社の管理者が `job_applications` に直接 confirmed の行を作れる（同意なし・定員超過・時間の重なり・決定者の偽装を DB が止めない）。確定済みの応募を直接 DELETE することもでき、その直後に案件を削除できる（削除ガードは応募が存在する間だけ有効）。Sprint 9 で応募・確定を RPC 経由に限り、直接の insert/update の権限を外す。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
-- **KR-4 TRUNCATE 権限:** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE・TRIGGER・REFERENCES 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
+- **KR-1 応募テーブルの直接書き込み（直接の INSERT/UPDATE/DELETE 権限は 0419 で取り消し済み。応募の RPC は Sprint 9 の REQ-039 で提供するまで書き込み手段が無い）:** 会社の管理者が `job_applications` に直接 confirmed の行を作れる（同意なし・定員超過・時間の重なり・決定者の偽装を DB が止めない）。確定済みの応募を直接 DELETE することもでき、その直後に案件を削除できる（削除ガードは応募が存在する間だけ有効）。Sprint 9 で応募・確定を RPC 経由に限り、直接の insert/update の権限を外す。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
+- **KR-4 TRUNCATE 権限（人材基盤の新6テーブルは 0419 で解消済み。既存のテーブルは対象外）:** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE・TRIGGER・REFERENCES 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
 - **KR-2 マイグレーションの再適用:** 0410 を 0413 の後に単独で再実行すると、強化した関数・ポリシーが旧版に戻る。マイグレーションは番号順に 1 回ずつ適用する前提（ランナーの手順書に明記）。
 - **KR-5 候補検索と個人情報の範囲:** `search_candidates` は、company_admin に限らず company_manager など会社に属する認証ユーザーなら呼べる。会社内の別現場の人の生年月日・電話・メールも `persons` から読める（既存の leave_requests などと同じく、会社全体を指す設計）。ロールごとの制限は Sprint 9 の REQ-040 で決める。
 - **KR-3 警備フラグと職種:** 案件の警備判定は職種マスタの選択に依存する。契約の形が警備（`security`）でも、職種が非警備なら警備の年齢・教育の判定を受けない。非警備の職種を選べば警備の判定を回避できる（職種の選択の統制は OQ-21 と合わせて決める）。
@@ -551,7 +551,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - WHEN `listRenewals` が項目を並べる THE システム SHALL `dueOn` が基準日より前なら `expired`、`daysLeft` が 0 以上 `soonDays` 以下なら `soon` とし、`expired` を先頭に、`daysLeft` の小さい順、同日は `personId` のコードポイント順（ロケールに依存しない昇順。UTF-16 の並びではなく、サロゲートペアの文字を 1 つのコードポイントとして比較する）、それも同じなら `contract`、`annual_training`、`residence` の順で並べる。期限切れの項目の `daysLeft` は負の値（期限日が基準日の前日なら -1）とする。
 - WHEN 現任教育の更新手続きを作る THE システム SHALL `dueOn` を基準日の年度末（3 月 31 日）にする（REQ-033）。
 - WHEN シフトの終了時刻が開始時刻と同じ THE システム SHALL 24 時間勤務として扱い、翌日に終わる勤務の時間の重なりと通算に使う（REQ-031）。
-- WHEN `checkEligibility` または `validateJobForPublish` の入力に不正な値がある THE システム SHALL `invalid_input` で拒否し、応募可・公開可にしない。不正な値とは、次のいずれかである。①シフト日・生年月日・在留期限・新任教育の修了日（`basicDoneOn`。値がある場合）、他の勤務（`busy`）の日付、雇用の入社日・退社日が、暦に存在する `YYYY-MM-DD` でない ②シフトと他の勤務の開始・終了時刻が、`HH:MM`（00:00〜23:59）でない ③派遣案件の `employmentDays` が 0 以上の整数でない ④ `guardTraining.annualFiscalYears` が配列でない（欠落を含む。`listRenewals` での扱いは後述）（REQ-026・REQ-037）。雇用の退社日が空文字の場合も不正とする（退社していない場合は項目を持たない）。確認日（日雇派遣の例外の `verifiedOn`、線引き確認の `confirmedOn`）の不正は `invalid_input` にせず、それぞれ `dispatch_exception_invalid`、`boundary_not_confirmed` とする。
+- WHEN `checkEligibility` または `validateJobForPublish` の入力に不正な値がある THE システム SHALL `invalid_input` で拒否し、応募可・公開可にしない。不正な値とは、次のいずれかである。①シフト日・生年月日・在留期限・新任教育の修了日（`basicDoneOn`。値がある場合）、他の勤務（`busy`）の日付、雇用の入社日・退社日が、暦に存在する `YYYY-MM-DD` でない ②シフトと他の勤務の開始・終了時刻が、`HH:MM`（00:00〜23:59）でない ③派遣案件の `employmentDays` が 0 以上の整数でない ④ `guardTraining.annualFiscalYears` が配列でない（欠落を含む。`listRenewals` での扱いは後述）⑤ `consentJointUse` と `residence.workAllowed`（在留情報がある場合）が真偽値（boolean）でない（文字列の `"false"` や数値の 0 などを真として扱わない。SEC-007）⑥ 入力の件数が上限を超える（案件のシフトは 366 件、他の勤務（`busy`）は 1,000 件まで。重なりの判定が件数の積に比例するため、巨大な入力で処理を止められないようにする。SEC-004）（REQ-026・REQ-037）。雇用の退社日が空文字の場合も不正とする（退社していない場合は項目を持たない）。確認日（日雇派遣の例外の `verifiedOn`、線引き確認の `confirmedOn`）の不正は `invalid_input` にせず、それぞれ `dispatch_exception_invalid`、`boundary_not_confirmed` とする。
 - WHEN 日雇派遣の例外区分 `kind` が定義された区分（`age60` / `day_student` / `side_job` / `household_income`）以外 THE システム SHALL `dispatch_exception_invalid` で拒否する（REQ-029）。
 - WHEN 在留の判定で `residence_invalid` が 1 つでもある THE システム SHALL `residence_expiring` の警告を返さない（拒否と警告を同時に返さない。REQ-032）。
 - WHEN 労働時間を通算する THE システム SHALL 日をまたぐ勤務の全時間を、始業日の労働としてまとめて計上する（労働基準法の扱い。継続勤務が二暦日にわたる場合は始業時刻の属する日の労働。社労士の確認前提。REQ-031）。
@@ -618,6 +618,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-07 v2.21: Adversary Sprint 8 第6回 FAIL(Critical0・High1=中核3表の WITH CHECK の検証欠落・Medium5・Low3)を受けて確定。夜間勤務はシフト時刻から導出、annualFiscalYears の不正、状態が filled でも線引き確認を要求、空白の集合を TS と DB で揃える、KR-4 を TRUNCATE 以外の権限に広げる。
 - 2026-11-07 v2.22: Spec-Validator v2.21 審査 CONDITIONAL 84点(−16)の是正。ヘッダ、REQ-034 を 034a/034b に分割（034b は要否変更の権限で Sprint 9）、要否の変更は true・false いずれも本社のみ、人に対する範囲（自現場の人・自支店の人・自社の応募者）の判定材料、OQ-22（候補検索の個人情報）の起票、契約の Bead と見出し、invalid_input の列挙に annualFiscalYears を追加。
 - 2026-11-08 v2.23: Spec-Validator v2.22 審査 APPROVED 87点(−13)の是正。REQ-034 の属性(Sprint・依存・変更対象)を 034a/034b に分け、孤立していた『確認者は現場責任者または支店とする』を 034b の EARS に、034b のテスト観点、REQ-037/040 の依存を 034a に書き分け、契約の Bead に REQ-028。RYUGEN は正規ルートを選択(evidence/sprint-8-gate-applicability.md)。
+- 2026-11-08 v2.24: セキュリティ監査(Critical0・High2・Medium11・Low4)と Adversary 第7回 PASS(Critical0・High0)を受けて確定。invalid_input に型(consentJointUse・workAllowed が boolean)と件数の上限(シフト366・他の勤務1,000)を追加。DB は 0419(権限の取り消し)・0420(雇用先の会社と人のグループの一致)を追加。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
