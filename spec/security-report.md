@@ -3,6 +3,43 @@
 **監査者:** ⑪ Security Engineer 鍵山 剛　**再監査日:** 2026-11-08　**対象:** HEAD `3063bae`（初回監査は 9818be4 / 追補 v2.23）、spec/behavioral-spec.md 追補 v2.26（v2.25 の文面是正版）
 **対象物:** `packages/input-core/src/talent/{model,eligibility,renewal}.ts`、`supabase/migrations/0410〜0420`、`supabase/tests/{run_talent_rls_check.sh,talent_rls_check.sql}`、`package.json` の pnpm.overrides / `pnpm-lock.yaml`。初回監査の記述は第1〜7章に残し、再監査の結果は冒頭と第3A章・各 Finding の「再監査」行に追記した。
 
+## 第3回（差分再監査）の結論
+
+**監査者:** ⑪ Security Engineer 鍵山 剛　**日付:** 2026-11-08　**対象:** HEAD `6278a3e`（0421、仕様 v2.28、supabase/tests の 90 シナリオ）
+
+| Severity | 前回（open） | 第3回後（open） | 内訳 |
+|---|---|---|---|
+| Critical | 0 | **0** | — |
+| High | 1 | **0** | SEC-001 を closed |
+| Medium | 7 | **7** | SEC-003, 005, 006, 009, 010, 011, 014（変化なし） |
+| Low | 8 | **9** | SEC-013, 015〜021 + 新規 SEC-022 |
+
+**Gate 3（Critical 0 件 / High 0 件）: 合格。**
+
+**SEC-001: closed。** 是正を信用せず、使い捨て Postgres 16 に本番と同じ連鎖（0000, 0100, 0102, 0103, 0200〜0202, 0400〜0402, 0406〜0421。前に `alter default privileges ... grant all on tables/functions/sequences to anon, authenticated`。0421 は 2 回適用して冪等を確認）を適用して攻撃した。
+- 根拠1: public の 46 表で anon / authenticated / PUBLIC の TRUNCATE・REFERENCES・TRIGGER が 0 件（aclexplode で全リレーション、列権限、継承・パーティション、pg_default_acl まで確認）。
+- 根拠2（対照）: 0421 だけ外した同じ連鎖では `truncate shifts` / `truncate notices` と staff への `create trigger` が成功した。攻撃が現実に通ることを確認したうえで、0421 適用後に全て拒否された。
+
+実行した攻撃（anon / authenticated / app_client の 3 ロール × 46 表 × 15 種、約 2,070 回。成功した権限破壊は 0 件）:
+1. 前回の攻撃の再実行: `truncate shifts / leave_requests / daily_reports / jyoban_reports / notices / app_profiles / staff / companies / sites / persons / job_applications / jobs / groups ... cascade`（26 件全て permission denied）。
+2. TRIGGER 乗っ取り: staff への `create trigger`（pg_temp 関数、public 関数、constraint trigger）、`create rule`、`create policy`、`alter table ... disable trigger` はすべて拒否（permission denied / must be owner）。
+3. TRUNCATE の変種: `truncate only`、`cascade`、`restart identity cascade`、パーティションの子、継承子、ビュー・マテリアライズドビュー（「is not a table」）。
+4. 権限の付け直し: `grant truncate ... to authenticated`、`grant all ... to public`、`grant select ... with grant option` は非所有者のため「no privileges were granted」となり ACL は不変（実行後に ACL を再確認）。`grant authenticated to anon`、`alter role ... superuser`、`create extension`、`alter table ... owner to`、`disable/no force row level security` も拒否。
+5. REFERENCES: 既存表への FK 追加、`references` 付きテーブルの作成、継承テーブルの作成は拒否（public スキーマへの CREATE 権限が anon/authenticated に無い）。
+6. 後から作る物の既定の権限: テーブル・パーティション・継承子・ビュー・マテリアライズドビューは arwd のみ（TRUNCATE・TRIGGER・REFERENCES なし）。`alter default privileges` を authenticated が自分用に変えても他ロールに影響しない。シーケンスは rwU、関数は EXECUTE のまま（0421 の対象外。破壊的ではない）。
+7. 他のスキーマ: auth / extensions への truncate は拒否。SECURITY DEFINER 関数に search_path 未固定のものは 0 件。public のテーブルの所有者は全て postgres（46 表）。
+8. `SET ROLE` / `SET SESSION AUTHORIZATION postgres` は、検証セッションが superuser のため成功する。これは検証環境の都合で、本番のログインロールは非 superuser のため脆弱性ではない。
+
+**過剰な取り消しの確認:** SELECT/INSERT/UPDATE/DELETE の付与数は 0421 の有無で同一（作ったテスト表を除き 362 件）。pg_policy 87 件、app_client の付与 32 件も同一。`supabase/tests/run_talent_rls_check.sh` の 90 シナリオと `run_jyoban_rls_check.sh` は全て PASS。
+
+**前回 closed の回帰:** SEC-002（job_applications への直接書込は拒否のまま。90 シナリオの W 系が PASS）、SEC-004, 007, 008, 012 に変化なし（0421 は REVOKE のみで関数・テーブル定義・lockfile に触れない。差分は SQL 1 本と文書）。回帰なし。
+
+**open の Medium/Low:** 変化なし。SEC-018〜021 は仕様 KR-7、SEC-006 は KR-6 に登録済みを確認（behavioral-spec.md 529〜530 行）。KR-4 は解消済みに更新され、OQ-23 に決定が記録されている。
+
+**新規 Finding:** SEC-022（Low 3.1）。`alter default privileges` は実行ロール（postgres）の分だけで、別ロール（Supabase の supabase_admin など）が public にテーブルを作ると ALL が付く（再現済み）。0421 のコメントと KR-4 に運用手順としては書かれているが、検出手順が無い。通常のマイグレーションは postgres で動くため現状は発火しない。
+
+**公開前の必須条件（第3回後）:** SEC-001 は満たされた。残りは SEC-003, 005, 006, 009 の 4 項目（Medium）と、前回の運用条件（REQ-039 の RPC まで job_applications への書込機能を作らない／OQ-12a/b/c の確定まで REQ-035b と共同利用を始めない／REQ-040 の許可表を DB に反映するまで persons を画面に出さない）。加えて、本番適用時に 0419〜0421 の適用と `select defaclrole::regrole, defaclacl from pg_default_acl` の確認を手順に入れる（SEC-022）。
+
 ## 再監査の結論
 
 是正を信用せず、使い捨て Postgres 16 に本番と同じ連鎖（0000, 0100, 0102, 0103, 0200〜0202, 0400〜0402, 0406〜0420。Supabase の既定どおり、マイグレーションの前に `alter default privileges in schema public grant all on functions/tables/sequences to anon, authenticated` を設定）を適用し、初回と同じ攻撃を再実行したうえで、権限取消・トリガ・新関数を迂回する攻撃を約 130 件追加した（第3A章）。

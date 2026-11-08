@@ -1,0 +1,28 @@
+{
+  "id": "SEC-022",
+  "title": "既定の権限の取り消しは 0421 を実行するロールの分だけ（別ロールが public に作るテーブルには TRUNCATE・TRIGGER・REFERENCES が付く）",
+  "severity": "Low",
+  "cvss": {
+    "score": 3.1,
+    "vector": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:N/I:N/A:L",
+    "version": "3.1"
+  },
+  "owasp": "A05:2021 Security Misconfiguration",
+  "file": "supabase/migrations/0421_revoke_destructive_privileges.sql",
+  "lines": "28",
+  "related": [
+    "SEC-001",
+    "KR-4"
+  ],
+  "mustFixBeforePublish": false,
+  "evidence": {
+    "summary": "alter default privileges は for role を省略すると実行ロール（postgres）のみ。別ロールが既定の ALL を持つ状態で public にテーブルを作ると、anon/authenticated に arwdDxt が付く。通常のマイグレーションは postgres で動くため現状は発火しない。",
+    "reproduction": "create role supabase_admin_sim nologin; grant create on schema public to supabase_admin_sim; alter default privileges for role supabase_admin_sim in schema public grant all on tables to anon, authenticated; set role supabase_admin_sim; create table public.zz_sa(id int); -- => relacl に anon=arwdDxt, authenticated=arwdDxt"
+  },
+  "remediation": "リリース手順に `select defaclrole::regrole, defaclacl from pg_default_acl` の確認と、該当ロールごとの `alter default privileges for role <r> in schema public revoke truncate, references, trigger on tables from anon, authenticated` を入れる。CI に『public の全テーブルに anon/authenticated の TRUNCATE・REFERENCES・TRIGGER が無い』検査を追加する。",
+  "status": "open",
+  "sprint": 8,
+  "reporter": "⑪ Security Engineer（鍵山 剛）",
+  "date": "2026-11-08",
+  "discoveredIn": "re-audit 3 (HEAD 6278a3e)"
+}

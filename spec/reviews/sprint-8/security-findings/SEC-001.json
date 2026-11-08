@@ -19,7 +19,7 @@
     "reproduction": "-- 環境: Supabase 既定相当（alter default privileges ... grant all on tables to anon, authenticated）\nset role authenticated; set request.jwt.claim.sub='<A1社 company_admin>';\ntruncate job_applications;            -- => OK（RLS・0414 の削除ガードは TRUNCATE を見ない）\ntruncate persons cascade;             -- => OK。NOTICE: truncate cascades to table \"staff\",\"shifts\",\"staff_sites\",\"jyoban_reports\",\"jyoban_devices\",\"jyoban_slot_staff\",\"jyoban_push_subscriptions\",\"jyoban_notifications\",\"job_applications\"\nselect count(*) from persons;         -- => 0（staff も 0。他社 B1 の行も消えた）\n-- 修正の検証\nrevoke truncate, references, trigger on all tables in schema public from anon, authenticated;\ntruncate job_applications;            -- => ERR: permission denied for table job_applications\ntruncate persons cascade;             -- => ERR: permission denied for table persons"
   },
   "remediation": "マイグレーションに `revoke truncate, references, trigger on public.<新テーブル> from anon, authenticated;` を明記し、`alter default privileges in schema public revoke truncate, references, trigger on tables from anon, authenticated;` を運用手順に入れる。PostgREST 経由では実行できないため直接接続の経路（接続情報の配布先）も棚卸しする。新テーブルには `force row level security` も付ける。",
-  "status": "open",
+  "status": "closed",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
   "date": "2026-11-08",
@@ -32,5 +32,15 @@
     "basis": "新6表（groups, persons, job_roles, jobs, job_shifts, job_applications）は TRUNCATE・TRIGGER が拒否され、truncate persons/staff/companies/sites cascade も job_applications / jobs への権限不足で失敗（防げた）。しかし既存 40 表は anon/authenticated に TRUNCATE・TRIGGER・REFERENCES が残る。pg_default_acl も未変更。",
     "reproduction": "set role authenticated;  -- anon でも同じ\ntruncate shifts;          -- => OK（count=0）。leave_requests / daily_reports / jyoban_reports / notices / app_profiles も OK\ncreate trigger evil before insert on staff for each row execute function public.jobs_guard_delete();   -- => CREATE TRIGGER\ncreate function pg_temp.tf() returns trigger language plpgsql as $$ begin raise warning 'RUNS AS %', current_user; return new; end $$;\ncreate trigger evil_x before update on staff for each row execute function pg_temp.tf();\n-- 別セッション: B1 社管理者が select company_set_staff_phone('<staff>','09011112222');\n-- => WARNING: TRIGGER FN RUNS AS postgres (session_user postgres)",
     "remediation": "0421 で `revoke truncate, references, trigger on all tables in schema public from anon, authenticated, public;`（既存表を含む）と `alter default privileges in schema public revoke truncate, references, trigger on tables from anon, authenticated;` を追加。仕様 KR-4 の「既存のテーブルは対象外」を削除。"
+  },
+  "reaudit2": {
+    "date": "2026-11-08",
+    "auditor": "⑪ Security Engineer（鍵山 剛）",
+    "head": "6278a3e",
+    "result": "closed",
+    "basis": "0421 適用後、public の全46表（継承・パーティションの子を含む）で anon / authenticated / PUBLIC の TRUNCATE・REFERENCES・TRIGGER は 0 件（aclexplode で全リレーション、列権限、pg_default_acl も確認）。対照として 0421 だけ外した同じ連鎖では、authenticated の `truncate shifts` / `truncate notices` と staff への CREATE TRIGGER が成功した（攻撃の再現性を確認）。0421 適用後は anon / authenticated / app_client の 3 ロール × 46 表 × 15 種の攻撃（約2,070 回）で、権限を壊す操作の成功は 0 件。",
+    "attacks": "truncate / truncate only / cascade / restart identity cascade、create trigger（pg_temp 関数・constraint trigger）、create rule/policy、grant truncate / grant all to public / grant ... with grant option（非所有者は『no privileges were granted』で ACL 不変）、alter table disable RLS / no force RLS / owner to / disable trigger、FK 追加（REFERENCES）、継承テーブル作成、REFERENCES 付きテーブル作成、後から作るテーブル・パーティション・継承子・ビュー・マテリアライズドビュー・シーケンス・関数の既定権限、alter default privileges、grant role、alter role superuser、create extension、auth / extensions スキーマへの truncate、public への CREATE。",
+    "residual": "SEC-022（Low）: ALTER DEFAULT PRIVILEGES は 0421 を実行するロール（postgres）の分だけ。他ロール（Supabase の supabase_admin 等）が public に作るテーブルには ALL が付く。0421 のコメントと仕様 KR-4 に運用手順として記載済みだが、検出手順が無い。",
+    "regression": "talent_rls_check 90 シナリオ全 PASS、jyoban 検査全 PASS。SELECT/INSERT/UPDATE/DELETE の付与数は 0421 の有無で同一、pg_policy 87 件・app_client の付与 32 件も同一。"
   }
 }

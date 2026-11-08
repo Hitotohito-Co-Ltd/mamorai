@@ -524,7 +524,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 ## 既知のリスク（Sprint 9 の REQ-039/040 で解消するまで、機能として公開しない）
 - **KR-1 応募テーブルの直接書き込み（0419 で解消済み。残るのは Sprint 9 の RPC の提供）:** 会社の管理者・anon・authenticated による `job_applications` への直接の INSERT/UPDATE/DELETE の権限は 0419 で取り消した。応募の作成・確定・取消の書き込み手段は現在どこにも無い。Sprint 9 の REQ-039 で RPC を提供し、同意・定員・時間の重なり・決定者を RPC の内部で検査する。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
-- **KR-4 TRUNCATE・TRIGGER 権限（0419 と 0421 で解消済み。本番では 0419〜0421 の適用を確認する）:** 人材基盤の新6テーブルは 0419、既存テーブル約40と後から作るテーブルの既定の権限は 0421 で、anon・authenticated の TRUNCATE・REFERENCES・TRIGGER を取り消した（OQ-23 で RYUGEN が決定）。SELECT・INSERT・UPDATE・DELETE は変えていない。別のロールでテーブルを作る場合は、そのロールでも既定の権限を同じに設定する（運用手順）。
+- **KR-4 TRUNCATE・TRIGGER 権限（0419 と 0421 で解消済み。本番では 0419〜0421 の適用を確認する）:** 人材基盤の新6テーブルは 0419、既存テーブル約40と後から作るテーブルの既定の権限は 0421 で、anon・authenticated の TRUNCATE・REFERENCES・TRIGGER を取り消した（OQ-23 で RYUGEN が決定）。SELECT・INSERT・UPDATE・DELETE は変えていない。別のロールでテーブルを作る場合は、そのロールでも既定の権限を同じに設定する（運用手順）。**リリース手順に、本番で 0419〜0421 の適用確認と `pg_default_acl` の確認を入れ、CI に『public の全テーブルに anon・authenticated の TRUNCATE・REFERENCES・TRIGGER が無い』検査を足す（再監査 SEC-022。`ALTER DEFAULT PRIVILEGES` はマイグレーションを実行するロールの分にしか効かない）。**
 - **KR-2 マイグレーションの再適用:** 0410 を 0413 の後に単独で再実行すると、強化した関数・ポリシーが旧版に戻る。マイグレーションは番号順に 1 回ずつ適用する前提（ランナーの手順書に明記）。
 - **KR-6 監査証跡の欠落（SEC-006）:** 同意の変更、個人情報の参照、候補検索が記録されない。`created_by`・`decided_by`・`boundary_confirmed_by` は自己申告の文字列。公開前に、監査表（誰が・いつ・何を）と、`auth.uid()` からサーバ側で設定する `*_by` 列を用意する（Sprint 9 の REQ-035b・039・040 で実装）。
 - **KR-7 Sprint 9 に送った Low（再監査 SEC-018〜021）:** 案件数・雇用件数の上限が無い（`listApplicableJobs` と `employments`。上限いっぱいで16秒）／null・配列でない入力が `invalid_input` でなく `TypeError`（安全側）／0420 は既存行を遡及して検査せず、運営が group_id を後から変えると不整合になる／線引き確認者の空白判定が不完全（U+2800・U+3164・U+00AD などの不可視文字で『確認者あり』にできる。DB と TS の両方）。
@@ -629,6 +629,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-08 v2.26: Spec-Validator v2.25 審査 APPROVED 96点(−4)の是正(文面のみ)。ヘッダの版の記述、契約の RenewalItem の型(daysLeft の null・urgency の invalid)、KR-4 の文言。
 - 2026-11-08 v2.27: ⑪ セキュリティ再監査(High1・Medium7・Low8、5件クローズ)の登録漏れを反映。KR-4 を既存テーブルと既定の権限に拡大(OQ-23)、KR-6(監査証跡)、KR-7(Low 4件)、OQ-16 の再監査条件、OQ-12a の追加項目。
 - 2026-11-08 v2.28: RYUGEN が OQ-23 で『取り消すマイグレーションを追加』を選択。0421 で全テーブルと既定の権限の TRUNCATE・REFERENCES・TRIGGER を取り消し、KR-4 を解消済みに。Adversary 第8回 FIND-801 の意図(新任修了日が不正でも今年度の現任が済んでいれば invalid 項目を返さない)を仕様に明記。
+- 2026-11-08 v2.29: ⑪ 差分再監査(第3回)で Gate 3 合格(Critical0・High0)、SEC-001 クローズ。新規 SEC-022(Low: 別ロールが作るテーブルに既定の権限が付く)を KR-4 の運用手順に登録。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
