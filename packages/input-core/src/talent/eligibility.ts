@@ -13,7 +13,7 @@ const DAILY_DISPATCH_MAX_DAYS = 30
 const RESIDENCE_WARN_DAYS = 60
 
 /** UTC の日付のエポックミリ秒。Date.UTC は 0〜99 年を 1900 年代に読み替えるため setUTCFullYear を使う */
-function utcMs(y: number, m: number, dd: number): number {
+export function utcMs(y: number, m: number, dd: number): number {
   const t = new Date(0)
   t.setUTCFullYear(y, m - 1, dd)
   return t.getTime()
@@ -92,8 +92,13 @@ function isRealTime(t: string): boolean {
   return typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)
 }
 
-/** 案件の日付・時刻・期間の入力が不正か（シフト日と時刻、派遣の雇用日数） */
+/** 入力件数の上限（重なりの判定が件数の積に比例するため、巨大な入力で処理を止められないようにする） */
+const MAX_SHIFTS = 366
+const MAX_BUSY = 1000
+
+/** 案件の日付・時刻・期間の入力が不正か（シフトの件数と日付・時刻、派遣の雇用日数） */
 function jobInputInvalid(job: JobPost): boolean {
+  if (job.shifts.length > MAX_SHIFTS) return true
   if (job.shifts.some((s) => !isRealDate(s.date) || !isRealTime(s.start) || !isRealTime(s.end))) return true
   if (job.form === 'dispatch' && !(Number.isInteger(job.employmentDays) && job.employmentDays >= 0)) return true
   return false
@@ -142,6 +147,9 @@ export function checkEligibility(
   // 不正な入力は黙って通さない（法令リスクの高い判定のため、拒否する）
   if (
     jobInputInvalid(job) ||
+    busy.length > MAX_BUSY ||
+    typeof person.consentJointUse !== 'boolean' ||
+    (person.residence !== undefined && typeof person.residence.workAllowed !== 'boolean') ||
     busy.some((b) => !isRealDate(b.date) || !isRealTime(b.start) || !isRealTime(b.end)) ||
     person.employments.some((e) => !isRealDate(e.startOn) || (e.endOn !== undefined && !isRealDate(e.endOn))) ||
     !isRealDate(person.birthDate) ||

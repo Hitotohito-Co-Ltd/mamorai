@@ -1,6 +1,6 @@
 // [TLN] 更新手続きの期限一覧（雇用契約の満了・現任教育・在留期限）。紙の更新管理表の置き換え
 import type { PersonProfile } from './model.js'
-import { fiscalYearOf, isRealDate } from './eligibility.js'
+import { fiscalYearOf, isRealDate, utcMs } from './eligibility.js'
 
 export type RenewalKind = 'contract' | 'annual_training' | 'residence'
 export type RenewalUrgency = 'expired' | 'soon' | 'ok' | 'invalid'
@@ -18,7 +18,7 @@ export interface RenewalItem {
 const MS_PER_DAY = 86_400_000
 function utcDay(d: string): number {
   const [y, m, dd] = d.split('-').map(Number)
-  return Date.UTC(y!, m! - 1, dd!)
+  return utcMs(y!, m!, dd!)
 }
 
 const KIND_RANK: Record<RenewalKind, number> = { contract: 0, annual_training: 1, residence: 2 }
