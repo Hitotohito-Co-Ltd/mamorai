@@ -327,7 +327,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 # 追補 v2.0 — Sprint 8〜10: 人材基盤（スタッフ台帳・案件・応募・更新手続き）
 
-**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** v2.25。審査の履歴: v2.5=96点 APPROVED、v2.6=78点、v2.8=70点、v2.11=71点（いずれも是正済み）、v2.19=86点 APPROVED。v2.21=84点、v2.22=87点 APPROVED。v2.23〜v2.24 は 91点 APPROVED（Spec-Validator）。v2.25 は v2.24 審査の指摘の是正（未審査）。RYUGEN は Sprint 8 の『正規ルート』を選択。RYUGEN が確認済みなのは v2.7 の再承認、OQ-15、OQ-12 の一部（同意の取得主体はホールディングス、アプリで取得、同意なしは全案件で応募不可）、OQ-20（6点の承認）、OQ-21（推奨案の採用。途中で切れていた入力を『推奨案をお願いします』と解釈したが、RYUGEN が再確認して確定）、Sprint 8 の Adversary 3回 FAIL 後の『直して続行』。OQ-12a/b/c が残るため REQ-035b の同意の画面は着手しない
+**作成:** Planner (#03) 白木 咲　**作成日:** 2026-11-07　**状態:** v2.26。審査の履歴: v2.5=96点 APPROVED、v2.6=78点、v2.8=70点、v2.11=71点（いずれも是正済み）、v2.19=86点 APPROVED。v2.21=84点、v2.22=87点 APPROVED。v2.24=91点 APPROVED、v2.25=96点 APPROVED（v2.23 は v2.22 審査の是正版で単独の審査はない）。v2.26 は v2.25 審査の指摘の是正（文面のみ、未審査）。RYUGEN は Sprint 8 の『正規ルート』を選択。RYUGEN が確認済みなのは v2.7 の再承認、OQ-15、OQ-12 の一部（同意の取得主体はホールディングス、アプリで取得、同意なしは全案件で応募不可）、OQ-20（6点の承認）、OQ-21（推奨案の採用。途中で切れていた入力を『推奨案をお願いします』と解釈したが、RYUGEN が再確認して確定）、Sprint 8 の Adversary 3回 FAIL 後の『直して続行』。OQ-12a/b/c が残るため REQ-035b の同意の画面は着手しない
 **参照:** 「MAMOR-AI 人材プラットフォーム構想」「MAMOR-AI 構成案・設計書（2026年11月版）」「UIデザイン案」「帳票一覧」
 **目的:** 複数のExcelと紙の管理を、MAMOR-AI 1つに置き換える。第一弾の対象は 有休申請・労働条件・更新手続き・現任申込・配置入力・スタッフ台帳・採用・案件・配置・シフト。
 
@@ -524,7 +524,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 ## 既知のリスク（Sprint 9 の REQ-039/040 で解消するまで、機能として公開しない）
 - **KR-1 応募テーブルの直接書き込み（0419 で解消済み。残るのは Sprint 9 の RPC の提供）:** 会社の管理者・anon・authenticated による `job_applications` への直接の INSERT/UPDATE/DELETE の権限は 0419 で取り消した。応募の作成・確定・取消の書き込み手段は現在どこにも無い。Sprint 9 の REQ-039 で RPC を提供し、同意・定員・時間の重なり・決定者を RPC の内部で検査する。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
-- **KR-4 TRUNCATE 権限（人材基盤の新6テーブルは 0419 で解消済み。既存のテーブルは対象外）:** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE・TRIGGER・REFERENCES 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
+- **KR-4 TRUNCATE 権限（人材基盤の新6テーブルは 0419 で解消済み。本番では 0419 の適用を確認する。既存のテーブルは対象外）:** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE・TRIGGER・REFERENCES 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
 - **KR-2 マイグレーションの再適用:** 0410 を 0413 の後に単独で再実行すると、強化した関数・ポリシーが旧版に戻る。マイグレーションは番号順に 1 回ずつ適用する前提（ランナーの手順書に明記）。
 - **KR-5 候補検索と個人情報の範囲:** `search_candidates` は、company_admin に限らず company_manager など会社に属する認証ユーザーなら呼べる。会社内の別現場の人の生年月日・電話・メールも `persons` から読める（既存の leave_requests などと同じく、会社全体を指す設計）。ロールごとの制限は Sprint 9 の REQ-040 で決める。
 - **KR-3 警備フラグと職種:** 案件の警備判定は職種マスタの選択に依存する。契約の形が警備（`security`）でも、職種が非警備なら警備の年齢・教育の判定を受けない。非警備の職種を選べば警備の判定を回避できる（職種の選択の統制は OQ-21 と合わせて決める）。
@@ -542,7 +542,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 | `checkEligibility` | (person, job, busy = []) | `{ eligible, reasons, warnings, details }`。`reasons` が空なら `eligible` は true。`warnings` の要素は `daily_hours_over_8` と `residence_expiring`。`details` は `{ residenceDaysLeft?: number, maxDailyHours?: number }`（`residenceDaysLeft` は警告が出たときの、全シフト日の最小日数。`maxDailyHours` は他社分を含む 1 日の最大労働時間（時間）で、`daily_hours_over_8` の警告が出たときだけ付く） |
 | `validateJobForPublish` | (job) | `EligibilityReason[]`。空配列なら公開できる。要素があれば公開を拒否する（`security_dispatch_forbidden`, `boundary_not_confirmed`, `no_shifts`, `invalid_input` のみ返しうる） |
 | `listApplicableJobs` | (person, jobs, busy = []) | 応募できる `JobPost[]`（入力順を維持） |
-| `listRenewals` | (people, referenceDate: 'YYYY-MM-DD', soonDays = 30) | `RenewalItem[]` = `{ personId, kind: 'contract'\|'annual_training'\|'residence', dueOn: 'YYYY-MM-DD', daysLeft, urgency: 'expired'\|'soon' }` |
+| `listRenewals` | (people, referenceDate: 'YYYY-MM-DD', soonDays = 30) | `RenewalItem[]` = `{ personId, kind: 'contract'\|'annual_training'\|'residence', dueOn: 'YYYY-MM-DD', daysLeft: number\|null, urgency: 'expired'\|'soon'\|'invalid' }`（`invalid` のときだけ `daysLeft` は null） |
 | `search_candidates`（DB の関数） | (p_company_id uuid, p_filter jsonb default '{}') | `TABLE(person_id uuid, name text)`。呼んだ会社と同じグループで、`consent_joint_use` が true の人だけを返す。`p_filter` は今回は使わない（空でよい） |
 
 **境界の確定（WHEN 形）**
@@ -623,6 +623,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-08 v2.23: Spec-Validator v2.22 審査 APPROVED 87点(−13)の是正。REQ-034 の属性(Sprint・依存・変更対象)を 034a/034b に分け、孤立していた『確認者は現場責任者または支店とする』を 034b の EARS に、034b のテスト観点、REQ-037/040 の依存を 034a に書き分け、契約の Bead に REQ-028。RYUGEN は正規ルートを選択(evidence/sprint-8-gate-applicability.md)。
 - 2026-11-08 v2.24: セキュリティ監査(Critical0・High2・Medium11・Low4)と Adversary 第7回 PASS(Critical0・High0)を受けて確定。invalid_input に型(consentJointUse・workAllowed が boolean)と件数の上限(シフト366・他の勤務1,000)を追加。DB は 0419(権限の取り消し)・0420(雇用先の会社と人のグループの一致)を追加。
 - 2026-11-08 v2.25: Spec-Validator v2.24 審査 APPROVED 91点(−9)の是正。ヘッダ、契約に 0419/0420 の WHEN 文、KR-1 と REQ-039 の整合(解消済みと Sprint 9 の RPC)、listRenewals の null の扱い(TypeError)。
+- 2026-11-08 v2.26: Spec-Validator v2.25 審査 APPROVED 96点(−4)の是正(文面のみ)。ヘッダの版の記述、契約の RenewalItem の型(daysLeft の null・urgency の invalid)、KR-4 の文言。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |
