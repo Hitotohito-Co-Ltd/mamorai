@@ -309,7 +309,7 @@
     "dual": "同一Reactコードを Web と Tauri で両出し可能"
   },
   "sprint8_talent": {
-    "status": "HALT: Sprint 8 の Adversary が3回連続 FAIL(第3回 High1/Medium6/Low3)。RYUGEN の判断待ち。GREEN: input-core 663件 PASS、DB 23シナリオ PASS",
+    "status": "正規ルート(RYUGEN 選択 2026-11-08): ⑪セキュリティ・⑬性能・⑫Adversary第7回・④Spec-Validator(v2.22)を実施中。⑩⑬のWeb指標は画面なしで適用外(spec/evidence/sprint-8-gate-applicability.md)。GREEN: input-core 1005件、DB 77シナリオ",
     "spec": "spec/behavioral-spec.md (追補 v2.0, REQ-026〜045)",
     "deviation": "REQ-026〜034 は仕様より先に実装された(3b711d1)。遡及仕様を作成。Spec-Validator承認→TDD再導出→Adversary(Fresh Context)評価まで feat/talent-foundation はマージしない",
     "next": "⑦ TDD-Writer(REQ-026〜034, 035のDB) → RED確認 → ⑧ Generator → ⑫ Adversary(Fresh Context)。OQ-15 は解決済み(2026-11-07)。REQ-036/037/039/040 のテスト生成を解除。OQ-12 は項目と取り直し方法が未決"
