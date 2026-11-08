@@ -53,7 +53,9 @@ for f in \
   0419_talent_revoke_privileges \
   0419_talent_revoke_privileges \
   0420_talent_staff_person_group \
-  0420_talent_staff_person_group; do   # 2回=冪等性確認
+  0420_talent_staff_person_group \
+  0421_revoke_destructive_privileges \
+  0421_revoke_destructive_privileges; do   # 2回=冪等性確認
   $P -d tln_rls -f "$f.sql" >/dev/null 2>&1 || { echo "FAILED applying $f"; exit 1; }
 done
 # RLS/関数 検証シナリオを実行

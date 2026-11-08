@@ -524,7 +524,7 @@ Architect(#07)・Database Engineer(#08) 合同是正に伴う本仕様書の軽�
 
 ## 既知のリスク（Sprint 9 の REQ-039/040 で解消するまで、機能として公開しない）
 - **KR-1 応募テーブルの直接書き込み（0419 で解消済み。残るのは Sprint 9 の RPC の提供）:** 会社の管理者・anon・authenticated による `job_applications` への直接の INSERT/UPDATE/DELETE の権限は 0419 で取り消した。応募の作成・確定・取消の書き込み手段は現在どこにも無い。Sprint 9 の REQ-039 で RPC を提供し、同意・定員・時間の重なり・決定者を RPC の内部で検査する。それまで、画面・API からこのテーブルへ書き込む機能を公開しない。
-- **KR-4 TRUNCATE・TRIGGER 権限（人材基盤の新6テーブルは 0419 で解消済み。本番では 0419 の適用を確認する）:** **既存のテーブル約40（shifts、leave_requests、daily_reports、jyoban_reports、notices、app_profiles、staff など）と、後から作るテーブルの既定の権限には、anon・authenticated の TRUNCATE・TRIGGER・REFERENCES が残っている。再監査（SEC-001）で `truncate` が実際に成功し、TRIGGER 権限で別会社の管理者の操作を乗っ取る経路も確認した。人材基盤の公開前に、既存テーブルと既定の権限の取り消しを決める（OQ-23）。** Supabase の API（PostgREST）は TRUNCATE を公開しないが、直接接続で anon/authenticated に TRUNCATE 権限があると RLS・削除ガードを回避できる。本番では新テーブルの TRUNCATE・TRIGGER・REFERENCES 権限を取り消す（運用手順の項目。Sprint 9 の導入前に確認）。
+- **KR-4 TRUNCATE・TRIGGER 権限（0419 と 0421 で解消済み。本番では 0419〜0421 の適用を確認する）:** 人材基盤の新6テーブルは 0419、既存テーブル約40と後から作るテーブルの既定の権限は 0421 で、anon・authenticated の TRUNCATE・REFERENCES・TRIGGER を取り消した（OQ-23 で RYUGEN が決定）。SELECT・INSERT・UPDATE・DELETE は変えていない。別のロールでテーブルを作る場合は、そのロールでも既定の権限を同じに設定する（運用手順）。
 - **KR-2 マイグレーションの再適用:** 0410 を 0413 の後に単独で再実行すると、強化した関数・ポリシーが旧版に戻る。マイグレーションは番号順に 1 回ずつ適用する前提（ランナーの手順書に明記）。
 - **KR-6 監査証跡の欠落（SEC-006）:** 同意の変更、個人情報の参照、候補検索が記録されない。`created_by`・`decided_by`・`boundary_confirmed_by` は自己申告の文字列。公開前に、監査表（誰が・いつ・何を）と、`auth.uid()` からサーバ側で設定する `*_by` 列を用意する（Sprint 9 の REQ-035b・039・040 で実装）。
 - **KR-7 Sprint 9 に送った Low（再監査 SEC-018〜021）:** 案件数・雇用件数の上限が無い（`listApplicableJobs` と `employments`。上限いっぱいで16秒）／null・配列でない入力が `invalid_input` でなく `TypeError`（安全側）／0420 は既存行を遡及して検査せず、運営が group_id を後から変えると不整合になる／線引き確認者の空白判定が不完全（U+2800・U+3164・U+00AD などの不可視文字で『確認者あり』にできる。DB と TS の両方）。
@@ -571,7 +571,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - WHEN 確認者の『空白』を判定する THE システム SHALL ASCII の空白に加え、Unicode の空白（U+00A0、U+1680、U+2000〜U+200A、U+2028、U+2029、U+202F、U+205F、U+3000）とゼロ幅文字（U+200B〜U+200D、U+2060、U+FEFF）を空白として扱い、TS と DB で同じ集合にする（REQ-034）。
 - WHEN 案件にシフトが 1 件もない THE システム SHALL `checkEligibility` で `no_shifts` により応募を拒否し、`validateJobForPublish` で公開を拒否する（REQ-026・REQ-037）。
 - WHEN `listRenewals` の人が null、または `PersonProfile` の形でない（`employments` が配列でない、`guardTraining` が欠落している等）THE システム SHALL `TypeError` を投げる（個人を特定できず invalid 項目にできないため。呼び出し側の契約違反として一覧全体を失敗させる。個人を特定できる範囲の不正な値は、後述の invalid 項目で返す。REQ-033）。
-- WHEN `listRenewals` の入力の期限日（契約満了日・在留期限）または雇用の入社日・退社日が不正 THE システム SHALL その項目を一覧から消さず、`urgency: 'invalid'`・`daysLeft: null` の項目として先頭に返す（法令上の期限の見落としを防ぐため）。invalid 項目の `kind` と `dueOn` は、契約満了日が不正なら `contract`・入力された値、在留期限が不正なら `residence`・入力された値。雇用の入社日・退社日が不正でその雇用の在籍を判定できない場合は、その雇用に契約満了日があれば `contract`（`dueOn` は契約満了日）の invalid 項目を返す（他の有効な雇用の契約満了日は通常どおり判定する）。現任教育は、入社日・退社日が不正な雇用が 1 件でもある人が今年度未達なら `annual_training`（`dueOn` は年度末）の invalid 項目を返す。invalid 項目同士は `personId` のコードポイント順、同じ `personId` では `contract`、`annual_training`、`residence` の順に並べる。基準日が不正なときは `RangeError` を投げる（REQ-033）。契約満了日が空文字または null の場合も不正として invalid 項目にする（キーが無い＝undefined の場合だけ対象外）。新任教育の修了日が不正な人は、`annual_training` の invalid 項目（`dueOn` は年度末）を返す。`RenewalItem.urgency` に `'invalid'` を、`daysLeft` に `null` を加える。
+- WHEN `listRenewals` の入力の期限日（契約満了日・在留期限）または雇用の入社日・退社日が不正 THE システム SHALL その項目を一覧から消さず、`urgency: 'invalid'`・`daysLeft: null` の項目として先頭に返す（法令上の期限の見落としを防ぐため）。invalid 項目の `kind` と `dueOn` は、契約満了日が不正なら `contract`・入力された値、在留期限が不正なら `residence`・入力された値。雇用の入社日・退社日が不正でその雇用の在籍を判定できない場合は、その雇用に契約満了日があれば `contract`（`dueOn` は契約満了日）の invalid 項目を返す（他の有効な雇用の契約満了日は通常どおり判定する）。現任教育は、入社日・退社日が不正な雇用が 1 件でもある人が今年度未達なら `annual_training`（`dueOn` は年度末）の invalid 項目を返す。invalid 項目同士は `personId` のコードポイント順、同じ `personId` では `contract`、`annual_training`、`residence` の順に並べる。基準日が不正なときは `RangeError` を投げる（REQ-033）。契約満了日が空文字または null の場合も不正として invalid 項目にする（キーが無い＝undefined の場合だけ対象外）。新任教育の修了日が不正な人は、今年度の現任教育が済んでいない（`annualFiscalYears` に今年度が無い）場合に限り、`annual_training` の invalid 項目（`dueOn` は年度末）を返す（今年度の現任が済んでいれば、その年度の期限は残っていないため返さない。Adversary 第8回 FIND-801 で意図を確定）。`RenewalItem.urgency` に `'invalid'` を、`daysLeft` に `null` を加える。
 - WHEN `listRenewals` が「在籍中」を判定する THE システム SHALL 「入社日が基準日以前、かつ退社日がない、または退社日が基準日以後」の雇用を在籍中とする。契約満了と現任教育（在籍中の雇用が 1 件以上必要）の両方がこの定義を使う。現任教育は、新任教育の修了日が基準日より後の人（基準日時点で未修了）も対象外とする（REQ-033）。
 - WHEN 日雇派遣（30 日以内）に例外区分で応募する THE システム SHALL 確認日 `verifiedOn` が暦に存在する `YYYY-MM-DD` の日付（`2026-13-45` などは不可）で、かつシフト日以前であり、区分が `age60` の場合は本人がシフト日に満 60 歳以上である場合に限り例外を認め、満たさなければ `dispatch_exception_invalid` で拒否する。複数のシフト日があるときは、すべてのシフト日でこの条件を満たすこと（REQ-029）。
 
@@ -592,7 +592,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 | OQ-18 | 有休・現任申込の承認を、既存実装(0402/0103)の遡及仕様 REQ として Sprint 10 に追加する（追加後に REQ-044 の対象へ戻す） | REQ-044 | Planner |
 | OQ-20 | **解決（2026-11-07 RYUGEN 承認）:** ①本社の範囲は自社のみ ②採用担当は会社ごとに複数可・支店ロールと兼務可（権限は和集合） ③採用担当が不在の会社では本社に通知 ④応援依頼の応募の採否を、同一支店の支店ロールが代行できる ⑤更新手続きの確認・対応は、現場責任者=自現場、支店=自支店、本社=自社、管制・採用担当は不可 ⑥採用担当の付与・解除は本社のみ。これらに依存していた暫定のテストも確定とする | REQ-036, 040, 041, 044 | RYUGEN |
 | OQ-21 | **解決（2026-11-07 RYUGEN が推奨案を採用。入力が途中で切れていたが、再確認で『その案で良い』と確定）:** 線引き確認が必要かどうかは、職種マスタ（`job_roles.needs_boundary_check`）の既定値から案件作成時に引き継ぐ。案件ごとに変更できるのは本社のみ（許可表の『線引き確認の要否を変更する』）。案件を作る管理者が false にして回避することはできない。実装は Sprint 9（REQ-037）で、テストを先に書く | REQ-034, 037, 040 | RYUGEN |
-| OQ-23 | 既存テーブル約40と、後から作るテーブルの既定の権限から、anon・authenticated の TRUNCATE・TRIGGER・REFERENCES を取り消すか（KR-4、再監査 SEC-001。取り消しのみで追加・削除はしない。既存システムが TRUNCATE などをこれらのロールで使っていないことの確認が前提）。人材基盤の画面・API を公開する前までに決める | KR-4 | RYUGEN |
+| OQ-23 | **解決（2026-11-08 RYUGEN が『取り消すマイグレーションを追加』を選択）:** 0421 で、public スキーマの全テーブルと、後から作るテーブルの既定の権限から、anon・authenticated の TRUNCATE・REFERENCES・TRIGGER を取り消した。リポジトリ内に、これらのロールでその権限を使うコードが無いことを確認した | KR-4 | RYUGEN |
 | OQ-22 | 候補検索と人の個人情報（生年月日・電話・メール）の参照を、どの役割に許可するか（REQ-040 の許可表の『候補検索』の行の案。既知のリスク KR-5 の解消）。Sprint 9 の仕様審査までに RYUGEN が確認する | REQ-040, KR-5 | RYUGEN |
 | OQ-19 | 支店の区切りと、各現場の所属支店。グループ横断で見る「本部」の権限（REQ-040 の許可表の対象外） | REQ-037, 040 | RYUGEN |
 | OQ-14 | 「欠時間」「約定人数」の定義（UI案の7指標） | 配備状況画面 | RYUGEN |
@@ -628,6 +628,7 @@ TDD-Writer が仕様だけからテストを書いた際、戻り値の形が仕
 - 2026-11-08 v2.25: Spec-Validator v2.24 審査 APPROVED 91点(−9)の是正。ヘッダ、契約に 0419/0420 の WHEN 文、KR-1 と REQ-039 の整合(解消済みと Sprint 9 の RPC)、listRenewals の null の扱い(TypeError)。
 - 2026-11-08 v2.26: Spec-Validator v2.25 審査 APPROVED 96点(−4)の是正(文面のみ)。ヘッダの版の記述、契約の RenewalItem の型(daysLeft の null・urgency の invalid)、KR-4 の文言。
 - 2026-11-08 v2.27: ⑪ セキュリティ再監査(High1・Medium7・Low8、5件クローズ)の登録漏れを反映。KR-4 を既存テーブルと既定の権限に拡大(OQ-23)、KR-6(監査証跡)、KR-7(Low 4件)、OQ-16 の再監査条件、OQ-12a の追加項目。
+- 2026-11-08 v2.28: RYUGEN が OQ-23 で『取り消すマイグレーションを追加』を選択。0421 で全テーブルと既定の権限の TRUNCATE・REFERENCES・TRIGGER を取り消し、KR-4 を解消済みに。Adversary 第8回 FIND-801 の意図(新任修了日が不正でも今年度の現任が済んでいれば invalid 項目を返さない)を仕様に明記。
 
 ## REQ 台帳（追補）
 | REQ | 状態 | Sprint |

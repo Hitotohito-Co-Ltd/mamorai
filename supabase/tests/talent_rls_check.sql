@@ -827,6 +827,26 @@ do $$ begin
   exception when others then insert into t_rls_results values (87, '同じグループの人は自社の雇用に紐づけられる', false, sqlerrm);
   end; end $$;
 
+-- ── シナリオ 88〜90: セキュリティ再監査 SEC-001（既存テーブルと既定の権限）──
+reset role;
+-- 88: public スキーマの全テーブルで、anon・authenticated に TRUNCATE・REFERENCES・TRIGGER の権限が無い（テスト用の結果表を除く）
+insert into t_rls_results select 88, '既存を含む全テーブルで anon/authenticated の TRUNCATE・REFERENCES・TRIGGER 権限が無い',
+  count(*) = 0, coalesce(string_agg(r || ':' || c.relname || ':' || p, ', ' order by c.relname), '') 
+  from pg_class c cross join unnest(array['anon','authenticated']) r cross join unnest(array['TRUNCATE','REFERENCES','TRIGGER']) p
+  where c.relnamespace = 'public'::regnamespace and c.relkind in ('r','p') and c.relname <> 't_rls_results'
+    and has_table_privilege(r, c.oid, p);
+-- 89: 後から作るテーブルにも、その権限が既定で付かない（Supabase の既定の権限付与の下で）
+create table public.zz_new_table(i int);
+insert into t_rls_results select 89, '後から作るテーブルに anon/authenticated の TRUNCATE・REFERENCES・TRIGGER が既定で付かない',
+  count(*) = 0, coalesce(string_agg(r || ':' || p, ', '), '')
+  from unnest(array['anon','authenticated']) r cross join unnest(array['TRUNCATE','REFERENCES','TRIGGER']) p
+  where has_table_privilege(r, 'public.zz_new_table', p);
+-- 90: 通常の権限（SELECT/INSERT/UPDATE/DELETE）は取り消していない（既存システムの動作を壊さない）
+insert into t_rls_results select 90, '通常の権限(SELECT/INSERT/UPDATE/DELETE)は新しいテーブルに残る',
+  bool_and(has_table_privilege(r, 'public.zz_new_table', p)), 'SELECT/INSERT/UPDATE/DELETE'
+  from unnest(array['anon','authenticated']) r cross join unnest(array['SELECT','INSERT','UPDATE','DELETE']) p;
+drop table public.zz_new_table;
+
 -- ── 結果出力 ──
 select n || '. ' || case when ok then 'PASS' else 'FAIL' end || '  ' || name
   || case when not ok and detail <> '' then '  [' || detail || ']' else '' end
