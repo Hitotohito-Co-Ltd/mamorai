@@ -264,3 +264,22 @@ FIND-610 は仕様 v2.21 のテスト追補（MANIFEST の更新）に対応。
 | REQ-030 | 夜間はシフト単位で判定（FIND-004） | 4 | 0 |
 
 件数: 1005 → 1045（新規 40。うち RED 26）。緩めた・変更した既存アサーションは 0 件。
+
+
+---
+
+# 追加 第10回（仕様 v2.25）
+
+追加日: 2026-11-08 / 担当: TDD-Writer 赤松 灯 (⑦) / 対象: s8_talent_req026_034.test.ts への追記のみ（実装・マイグレーション・DB の SQL テスト・仕様は未編集、既存テストは未変更。実装 eligibility.ts / renewal.ts は未読）
+
+## 根拠
+Spec-Validator v2.24 審査の指摘4（listRenewals の人が null・PersonProfile の形でないときの規定の欠落）と、それを受けた仕様 v2.25 の境界の確定（TypeError を投げる。個人を特定できる範囲の不正な値は invalid 項目で返す）。承認: 呼び出し元の指示（v2.25 の確定）による。
+
+## どの REQ が変わったか・追加したテスト
+| REQ | 確定内容 | 追加 | RED |
+|---|---|---|---|
+| REQ-033 | people の要素が null / undefined / 文字列 / 数値 → TypeError（RangeError ではない）。有効な人との混在でも一覧全体が失敗。対: 空配列は []、有効な人は従来どおり | 12 | 0 |
+| REQ-033 | employments が配列でない（undefined/null/文字列/オブジェクト）、guardTraining が undefined → TypeError（単独・混在）。対: employments 空配列、annualFiscalYears が配列でない人は TypeError にならず annual_training の invalid 項目 | 12 | 0 |
+
+件数: 1045 → 1069（新規 24。RED 0）。緩めた・変更した既存アサーションは 0 件。
+RED が 0 の理由: 実装が既に TypeError を投げており、本追加は仕様の後追い（v2.11 と同じ扱い）。

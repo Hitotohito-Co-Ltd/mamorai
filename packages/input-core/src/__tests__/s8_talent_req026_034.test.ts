@@ -5071,3 +5071,159 @@ describe('[REQ-030] 夜間勤務の判定はシフト単位（FIND-004）', () =
     expect(reasonsOf(result)).not.toContain('under_age')
   })
 })
+
+// ─────────────────────────────────────────────────────────────
+// E. listRenewals の契約違反は TypeError（仕様 v2.25 / REQ-033）
+// 個人を特定できない入力は invalid 項目にできないため、一覧全体を失敗させる
+// ─────────────────────────────────────────────────────────────
+describe('[REQ-033] listRenewals の人が null・PersonProfile の形でない → TypeError（v2.25）', () => {
+  const REF = '2026-06-01'
+  const validPerson = () =>
+    mkPerson({
+      personId: 'p-valid',
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01', contractEndOn: '2026-06-11' }],
+    })
+
+  const BAD_PEOPLE: Array<[string, unknown]> = [
+    ['null', null],
+    ['undefined', undefined],
+    ['文字列 "x"', 'x'],
+    ['数値 42', 42],
+  ]
+
+  it.each(BAD_PEOPLE)('typeError_人の配列の要素が %s なら TypeError を投げる', (_l, bad) => {
+    // Arrange
+    const people = [bad as unknown as PersonProfile]
+    // Act
+    const act = () => listRenewals(people, REF)
+    // Assert
+    expect(act).toThrow(TypeError)
+  })
+
+  it.each(BAD_PEOPLE)('typeError_RangeError ではない（%s）', (_l, bad) => {
+    // Arrange
+    const people = [bad as unknown as PersonProfile]
+    // Act
+    let thrown: unknown
+    try {
+      listRenewals(people, REF)
+    } catch (e) {
+      thrown = e
+    }
+    // Assert
+    expect(thrown).toBeInstanceOf(TypeError)
+    expect(thrown).not.toBeInstanceOf(RangeError)
+  })
+
+  it('typeError_有効な人と null が混在しても一覧全体が失敗する（先頭が有効）', () => {
+    // Arrange
+    const people = [validPerson(), null as unknown as PersonProfile]
+    // Act
+    const act = () => listRenewals(people, REF)
+    // Assert
+    expect(act).toThrow(TypeError)
+  })
+
+  it('typeError_有効な人と null が混在しても一覧全体が失敗する（末尾が有効）', () => {
+    // Arrange
+    const people = [null as unknown as PersonProfile, validPerson()]
+    // Act
+    const act = () => listRenewals(people, REF)
+    // Assert
+    expect(act).toThrow(TypeError)
+  })
+
+  it('対_空配列は [] を返す', () => {
+    // Arrange / Act
+    const result = listRenewals([], REF)
+    // Assert
+    expect(result).toEqual([])
+  })
+
+  it('対_有効な人だけなら従来どおりの項目を返す', () => {
+    // Arrange
+    const people = [validPerson()]
+    // Act
+    const result = listRenewals(people, REF)
+    // Assert
+    expect(result).toEqual([
+      { personId: 'p-valid', kind: 'contract', dueOn: '2026-06-11', daysLeft: 10, urgency: 'soon' },
+    ])
+  })
+})
+
+describe('[REQ-033] employments・guardTraining の形が不正な人 → TypeError（v2.25）', () => {
+  const REF = '2026-06-01'
+  const withEmployments = (employments: unknown) =>
+    mkPerson({ personId: 'p-bad' , employments: employments as unknown as PersonProfile['employments'] })
+  const withGuard = (guardTraining: unknown) =>
+    mkPerson({ personId: 'p-bad', guardTraining: guardTraining as unknown as PersonProfile['guardTraining'] })
+
+  const BAD_EMPLOYMENTS: Array<[string, unknown]> = [
+    ['undefined', undefined],
+    ['null', null],
+    ['文字列', 'c-001'],
+    ['オブジェクト', { companyId: 'c-001', startOn: '2020-01-01' }],
+  ]
+
+  it.each(BAD_EMPLOYMENTS)('typeError_employments が %s の人は TypeError', (_l, v) => {
+    // Arrange
+    const people = [withEmployments(v)]
+    // Act
+    const act = () => listRenewals(people, REF)
+    // Assert
+    expect(act).toThrow(TypeError)
+  })
+
+  it.each(BAD_EMPLOYMENTS)('typeError_有効な人と employments が %s の人が混在しても一覧全体が失敗する', (_l, v) => {
+    // Arrange
+    const people = [mkPerson({ personId: 'p-ok' }), withEmployments(v)]
+    // Act
+    const act = () => listRenewals(people, REF)
+    // Assert
+    expect(act).toThrow(TypeError)
+  })
+
+  it('typeError_guardTraining が undefined の人は TypeError', () => {
+    // Arrange
+    const people = [withGuard(undefined)]
+    // Act
+    const act = () => listRenewals(people, REF)
+    // Assert
+    expect(act).toThrow(TypeError)
+  })
+
+  it('typeError_有効な人と guardTraining が undefined の人が混在しても一覧全体が失敗する', () => {
+    // Arrange
+    const people = [withGuard(undefined), mkPerson({ personId: 'p-ok' })]
+    // Act
+    const act = () => listRenewals(people, REF)
+    // Assert
+    expect(act).toThrow(TypeError)
+  })
+
+  it('対_employments が空配列の人は TypeError にならず項目なし', () => {
+    // Arrange
+    const people = [mkPerson({ personId: 'p-empty', employments: [] })]
+    // Act
+    const result = listRenewals(people, REF)
+    // Assert
+    expect(result).toEqual([])
+  })
+
+  it('対_annualFiscalYears が配列でない人は TypeError にならず annual_training の invalid 項目で返る', () => {
+    // Arrange: 在籍中・新任修了済み・現任の配列が文字列
+    const person = mkPerson({
+      personId: 'p-bad-annual',
+      employments: [{ companyId: 'c-001', startOn: '2020-01-01' }],
+      guardTraining: { basicDoneOn: '2020-01-01', annualFiscalYears: 'x' } as unknown as PersonProfile['guardTraining'],
+    })
+    // Act
+    const act = () => listRenewals([person], '2027-03-10')
+    // Assert
+    expect(act).not.toThrow()
+    expect(act()).toEqual([
+      { personId: 'p-bad-annual', kind: 'annual_training', dueOn: '2027-03-31', daysLeft: null, urgency: 'invalid' },
+    ])
+  })
+})

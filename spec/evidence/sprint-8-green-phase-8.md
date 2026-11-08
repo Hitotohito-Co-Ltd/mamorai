@@ -18,3 +18,7 @@ RED 記録: spec/evidence/sprint-8-red-phase-8.md（TS 613件中26件が RED）�
 
 ## 残る課題（Sprint 9 以降。セキュリティ報告の『公開前の必須条件』）
 SEC-003（KR-5/OQ-22/19/20）、SEC-005（KR-3/OQ-21）、SEC-006（監査証跡）、SEC-009（OQ-12a/b/c、弁護士の確認）、SEC-010〜017（Medium/Low）
+
+## 追記（仕様 v2.25 の後追いテスト）
+- listRenewals の人が null・形が違う場合の TypeError の仕様（v2.25）に対するテスト24件を追加。実装は既に準拠しており RED なし（仕様の後追い）
+- 最終: input-core 1069件 全 PASS（s8 は637件）、tsc エラー0、DB 87シナリオ all PASS
