@@ -9,5 +9,6 @@
 | v2.11 | 71 | CONDITIONAL | REQ-035 の同意送信の計測、Planner 案の管理ほか |
 | v2.19 | 86 | APPROVED | 状態ヘッダ、EARS の列挙漏れほか |
 | v2.21 | 84 | CONDITIONAL | REQ-034 のスプリント整合、人に対する範囲の判定材料ほか（v2.22 で是正） |
+| v2.22 | 87 | APPROVED | REQ-034 の属性の追随漏れ、孤立した EARS 文、契約の Bead（v2.23 で是正） |
 
-人間（RYUGEN）の決定: v2.7 の再承認、OQ-12（一部）、OQ-15、OQ-20、OQ-21、Sprint 8 の『直して続行』。
+人間（RYUGEN）の決定: v2.7 の再承認、OQ-12（一部）、OQ-15、OQ-20、OQ-21、Sprint 8 の『直して続行』と『正規ルート』。
