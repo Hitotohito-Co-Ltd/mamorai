@@ -801,6 +801,32 @@ do $$ begin
   end; end $$;
 reset role;
 
+-- ── シナリオ 85〜87: セキュリティ監査 SEC-008（雇用先の会社と人のグループの一致）──
+reset role;
+-- 85: 他グループの人を、自グループの会社の雇用に紐づけられない（候補検索で他グループの人の個人情報を引ける経路になる）
+do $$ begin
+  begin
+    insert into staff(id, company_id, person_id, name, staff_no)
+      values ('0b000000-0000-0000-0000-0000000000f1', 'cc000000-0000-0000-0000-000000000011', '0a000000-0000-0000-0000-000000000003', '越境', 'X-1');
+    insert into t_rls_results values (85, '他グループの人を自社の雇用に紐づけられない', false, '紐づけられてしまった');
+  exception when others then insert into t_rls_results values (85, '他グループの人を自社の雇用に紐づけられない', sqlerrm like '%グループ%', sqlerrm);
+  end; end $$;
+-- 86: 既存の雇用の person_id を他グループの人に付け替えられない
+do $$ begin
+  begin
+    update staff set person_id = '0a000000-0000-0000-0000-000000000003' where id = '0b000000-0000-0000-0000-000000000001';
+    insert into t_rls_results values (86, '雇用の person_id を他グループの人に付け替えられない', false, '付け替えられてしまった');
+  exception when others then insert into t_rls_results values (86, '雇用の person_id を他グループの人に付け替えられない', sqlerrm like '%グループ%', sqlerrm);
+  end; end $$;
+-- 87: 同じグループの人なら紐づけられる（対になる正常系）
+do $$ begin
+  begin
+    insert into staff(id, company_id, person_id, name, staff_no)
+      values ('0b000000-0000-0000-0000-0000000000f2', 'cc000000-0000-0000-0000-000000000011', '0a000000-0000-0000-0000-000000000004', '同グループ', 'X-2');
+    insert into t_rls_results values (87, '同じグループの人は自社の雇用に紐づけられる', true, '');
+  exception when others then insert into t_rls_results values (87, '同じグループの人は自社の雇用に紐づけられる', false, sqlerrm);
+  end; end $$;
+
 -- ── 結果出力 ──
 select n || '. ' || case when ok then 'PASS' else 'FAIL' end || '  ' || name
   || case when not ok and detail <> '' then '  [' || detail || ']' else '' end
