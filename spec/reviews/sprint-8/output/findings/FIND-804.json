@@ -1,0 +1,17 @@
+{
+  "id": "FIND-804",
+  "round": 8,
+  "severity": "MEDIUM",
+  "dimension": "D5 Verification Readiness",
+  "file": "supabase/migrations/0414_talent_integrity.sql",
+  "lines": "43,47,51 (および 0415_talent_integrity2.sql:11)",
+  "severityRationale": "Medium: 負の値の拒否は 409/418/521/631/634 でテストされており(部分的に守る)、境界値(0)と正常系(正の値)だけが変異で生存する。実装は仕様どおりで、実害の再現は無い。",
+  "evidence": {
+    "filePath": "supabase/migrations/0414_talent_integrity.sql",
+    "lineRange": "43,47,51 (および 0415_talent_integrity2.sql:11)",
+    "snippet": "check (employment_days is null or employment_days >= 0);\ncheck (hourly_wage is null or hourly_wage >= 0);\ncheck (billing_rate is null or billing_rate >= 0);\n-- 0415: check (wage is null or wage >= 0);",
+    "reproduction": "自動変異(sqlmutate.py。runner と同じ連鎖で各 2 回適用)で生存: 0414:43/47/51 と 0415:11 の『>= 0』→『> 0』(0 を拒否)、0414:47/51 と 0415:11 の『or』→『and』(非 NULL を全て拒否。NULL だけ通る)、0414:43/47/51 の『0』→『1』。仕様(境界の確定): 『DB で 0 未満を拒否』=0 は許可。talent_rls_check.sql の hourly_wage / billing_rate / job_shifts.wage のテストは負の値(-100, -1, 負の単価)だけで、0 も正の値も一度も保存していない(grep: hourly_wage/billing_rate は 409, 521, 634 の負値のみ。employment_days は 442 で 45 を保存するため『or→and』は検出される)。したがって『時給・請求単価・シフト単価を保存できなくなる』変異が通る。"
+  },
+  "expected": "hourly_wage = 0 / 正の値、billing_rate = 0 / 正の値、job_shifts.wage = 0 / 正の値、employment_days = 0 を保存できる対のシナリオを追加する。",
+  "routeToPhase": "Phase 1a (Planner) 経由で Phase 2a(TDD-Writer が DB シナリオを追加)"
+}

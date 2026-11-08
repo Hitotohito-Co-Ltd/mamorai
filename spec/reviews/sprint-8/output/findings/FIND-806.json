@@ -1,0 +1,17 @@
+{
+  "id": "FIND-806",
+  "round": 8,
+  "severity": "LOW",
+  "dimension": "D4 Structural Integrity",
+  "file": "packages/input-core/src/talent/eligibility.ts; renewal.ts",
+  "lines": "eligibility.ts:118, 21-24; renewal.ts:18-23, 76-78",
+  "severityRationale": "Low: 構造・保守性の問題で、挙動の誤りは再現できない。",
+  "evidence": {
+    "filePath": "packages/input-core/src/talent/eligibility.ts; renewal.ts",
+    "lineRange": "eligibility.ts:118, 21-24; renewal.ts:18-23, 76-78",
+    "snippet": "if (!ex) return false   // eligibility.ts:118\nfunction utcDay(d: string): number { ... utcMs(...) }   // eligibility.ts と renewal.ts に同じ関数と MS_PER_DAY\nif (trainingInvalid) {\n  // 上で invalid 項目を返した\n} else if (...)   // renewal.ts:76-78 空の分岐",
+    "reproduction": "(1) eligibility.ts:118 は呼び出し元(dispatchExceptionValid の呼び出し直前で person.dailyDispatchException を確認)から到達できないデッドコード。自動変異『false→true』『return を削除』が生存し、カバレッジも 118 行の分岐が未到達(Branch 99.32)。(2) utcDay と MS_PER_DAY が eligibility.ts と renewal.ts に重複(round 7 の FIND-007 は renewal 側の複製が古い Date.UTC を使い続けたことが原因の欠陥だった)。(3) renewal.ts:76-78 の空の if 分岐(コメントだけ)。"
+  },
+  "expected": "デッドコードの削除、utcDay を eligibility.ts から export して共有、空の分岐を条件の整理で除く。",
+  "routeToPhase": "Phase 2b-r (Refactor Agent)"
+}

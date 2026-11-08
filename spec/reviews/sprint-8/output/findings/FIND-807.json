@@ -1,0 +1,17 @@
+{
+  "id": "FIND-807",
+  "round": 8,
+  "severity": "LOW",
+  "dimension": "D5 Verification Readiness (⑤ ドキュメントの整合)",
+  "file": "spec/tests/sprint-8/MANIFEST.md",
+  "lines": "5,7,126,175-176",
+  "severityRationale": "Low: 文面の不一致のみ。テストと実装の挙動には影響しない。",
+  "evidence": {
+    "filePath": "spec/tests/sprint-8/MANIFEST.md",
+    "lineRange": "5,7,126,175-176",
+    "snippet": "仕様バージョン: ... 追補 v2.25 / 結果: ... DB 検証 ... 77 シナリオ all PASS（番号 1〜78、32 は欠番）/ S8-035-DB: 77シナリオ（本番と同じ連鎖 0000〜0413 で実行 / Vitest ユニットテスト（231 テスト）/ DB ... 77 シナリオ",
+    "reproduction": "実測との食い違い: (1) DB シナリオ数: 実行出力の番号は 1〜87 から 32 を除いた 86 件で all PASS(MANIFEST は 77・『1〜78』、spec/evidence/sprint-8-green-phase-8.md は『87シナリオ』、pipeline-state.json:312 は『DB 77シナリオ』『1005件』)。(2) S8-035-DB の連鎖は 0000〜0420(MANIFEST は 0413)。(3) s8 は 637 件(MANIFEST の『作成ファイル』は 231)。(4) 仕様の現在版は ヘッダ『v2.26』・履歴の末尾は v2.27(MANIFEST は v2.25、仕様ヘッダ自体が履歴と 1 版ずれている)。(5) MANIFEST の REQ-034 節(107 行)は 034a/034b の分割を反映していない。(6) 第9回追加表の注『約 -738,000 日台は実際は -703,609』はテスト側の注記のみで、依頼文の誤りが仕様側に残る可能性。round 7 の FIND-010 は版の更新(v2.21→v2.25)のみ是正され、件数・連鎖・分割は残っている。"
+  },
+  "expected": "MANIFEST・green-phase-8・pipeline-state・仕様ヘッダを実測(86 シナリオ、637 件、連鎖 0000〜0420、v2.27)に揃える。",
+  "routeToPhase": "Phase 1a (Planner) / ドキュメント"
+}

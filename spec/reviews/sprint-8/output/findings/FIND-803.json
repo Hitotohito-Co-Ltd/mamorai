@@ -1,0 +1,17 @@
+{
+  "id": "FIND-803",
+  "round": 8,
+  "severity": "MEDIUM",
+  "dimension": "D5 Verification Readiness",
+  "file": "supabase/migrations/0420_talent_staff_person_group.sql",
+  "lines": "14-25",
+  "severityRationale": "Medium: 0420 の不変条件には 3 シナリオ(85 INSERT、86 person_id 付替え、87 正常系)が実在し部分的に守られている。company_id 経路と group 未設定の 2 経路だけ変異が生存する。現状の実装は拒否するので Critical/High の『漏えい』『REQ を破る実装』ではなく、また staff.company_id を書けるのは現状サーバ側のみ(authenticated は staff に書けないことを実測)。",
+  "evidence": {
+    "filePath": "supabase/migrations/0420_talent_staff_person_group.sql",
+    "lineRange": "14-25",
+    "snippet": "create trigger trg_staff_guard_person_group before insert or update of person_id, company_id on public.staff\n  for each row execute function public.staff_guard_person_group();\n-- 本体: if v_person_group is null or v_company_group is distinct from v_person_group then raise exception ...",
+    "reproduction": "supabase/tests/run_talent_rls_check.sh を変異コピーで実行(0419/0420 の手書き変異 25 件のうち 0420 は 8 件)。検出されない変異: (1) 『before insert or update of person_id, company_id』を『update of person_id』のみにする → 全 87 行 PASS(生存)。実害: この変異で `update staff set company_id = B社(別グループ)` が通り、B 社管理者の persons に他グループの人(P1)が現れる(scratch adv8 DB で実行: 『B admin sees persons: P1 A consent,P3 B』)。(2) 『会社の group_id が未設定なら人を紐づけられる』(v_company_group is not null and ... に変更)→ 全 PASS(生存)。仕様の WHEN 文は『会社の group_id が未設定の場合も拒否』と明記。テスト 85/86/87 は INSERT・person_id の付替え・同グループ可だけで、company_id の付替えと group 未設定の会社が無い。正規実装では両方とも拒否されることを実行で確認済み(null-group company link: 拒否 / move linked staff to other-group company: 拒否)。"
+  },
+  "expected": "talent_rls_check.sql に (a) 雇用の company_id を他グループの会社に付け替える UPDATE、(b) group_id が NULL の会社への紐づけ、の 2 シナリオを追加し、それぞれ拒否を確認する。",
+  "routeToPhase": "Phase 1a (Planner) 経由で Phase 2a(TDD-Writer が DB シナリオを追加)"
+}

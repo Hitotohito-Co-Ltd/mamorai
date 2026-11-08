@@ -1,0 +1,17 @@
+{
+  "id": "FIND-805",
+  "round": 8,
+  "severity": "LOW",
+  "dimension": "D2 Edge Case Coverage",
+  "file": "packages/input-core/src/talent/renewal.ts",
+  "lines": "28,54",
+  "severityRationale": "Low: 呼び出し側の契約違反の入力に限られ、仕様に値域の規定が無い。期限の見落としが起きるのは呼び出し側が不正な値を渡した場合のみ。",
+  "evidence": {
+    "filePath": "packages/input-core/src/talent/renewal.ts",
+    "lineRange": "28,54",
+    "snippet": "const urgency: RenewalUrgency = daysLeft < 0 ? 'expired' : daysLeft <= soonDays ? 'soon' : 'ok'\nexport function listRenewals(people: PersonProfile[], referenceDate: string, soonDays = 30)",
+    "reproduction": "soonDays を検証しない。scratch(h1.test.ts): 在留期限が 9 日後の人に soonDays=NaN → []、soonDays=-1 → [](期限当日の項目も落ちる)、soonDays='30'(文字列)は 30 として動く。基準日は不正なら RangeError にするのに、soonDays は黙って項目を消す(Silent failure)。仕様は『30 日以内』の既定のみで soonDays の値域は未規定。s8 に soonDays の不正値のテストは無い(0 / 7 / 既定 30 のみ)。"
+  },
+  "expected": "soonDays が有限の 0 以上の整数でなければ RangeError にする(または仕様に値域を書く)。",
+  "routeToPhase": "Phase 1a (Planner) → Phase 2b (Generator)"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "FIND-802",
+  "round": 8,
+  "severity": "MEDIUM",
+  "dimension": "D5 Verification Readiness",
+  "file": "packages/input-core/src/talent/renewal.ts",
+  "lines": "46",
+  "severityRationale": "Medium: 接頭辞の並びを守るテストは存在する(部分的に守る)が、比較関数の戻り値の片側(長いほうが後)を固定するテストが無く変異が生存する。実装自体は正しく、出力の順序が崩れるのは変異のみなので High にはしない。",
+  "evidence": {
+    "filePath": "packages/input-core/src/talent/renewal.ts",
+    "lineRange": "46",
+    "snippet": "return x.length === y.length ? 0 : x.length < y.length ? -1 : 1",
+    "reproduction": "変異『x.length < y.length ? -1 : 1』の最後の 1 を 0 にしたコピー(scratch adv8/mut/demo)で s8 613+24 件と purity が全て PASS(生存)。同値ではない: 同じ人数・同じ daysLeft で personId が前方一致(ab と abc)かつ種別が違う入力(ab=residence、abc=contract)で、入力順 [ab, abc] だと出力が 'abc:contract, ab:residence'(コードポイント順に反する)、[abc, ab] だと正しい順になり、結果が入力順に依存する(スクリプト adv8/mut/demo/src/__tests__/zz_demo.test.ts)。正規実装は両方 'ab:residence, abc:contract'。MANIFEST の第5回『personId 接頭辞の並び(ab/abc、''/a)』テストはあるが、同じ種別のため比較が 0 を返しても順序が崩れない。自動変異 323 件中、同値を除く生存はこの 1 件のみ。"
+  },
+  "expected": "前方一致の personId × 異なる種別(ab=residence と abc=contract)を、入力順を入れ替えて 2 通り検証するテストを追加する。",
+  "routeToPhase": "Phase 1a (Planner) 経由で Phase 2a(TDD-Writer が該当分を再生成)"
+}

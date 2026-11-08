@@ -1,0 +1,17 @@
+{
+  "id": "FIND-808",
+  "round": 8,
+  "severity": "LOW",
+  "dimension": "D5 Verification Readiness",
+  "file": "supabase/migrations/0413_talent_hardening2.sql; 0410_talent_foundation.sql",
+  "lines": "0413:68-69; 0410:165-168",
+  "severityRationale": "Low: 変異は拒否側(安全側)に倒れ、他社の情報は漏れない。正常系の対の欠落であり、REQ を破る再現は無い。",
+  "evidence": {
+    "filePath": "supabase/migrations/0413_talent_hardening2.sql; 0410_talent_foundation.sql",
+    "lineRange": "0413:68-69; 0410:165-168",
+    "snippet": "select company_id into v_slot_company from public.jyoban_slots where id = new.slot_id;   -- 0413:69\nusing (exists (select 1 from public.companies c where c.group_id = groups.id and c.id = public.app_company_id()))   -- 0410:165",
+    "reproduction": "自動変異で生存: (1) 0413:69 の『id = new.slot_id』→『id <> new.slot_id』: 他の勤務枠の会社を引くため、自社の勤務枠でも拒否される(正常な slot_id 付きシフトが保存できなくなる)。テストの勤務枠は B 社の 1 件だけ(talent_rls_check.sql:303)で、『自社の slot_id なら登録できる』対のシナリオが無い。(2) 0410:165/168 の『c.id = app_company_id()』→『<>』: 会社が自分のグループ・職種を読めなくなる(安全側に倒れるので他グループは見えない 38/39 は通る)。自社のグループ・職種が読めることのシナリオが無い。いずれも安全側の誤動作で、漏えいにはならない。"
+  },
+  "expected": "自社の slot_id を持つシフトの登録(可)、自社のグループ・職種の参照(可)の対を追加する。",
+  "routeToPhase": "Phase 1a (Planner) 経由で Phase 2a"
+}

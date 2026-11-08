@@ -1,0 +1,17 @@
+{
+  "id": "FIND-809",
+  "round": 8,
+  "severity": "LOW",
+  "dimension": "D4 Structural Integrity",
+  "file": "supabase/migrations/0413_talent_hardening2.sql; 0414_talent_integrity.sql",
+  "lines": "0413:10-19; 0414:23-34",
+  "severityRationale": "Low: デッドコード・冗長な防御で、攻撃は再現できない。",
+  "evidence": {
+    "filePath": "supabase/migrations/0413_talent_hardening2.sql; 0414_talent_integrity.sql",
+    "lineRange": "0413:10-19; 0414:23-34",
+    "snippet": "create or replace function public.app_company_has_person(p_person_id uuid) returns boolean ... grant execute ... to authenticated;\n-- 0414: create or replace function public.jobs_guard_delete() ... where s.job_id = old.id",
+    "reproduction": "(1) app_company_has_person は 0418 で persons_company_read から使われなくなった(grep: 参照するポリシー・関数が無い)が、authenticated に EXECUTE が残る SECURITY DEFINER の関数のまま。自社の雇用に当該 person があるかを返すだけで漏えいは無い(scratch で P2 に false)。(2) jobs_guard_delete は冗長: 変異『raise を null に』『join の =→<>』『where s.job_id <> old.id』が全て生存(案件の削除は子のシフトの削除トリガ job_shifts_guard_delete が止めるため、案件側のガードが単独では効いていることを示すテストが無く、消しても振る舞いが変わらない)。"
+  },
+  "expected": "未使用関数の削除(または用途を明記)、案件側ガードの要否を決める(要るなら単独で効くことを示すテスト)。",
+  "routeToPhase": "Phase 2b-r (Refactor Agent)"
+}

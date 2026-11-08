@@ -1,0 +1,17 @@
+{
+  "id": "FIND-801",
+  "round": 8,
+  "severity": "MEDIUM",
+  "dimension": "D1 Spec Fidelity",
+  "file": "packages/input-core/src/talent/renewal.ts",
+  "lines": "76-80",
+  "severityRationale": "Medium: 仕様の文面との不一致は実在するが、影響は『基準年度の現任教育が済んでいる人の不正な修了日が一覧に出ない』に限られる(その年度の期限は残っておらず、翌年度は pending で出る。checkEligibility は常に invalid_input で応募を止める)。Critical/High の『法令違反の応募が通る』『期限の見落とし』には至らないため、特定条件の誤動作として Medium。",
+  "evidence": {
+    "filePath": "packages/input-core/src/talent/renewal.ts",
+    "lineRange": "76-80",
+    "snippet": "} else if (t.basicDoneOn !== undefined && !isRealDate(t.basicDoneOn)) {\n  // 新任教育の修了日が不正: 今年度の現任が済んでいなければ、判定できない項目として返す\n  if (!t.annualFiscalYears.includes(fy)) out.push(invalidItem(p.personId, 'annual_training', `${fy + 1}-03-31`))",
+    "reproduction": "spec/behavioral-spec.md 契約の末尾: 『新任教育の修了日が不正な人は、`annual_training` の invalid 項目（`dueOn` は年度末）を返す。』は無条件の文。実装は『今年度の現任教育が済んでいる人』には返さない。scratch(adv8/ts/h1.test.ts): listRenewals([{guardTraining:{basicDoneOn:'garbage', annualFiscalYears:[2026]}}], '2027-03-10') => [] (仕様の文面どおりなら invalid 項目 1 件)。同 annualFiscalYears:[2025] => invalid 1 件。さらに s8 テスト(s8_talent_req026_034.test.ts:3853-3870『basicDoneOn が不正でも今年度の現任教育済みなら annual_training の invalid 項目は出ない』)が実装の挙動を仕様として固定しており、仕様の文面と食い違うテストになっている(ミラーテスト化)。"
+  },
+  "expected": "仕様とテスト・実装のどちらかを揃える。(a) 仕様の文面が意図なら実装とテスト 3853- を無条件に直す、(b) 実装の挙動が意図なら Planner が仕様に『今年度の現任教育が済んでいる人は除く』と明記する(コメントだけが根拠になっている)。",
+  "routeToPhase": "Phase 1a (Planner) で意図を確定 → Spec-Validator → Phase 2a で該当テスト再生成 → Phase 2b"
+}

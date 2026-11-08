@@ -1,54 +1,53 @@
 {
   "sprint": 8,
-  "evaluator": "⑫ Adversary 鵜飼 玄(第7回, Fresh Context)",
+  "round": 8,
+  "evaluator": "⑫ Adversary 鵜飼 玄(第8回, Fresh Context)",
   "evaluatedAt": "2026-11-08",
-  "scope": "REQ-026〜033, 034a, 035a, インターフェース契約(境界の確定を含む), KR-1〜5(記述と実態の照合のみ), NFR-05。034b/035b/036以降と OQ-12a/b/c, OQ-16〜22 は対象外。",
-  "verdictRule": "Critical または High が 1 件でもあれば FAIL、Medium と Low のみなら PASS(Medium は次スプリントへ登録)。各次元の PASS/FAIL も同じ基準(次元内に Critical/High があれば FAIL)。",
+  "repoState": "feat/talent-foundation @ 304fc27(spec v2.27。コード・マイグレーションは 3063bae と同一。評価中に ⑪ 再監査と仕様 v2.26/v2.27 のコミットが入ったが、差分は docs/spec のみ)",
+  "scope": "REQ-026〜033, 034a, 035a, インターフェース契約(境界の確定を含む), KR-1〜5(記述と実態の照合のみ), NFR-05。034b/035b/036以降と OQ-12a/b/c, OQ-16〜22 は対象外。重点: 0419・0420・eligibility.ts/renewal.ts の第7回以降の差分。",
+  "verdictRule": "Critical または High が 1 件でもあれば FAIL、Medium と Low のみなら PASS(Medium は次スプリントへ登録)。各次元の PASS/FAIL も同じ基準。",
   "dimensions": {
     "D1_SpecFidelity": {
       "result": "PASS",
-      "note": "Critical/High なし。Medium 1 件 FIND-005(REQ-034a の応募の DB 拒否が KR-1 の列挙に無い)、Low 1 件(FIND-010 計測要件)。",
+      "note": "Critical/High なし。Medium 1 件 FIND-801(無効な新任修了日 × 今年度の現任済み)。checkEligibility は独立オラクルとの差分ファズ 300,000 件、listRenewals は 20,000 件で差分 0。",
       "findings": [
-        "FIND-005",
-        "FIND-010"
+        "FIND-801"
       ]
     },
     "D2_EdgeCaseCoverage": {
       "result": "PASS",
-      "note": "境界値(18歳・60/61日・8時間・3/31-4/1・30/31日)・不正入力・空データを TS 574 件と変異 461 件で確認。Low 1 件 FIND-008。",
+      "note": "境界値(18歳・60/61日・8時間・年度境界・30/31日・24時間勤務・古い年)はファズと変異で確認。Low 1 件 FIND-805(soonDays の不正値)。",
       "findings": [
-        "FIND-008"
+        "FIND-805"
       ]
     },
     "D3_ImplementationCorrectness": {
       "result": "PASS",
-      "note": "仕様の REQ を破る実装の穴は再現できず。DB は越境・権限昇格・情報漏えいの攻撃シナリオ(約 60 本)を全て防いだ。Low 1 件 FIND-007(renewal.ts の 0〜99 年)。",
-      "findings": [
-        "FIND-007"
-      ]
+      "note": "仕様を破る実装の穴は再現できず。DB は越境・権限昇格・情報漏えい・RLS 抜けの攻撃シナリオ約 65 本を全て防御(0419 の TRUNCATE/応募書込、0420 のグループ一致を含む)。",
+      "findings": []
     },
     "D4_StructuralIntegrity": {
       "result": "PASS",
-      "note": "追加のみ方針は守られている(既存ファイルの変更は index.ts への export 追加、vitest.config の coverage 対象追加、pipeline-state、spec のみ)。Low 1 件 FIND-009(冗長コード)。",
+      "note": "追加のみ方針は守られている(既存ファイルは index.ts の export 追加、vitest.config の coverage 追加、package.json/pnpm-lock の overrides のみ。frozen-lockfile の web-push 不一致は main でも同じで本ブランチ起因でない)。Low 2 件 FIND-806/809。",
       "findings": [
-        "FIND-009"
+        "FIND-806",
+        "FIND-809"
       ]
     },
     "D5_VerificationReadiness": {
       "result": "PASS",
-      "note": "High 以上なし。TS テストの変異耐性は高い(461 変異中、同値を除く生存は 1 件: FIND-004)。DB テストは変異 110 件中 41 件が生存し、同値・重複防御を除いた実質の穴を Medium 3 件(FIND-001/002/003)と Low 2 件(FIND-006/010)で登録。次スプリントへ登録。",
+      "note": "High 以上なし。TS 変異 323 件中、同値を除く生存は 1 件(FIND-802)。DB は 0419 の手書き変異 17 件を全て検出、0420 は 8 件中 4 件が生存(うち 2 件は同値。実質の穴 2 件が FIND-803)。CHECK 制約の境界と正常系に穴(FIND-804)。Medium 3 件は次スプリントへ登録。",
       "findings": [
-        "FIND-001",
-        "FIND-002",
-        "FIND-003",
-        "FIND-004",
-        "FIND-006",
-        "FIND-010"
+        "FIND-802",
+        "FIND-803",
+        "FIND-804",
+        "FIND-807",
+        "FIND-808"
       ]
     },
     "D6_AIOutputQuality": {
       "result": "N/A",
-      "note": "LLM 機能なし(packages/input-core/src/talent と migrations 0410-0418 に LLM 呼出しなし)。",
+      "note": "LLM 機能なし(packages/input-core/src/talent と migrations 0410-0420 に LLM 呼出しなし)。",
       "findings": []
     }
   },
@@ -56,88 +55,87 @@
   "findingCounts": {
     "CRITICAL": 0,
     "HIGH": 0,
-    "MEDIUM": 5,
+    "MEDIUM": 4,
     "LOW": 5
   },
   "findings": [
     {
-      "id": "FIND-001",
-      "severity": "MEDIUM",
-      "dimension": "D5 Verification Readiness",
-      "file": "supabase/tests/talent_rls_check.sql",
-      "lines": "252-262"
-    },
-    {
-      "id": "FIND-002",
-      "severity": "MEDIUM",
-      "dimension": "D5 Verification Readiness",
-      "file": "supabase/migrations/0417_talent_boundary_status_space.sql",
-      "lines": "22-24"
-    },
-    {
-      "id": "FIND-003",
-      "severity": "MEDIUM",
-      "dimension": "D5 Verification Readiness",
-      "file": "supabase/migrations/0418_talent_persons_rls_perf.sql",
-      "lines": "8-19"
-    },
-    {
-      "id": "FIND-004",
-      "severity": "MEDIUM",
-      "dimension": "D5 Verification Readiness",
-      "file": "packages/input-core/src/talent/eligibility.ts",
-      "lines": "186"
-    },
-    {
-      "id": "FIND-005",
+      "id": "FIND-801",
       "severity": "MEDIUM",
       "dimension": "D1 Spec Fidelity",
-      "file": "supabase/migrations/0412_talent_hardening.sql",
-      "lines": "61-89"
-    },
-    {
-      "id": "FIND-006",
-      "severity": "LOW",
-      "dimension": "D5 Verification Readiness",
-      "file": "supabase/migrations/0410_talent_foundation.sql",
-      "lines": "21-55"
-    },
-    {
-      "id": "FIND-007",
-      "severity": "LOW",
-      "dimension": "D3 Implementation Correctness",
       "file": "packages/input-core/src/talent/renewal.ts",
-      "lines": "19-22"
+      "lines": "76-80"
     },
     {
-      "id": "FIND-008",
+      "id": "FIND-802",
+      "severity": "MEDIUM",
+      "dimension": "D5 Verification Readiness",
+      "file": "packages/input-core/src/talent/renewal.ts",
+      "lines": "46"
+    },
+    {
+      "id": "FIND-803",
+      "severity": "MEDIUM",
+      "dimension": "D5 Verification Readiness",
+      "file": "supabase/migrations/0420_talent_staff_person_group.sql",
+      "lines": "14-25"
+    },
+    {
+      "id": "FIND-804",
+      "severity": "MEDIUM",
+      "dimension": "D5 Verification Readiness",
+      "file": "supabase/migrations/0414_talent_integrity.sql",
+      "lines": "43,47,51 (および 0415_talent_integrity2.sql:11)"
+    },
+    {
+      "id": "FIND-805",
       "severity": "LOW",
       "dimension": "D2 Edge Case Coverage",
       "file": "packages/input-core/src/talent/renewal.ts",
-      "lines": "66-67"
+      "lines": "28,54"
     },
     {
-      "id": "FIND-009",
+      "id": "FIND-806",
       "severity": "LOW",
       "dimension": "D4 Structural Integrity",
-      "file": "packages/input-core/src/talent/renewal.ts",
-      "lines": "92-100"
+      "file": "packages/input-core/src/talent/eligibility.ts; renewal.ts",
+      "lines": "eligibility.ts:118, 21-24; renewal.ts:18-23, 76-78"
     },
     {
-      "id": "FIND-010",
+      "id": "FIND-807",
+      "severity": "LOW",
+      "dimension": "D5 Verification Readiness (⑤ ドキュメントの整合)",
+      "file": "spec/tests/sprint-8/MANIFEST.md",
+      "lines": "5,7,126,175-176"
+    },
+    {
+      "id": "FIND-808",
       "severity": "LOW",
       "dimension": "D5 Verification Readiness",
-      "file": "spec/tests/sprint-8/MANIFEST.md",
-      "lines": "5,126,175"
+      "file": "supabase/migrations/0413_talent_hardening2.sql; 0410_talent_foundation.sql",
+      "lines": "0413:68-69; 0410:165-168"
+    },
+    {
+      "id": "FIND-809",
+      "severity": "LOW",
+      "dimension": "D4 Structural Integrity",
+      "file": "supabase/migrations/0413_talent_hardening2.sql; 0414_talent_integrity.sql",
+      "lines": "0413:10-19; 0414:23-34"
     }
   ],
-  "carryOverToNextSprint": [
-    "FIND-001",
-    "FIND-002",
-    "FIND-003",
-    "FIND-004",
-    "FIND-005"
-  ],
-  "searchLog": "searchLog.md",
-  "contextAttestation": "builder(⑧⑨⑩)の会話・過去の Adversary 評価は参照していない。入力はディスク上の成果物のみ(spec/behavioral-spec.md 追補、packages/input-core/src/talent、supabase/migrations 0410-0418、テスト、spec/evidence、MANIFEST)。spec/security-report.md は評価の途中で出現したため、DB 攻撃・変異は自分で先に実行し、同報告の内容には結論を依存させていない。リポジトリの編集は spec/reviews/sprint-8/output/ 配下のみ。"
+  "round7Carryover": {
+    "FIND-001": "未是正(talent_rls_check.sql の該当シナリオに変更なし。MEDIUM のまま次スプリント)",
+    "FIND-002": "未是正(0417:22 の変異が引き続き生存)",
+    "FIND-003": "未是正(0418:13-15 の ACL 変異が引き続き生存)",
+    "FIND-004": "是正済み(夜間判定のシフト単位は自動変異で全て検出)",
+    "FIND-005": "実質解消(0419 で応募の INSERT/UPDATE/DELETE 権限を取り消し。書込手段は Sprint 9 の RPC。KR-1 に反映済み)",
+    "FIND-006": "未是正(0410 の staff 制約・既定値などは引き続き未テスト)",
+    "FIND-007": "是正済み(renewal.ts は utcMs を使用。0099-12-31 → daysLeft -2 を実測)",
+    "FIND-008": "未是正(Low)",
+    "FIND-009": "未是正(Low)",
+    "FIND-010": "一部是正(版のみ。残りは FIND-807)"
+  },
+  "knownRisksNotRegistered": "KR-7(上限なし・TypeError・0420 の遡及なし/運営の group_id 変更・不可視文字)、KR-4/OQ-23(既存表の TRUNCATE/TRIGGER)は仕様に既知として記載済みのため Finding にしない(実測で TypeError・groups.group_id 変更後の不整合・app_profiles の TRUNCATE 成功を再現し、記述と一致することを確認)。",
+  "searchLog": "searchLog.md の『第8回』節を参照",
+  "contextAttestation": "Fresh Context。builder の会話履歴・自己評価・過去の Adversary 評価を判断材料にせず、ディスク上の仕様・実装・テスト・マイグレーションと scratch での実行結果のみを根拠にした。第7回の成果物は『carryover』の照合にのみ参照した。"
 }
