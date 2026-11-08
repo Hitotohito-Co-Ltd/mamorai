@@ -8,5 +8,11 @@
     "test:core": "pnpm --filter @mamorai/input-core test",
     "build:core": "pnpm --filter @mamorai/input-core build"
   },
-  "packageManager": "pnpm@10.28.0"
+  "packageManager": "pnpm@10.28.0",
+  "pnpm": {
+    "overrides": {
+      "brace-expansion@>=2.0.0 <2.1.7": "^2.1.7",
+      "brace-expansion@>=4.0.0 <5.0.12": "^5.0.12"
+    }
+  }
 }

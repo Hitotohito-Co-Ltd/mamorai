@@ -20,8 +20,9 @@
     "reproduction": "-- 特権側（Sprint 9 の RPC を想定して postgres で挿入）: B1社(別グループ)の staff に A グループの person(同意なし)を結ぶ\ninsert into staff(id,company_id,person_id,name,staff_no) values (..., '<B1>', '<A群 同意なし person>', 'link','LINK');\nset role authenticated; set request.jwt.claim.sub='<B1社 company_admin>';\nselect name, birth_date, phone, email, residence_expires_on from persons where group_id='<A群>';\n-- => A1雇用・同意なし 1985-05-05 09033334444 a2@example.com res=2027-01-01\n-- 不整合の検出: select count(*) from staff s join persons p on p.id=s.person_id join companies c on c.id=s.company_id where c.group_id is distinct from p.group_id;  -- => 1"
   },
   "remediation": "staff の person_id 設定時に `persons.group_id = companies.group_id` を検査するトリガ（SECURITY DEFINER）。候補から雇用へ進む RPC は、同意済みであること・同グループであることを内部で再検証し、PII 列は雇用成立後にだけ可視にする。",
-  "status": "open",
+  "status": "fixed_pending_reaudit",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
-  "date": "2026-11-08"
+  "date": "2026-11-08",
+  "fix": "0420_talent_staff_person_group.sql"
 }

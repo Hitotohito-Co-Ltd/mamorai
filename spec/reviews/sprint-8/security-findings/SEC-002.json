@@ -20,8 +20,9 @@
     "reproduction": "set role authenticated; set request.jwt.claim.sub='<A1社 company_admin>';\n-- 同意なし(consent_joint_use=false)の人の応募を、決定者を偽装して確定\nupdate job_applications set status='confirmed', decided_by='社長', decided_at='2020-01-01', conditions_notified_at=now(), conditions_confirmed_at=now() where id='aa11...';  -- => OK rows=1\ndelete from job_applications where id='aa11...';                 -- => OK rows=1（確定済みの記録を削除）\ndelete from job_shifts where job_id='e100...';                   -- => OK rows=1（応募が無くなったのでガードを通過）\ndelete from jobs where id='e100...';                             -- => OK rows=1\n-- 修正の検証\nrevoke insert, update, delete on job_applications from authenticated;\ninsert into job_applications(...) values (... 'confirmed');      -- => ERR: permission denied for table job_applications"
   },
   "remediation": "Sprint 9 の REQ-039 の通り、応募の作成・確定・取消は SECURITY DEFINER の RPC に限り、`job_applications` の insert/update/delete 権限を authenticated から取り消す（RLS の _company ポリシーは select のみに変更）。decided_by は auth.uid() から RPC 内で設定し、クライアント値を受けない。確定済みの応募は物理削除せず状態遷移＋履歴で残す。",
-  "status": "open",
+  "status": "fixed_pending_reaudit",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
-  "date": "2026-11-08"
+  "date": "2026-11-08",
+  "fix": "0419_talent_revoke_privileges.sql"
 }

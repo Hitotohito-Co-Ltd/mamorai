@@ -19,8 +19,9 @@
     "reproduction": "-- 環境: Supabase 既定相当（alter default privileges ... grant all on tables to anon, authenticated）\nset role authenticated; set request.jwt.claim.sub='<A1社 company_admin>';\ntruncate job_applications;            -- => OK（RLS・0414 の削除ガードは TRUNCATE を見ない）\ntruncate persons cascade;             -- => OK。NOTICE: truncate cascades to table \"staff\",\"shifts\",\"staff_sites\",\"jyoban_reports\",\"jyoban_devices\",\"jyoban_slot_staff\",\"jyoban_push_subscriptions\",\"jyoban_notifications\",\"job_applications\"\nselect count(*) from persons;         -- => 0（staff も 0。他社 B1 の行も消えた）\n-- 修正の検証\nrevoke truncate, references, trigger on all tables in schema public from anon, authenticated;\ntruncate job_applications;            -- => ERR: permission denied for table job_applications\ntruncate persons cascade;             -- => ERR: permission denied for table persons"
   },
   "remediation": "マイグレーションに `revoke truncate, references, trigger on public.<新テーブル> from anon, authenticated;` を明記し、`alter default privileges in schema public revoke truncate, references, trigger on tables from anon, authenticated;` を運用手順に入れる。PostgREST 経由では実行できないため直接接続の経路（接続情報の配布先）も棚卸しする。新テーブルには `force row level security` も付ける。",
-  "status": "open",
+  "status": "fixed_pending_reaudit",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
-  "date": "2026-11-08"
+  "date": "2026-11-08",
+  "fix": "0419_talent_revoke_privileges.sql"
 }

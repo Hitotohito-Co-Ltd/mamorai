@@ -20,8 +20,9 @@
     "reproduction": "checkEligibility(person({consentJointUse:'false'}), job())          -> {\"eligible\":true,\"reasons\":[]}      ← 同意なしが通る\ncheckEligibility(person({residence:{workAllowed:'false'}}), job())  -> {\"eligible\":true,\"reasons\":[]}\ncheckEligibility(person({consentJointUse:0}), job()).reasons         -> [\"no_consent\"]\ncheckEligibility(person({guardTraining:null}), job())                -> THROWS TypeError: Cannot read properties of null (reading 'annualFiscalYears')\ncheckEligibility(person({employments:undefined}), job())             -> THROWS TypeError: Cannot read properties of undefined (reading 'some')\ncheckEligibility(person(), job({shifts:null}))                       -> THROWS TypeError\nlistRenewals([null], '2026-11-08')                                   -> THROWS TypeError"
   },
   "remediation": "境界（API/RPC の入口）で Zod により PersonProfile / JobPost / BusyShift をパースし、純粋関数側でも `typeof x === \"boolean\"` と配列・オブジェクトの存在を確認して invalid_input を返す。判定は fail-closed（真偽値でなければ拒否）。",
-  "status": "open",
+  "status": "fixed_pending_reaudit",
   "sprint": 8,
   "reporter": "⑪ Security Engineer（鍵山 剛）",
-  "date": "2026-11-08"
+  "date": "2026-11-08",
+  "fix": "eligibility.ts の型の検証（consentJointUse・workAllowed が boolean）"
 }
