@@ -25,6 +25,17 @@ input,select{font:inherit}
 .pwa-btn-block{display:block;width:100%}
 .pwa-btn-sm{padding:9px 14px;border-radius:10px;background:var(--pri);color:#fff;font-size:14px}
 
+/* ---- 生体認証（顔・指紋）---- */
+.pwa-bio{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.pwa-bio .pwa-btn{width:100%;min-height:52px}
+.pwa-bio .pwa-note{margin-top:4px}
+.pwa-link{background:none;border:none;color:var(--pri);font-size:14px;font-weight:600;padding:10px;min-height:44px;text-decoration:underline}
+.pwa-bio-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 12px 0;display:flex;flex-direction:column;gap:6px}
+.pwa-bio-title{font-weight:700}
+.pwa-bio-card .pwa-note{text-align:left;margin-top:0}
+.pwa-bio-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.pwa-bio-actions .pwa-btn{min-height:44px}
+
 /* ---- シェル ---- */
 .pwa-shell{min-height:100%;display:flex;flex-direction:column;padding-bottom:76px}
 .pwa-head{background:linear-gradient(160deg,var(--navy),var(--navy2));color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;position:sticky;top:0;z-index:5}

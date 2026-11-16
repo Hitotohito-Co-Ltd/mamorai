@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
 import { buildReportUrl, type JyobanSlot, type SlotFieldError } from '@mamorai/input-core'
 import {
-  listSites, listSlots, saveSlot, issueReportToken, setSharedDevice, publicOrigin,
+  listSites, listSlots, saveSlot, issueReportToken, setSharedDevice, setSiteBiometric, publicOrigin,
   JyobanValidationError, type JyobanSite,
 } from './jyobanApi.js'
 import { printSiteQr } from './jyobanPrint.js'
@@ -12,6 +12,8 @@ import {
   getNotifySettings, saveNotifySettings, listSlotStaff, setSlotStaff, setStaffPhone, listNotifications, parseEmails,
   DEFAULT_NOTIFY, type NotifySettings, type SlotStaff, type NotificationLog,
 } from './callsApi.js'
+
+const BIO_LABEL = { off: '使わない', optional: '使える人は使う', required: '必須' } as const
 
 const DOW = ['日', '月', '火', '水', '木', '金', '土']
 const GRACE = [0, 5, 10, 15, 30]
@@ -416,6 +418,20 @@ export function JyobanSettings(): JSX.Element {
                           .then(() => { setSites((p) => p.map((x) => (x.id === site.id ? { ...x, sharedDevice: v } : x))); setToast(`現場スマホを${v ? 'ON' : 'OFF'}にしました`) })
                           .catch((e: Error) => setToast(`保存できませんでした: ${e.message}`))
                       }} />
+                  </div>
+                  <div className="jy-row">
+                    <span><b>顔・指紋の本人確認</b><br /><span className="muted">勤務員のスマホから報告するとき、顔・指紋で本人か確かめます（代理報告の防止）。共用端末は対象外です</span></span>
+                    <select id={`bio-${site.id}`} className="input" aria-label="顔・指紋の本人確認" style={{ maxWidth: 200 }} value={site.biometric}
+                      onChange={(e) => {
+                        const mode = e.target.value as typeof site.biometric
+                        void setSiteBiometric(site.id, mode)
+                          .then(() => { setSites((p) => p.map((x) => (x.id === site.id ? { ...x, biometric: mode } : x))); setToast(`顔・指紋の本人確認を「${BIO_LABEL[mode]}」にしました`) })
+                          .catch((e: Error) => setToast(`保存できませんでした: ${e.message}`))
+                      }}>
+                      <option value="off">{BIO_LABEL.off}</option>
+                      <option value="optional">{BIO_LABEL.optional}</option>
+                      <option value="required">{BIO_LABEL.required}</option>
+                    </select>
                   </div>
                 </div>
               </section>

@@ -7,10 +7,12 @@ import { reportButtons, JYOBAN_OTHER_KINDS, validateOtherReport, type JyobanOthe
 import {
   fetchContext, registerDevice, submitReport, flushOutbox, voidReport, outbox,
   saveDevice, localNow, resolveStart, rememberSite, forgetSite, recentSites,
-  ReportAuthError, NetworkError,
+  ReportAuthError, NetworkError, BioRequiredError, loadDevice,
   type ReportContext, type CtxSlot, type ReportType, type Device, type RecentSite,
 } from './reportApi.js'
 import { pushState, enablePush, type PushState } from './pushApi.js'
+import { biometricAvailable, enrollBiometric, isEnrolled, prepareVerify, verifyBiometric } from '../biometric.js'
+import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser'
 import './jyoban.css'
 
 const TYPE_LABEL: Record<ReportType, string> = { wakeup: '起床連絡', departure: '出発連絡', onduty: '上番連絡', offduty: '下番連絡', other: 'その他の報告' }
@@ -258,6 +260,13 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
   const [pending, setPending] = useState(outbox().length)
   const [online, setOnline] = useState(globalThis.navigator?.onLine !== false)
   const [toast, setToast] = useState<string | null>(null)
+  // 生体認証（顔・指紋）: 端末が使えるか / 送信待ちが本人確認待ちか / 事前に取った確認オプション / 登録状態の再描画用
+  const [bioAvail, setBioAvail] = useState(false)
+  const [needsBio, setNeedsBio] = useState(false)
+  const [bioPrepared, setBioPrepared] = useState<PublicKeyCredentialRequestOptionsJSON | null>(null)
+  const [bioBusy, setBioBusy] = useState(false)
+  const [, setBioTick] = useState(0)
+  useEffect(() => { void biometricAvailable().then(setBioAvail) }, [])
 
   const reload = useCallback(async (): Promise<void> => {
     if (token === null) return
@@ -290,6 +299,7 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
     if (outbox().length === 0) return
     const r = await flushOutbox()
     setPending(r.remaining)
+    setNeedsBio(r.needsBio)
     if (r.sent > 0) setToast(`送信待ちの報告を${r.sent}件送信しました`)
     if (r.failed.length > 0) setToast(`送信できなかった報告があります: ${r.failed[0]!.message}`)
     if (r.sent > 0 || r.failed.length > 0) void reload()
@@ -305,6 +315,18 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); document.removeEventListener('visibilitychange', vis); clearInterval(t) }
   }, [reload, flush])
   useEffect(() => { if (toast === null) return; const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t) }, [toast])
+  // 報告の確認画面を開いた時点で本人確認の準備をしておく（［はい］を押すとすぐ顔・指紋の画面が出るように）
+  const bioMode = ctx?.site.biometric ?? 'off'
+  const wantsBio = ctx !== null && ctx.staff !== null && bioMode !== 'off' && bioAvail && isEnrolled(loadDevice())
+  const asking = confirm !== null || screen.kind === 'other'
+  useEffect(() => {
+    if (!wantsBio || !asking) { setBioPrepared(null); return }
+    const d = loadDevice()
+    if (d === null) return
+    let alive = true
+    void prepareVerify(d).then((o) => { if (alive) setBioPrepared(o) }).catch(() => { /* 押したときに取り直す */ })
+    return () => { alive = false }
+  }, [wantsBio, asking])
 
   if (picking) {
     return (
@@ -342,6 +364,24 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
 
   const send = async (type: ReportType, extra: { otherKind?: JyobanOtherKind; eta?: string; note?: string }, who?: { staffNo: string; pin: string }): Promise<string | null> => {
     if (slot === undefined) return '勤務枠を選んでください'
+    // 個人スマホ: 現場の設定に応じて、送る直前に顔・指紋で本人確認する
+    if (personal && bioMode !== 'off') {
+      const d = loadDevice()
+      if (d !== null && bioAvail && isEnrolled(d)) {
+        try {
+          await verifyBiometric(d, bioPrepared ?? undefined)
+        } catch (e) {
+          setBioPrepared(null)
+          if (bioMode === 'required') return (e as Error).message
+          // 任意の現場では、確認できなくてもそのまま送る（本社には「本人確認なし」と表示）
+        }
+        setBioPrepared(null)
+      } else if (bioMode === 'required') {
+        return bioAvail
+          ? 'この現場は顔・指紋での本人確認が必要です。ホームの「顔・指紋を登録」から登録してください'
+          : 'この現場は顔・指紋での本人確認が必要ですが、このスマホでは使えません。本社に連絡してください'
+      }
+    }
     try {
       const out = await submitReport(token, { slotId: slot.id, type, ...extra, ...(who ?? {}) })
       setConfirm(null)
@@ -351,6 +391,7 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
       return null
     } catch (e) {
       if (e instanceof NetworkError) return '通信できません。現場スマホの場合は電波の良い場所でもう一度押してください'
+      if (e instanceof BioRequiredError) return e.message
       if (e instanceof ReportAuthError && !shared && /本人登録/.test(e.message)) { saveDevice(null); setConfirm(null); setScreen({ kind: 'register' }) }
       return (e as Error).message
     }
@@ -408,6 +449,39 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
           </div>
         )}
         {personal && <PushCard />}
+        {personal && bioMode !== 'off' && (() => {
+          const d = loadDevice()
+          if (d === null) return null
+          if (!bioAvail) {
+            return bioMode === 'required'
+              ? <p className="jy-err" role="alert">この現場は顔・指紋での本人確認が必要ですが、このスマホでは使えません。本社に連絡してください。</p>
+              : null
+          }
+          if (isEnrolled(d)) {
+            return needsBio ? (
+              <div className="jy-card">
+                <p className="jy-lead">送信待ちの報告があります。顔・指紋で本人確認すると送信します。</p>
+                <button type="button" className="jy-btn jy-btn-navy" disabled={bioBusy} onClick={() => {
+                  setBioBusy(true)
+                  void verifyBiometric(d).then(() => flush()).catch((e: Error) => setToast(e.message)).finally(() => setBioBusy(false))
+                }}>{bioBusy ? '確認中…' : '顔・指紋で確認して送信'}</button>
+              </div>
+            ) : <p className="jy-note">報告のときに顔・指紋で本人確認します{bioMode === 'required' ? '（この現場は必須）' : ''}。</p>
+          }
+          return (
+            <div className="jy-card">
+              <p className="jy-lead">{bioMode === 'required'
+                ? 'この現場は、報告のときに顔・指紋での本人確認が必要です。最初に一度だけ登録してください。'
+                : 'この現場では、報告のときに顔・指紋で本人確認できます。'}</p>
+              <button type="button" className="jy-btn jy-btn-navy" disabled={bioBusy} onClick={() => {
+                setBioBusy(true)
+                void enrollBiometric(d).then(() => { setToast('顔・指紋を登録しました'); setBioTick((n) => n + 1) })
+                  .catch((e: Error) => setToast(e.message)).finally(() => setBioBusy(false))
+              }}>{bioBusy ? '登録中…' : '顔・指紋を登録'}</button>
+              <p className="jy-note">顔・指紋のデータはこのスマホの中だけで使われ、会社には送られません。</p>
+            </div>
+          )
+        })()}
         {shared && <p className="jy-lead">報告するときに、スタッフNoとPINで本人確認します。</p>}
         {pending > 0 && <p className="jy-pending" role="status">送信待ち {pending}件 ｜ 電波が戻ると自動で送ります</p>}
 

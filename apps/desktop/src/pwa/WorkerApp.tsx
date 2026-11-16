@@ -1,6 +1,6 @@
 // [勤務員PWA] スマホ特化シェル。スタッフログイン→ボトムナビで5機能。
 //   上番報告(出発/上番連絡・現場QR登録) / 希望(シフト希望提出) / 有給(有給申請) / 研修(講習会申込) / 連絡(お知らせ・業務連絡)
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signInStaff, changeStaffPin, type Staff } from './staff.js'
 import { isSupabaseConfigured } from '../lib/supabaseClient.js'
 import { APP_VERSION } from '../version.js'
@@ -9,8 +9,12 @@ import { LeaveApply } from './screens/LeaveApply.js'
 import { TrainingApplyPwa } from './screens/TrainingApplyPwa.js'
 import { Notices } from './screens/Notices.js'
 import { JyobanTab } from './jyoban/JyobanTab.js'
-import { ensureLoginDevice, saveDevice } from './jyoban/reportApi.js'
+import { ensureLoginDevice, saveDevice, loadDevice } from './jyoban/reportApi.js'
 import { siteCodes } from '../shared/runtimeCtx.js'
+import { SITE } from '../pilot/bulgari.js'
+import {
+  biometricAvailable, enrollBiometric, isEnrolled, verifyBiometric, forgetEnrollment, enrollDismissed, dismissEnroll,
+} from './biometric.js'
 
 type PwaTab = 'jyoban' | 'hope' | 'leave' | 'training' | 'notice'
 const TABS: { key: PwaTab; label: string; icon: string }[] = [
@@ -25,6 +29,20 @@ function StaffLogin({ onLogin }: { onLogin: (s: Staff, pin: string) => void }): 
   const [no, setNo] = useState('')
   const [pin, setPin] = useState('')
   const [err, setErr] = useState<string | null>(null)
+  // 顔・指紋でログイン: この端末で本人登録済み・顔・指紋も登録済みのときだけ出す
+  const [device, setDevice] = useState(loadDevice)
+  const [bioReady, setBioReady] = useState(false)
+  const [bioBusy, setBioBusy] = useState(false)
+  useEffect(() => { if (isEnrolled(device)) void biometricAvailable().then(setBioReady) }, [device])
+  const bioLogin = (): void => {
+    if (device === null) return
+    setBioBusy(true); setErr(null)
+    void verifyBiometric(device)
+      .then((v) => onLogin({ no: v.no, name: v.name, dob: '', dept: v.dept, sites: [SITE.name], pinMustChange: false }, ''))
+      .catch((e: Error) => { setErr(e.message); if (!isEnrolled(device)) setBioReady(false) })
+      .finally(() => setBioBusy(false))
+  }
+  const otherPerson = (): void => { saveDevice(null); forgetEnrollment(); setDevice(null); setBioReady(false) }
   const submit = (): void => {
     void signInStaff(no, pin).then((s) => {
       if (s === null) { setErr('スタッフNoまたはPINが正しくありません'); return }
@@ -36,6 +54,15 @@ function StaffLogin({ onLogin }: { onLogin: (s: Staff, pin: string) => void }): 
       <div className="pwa-login-card">
         <img src="/logo-full.png" alt="MAMOR-AI" className="pwa-login-logo" />
         <p className="pwa-login-sub">勤務員アプリ</p>
+        {bioReady && device !== null && (
+          <div className="pwa-bio">
+            <button type="button" className="pwa-btn pwa-btn-primary" disabled={bioBusy} onClick={bioLogin}>
+              {bioBusy ? '確認中…' : `顔・指紋でログイン（${device.staffName} さん）`}
+            </button>
+            <button type="button" className="pwa-link" onClick={otherPerson}>別の人でログインする</button>
+            <p className="pwa-note">または、スタッフNoとPINでログイン</p>
+          </div>
+        )}
         <label className="pwa-field">スタッフNo
           <input className="pwa-input" inputMode="numeric" value={no} onChange={(e) => setNo(e.target.value)} placeholder="例: 783" />
         </label>
@@ -46,6 +73,35 @@ function StaffLogin({ onLogin }: { onLogin: (s: Staff, pin: string) => void }): 
         <button type="button" className="pwa-btn pwa-btn-primary" onClick={submit}>ログイン</button>
         <p className="pwa-note">初期PINは生年月日の月日（例: 783 → 0415）。初回ログイン後に変更します。</p>
         <p className="pwa-note" style={{ marginTop: 6, fontSize: 11 }}>{APP_VERSION} / DB接続: {isSupabaseConfigured() ? 'ON' : 'OFF'}</p>
+      </div>
+    </div>
+  )
+}
+
+/** PINでログインしたあと、次回から顔・指紋でログインできるよう案内する（使える端末のみ・一度断ったら出さない）。 */
+function BioEnrollCard(): JSX.Element | null {
+  const [show, setShow] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  useEffect(() => {
+    const d = loadDevice()
+    if (d === null || isEnrolled(d) || enrollDismissed(d)) return
+    void biometricAvailable().then(setShow)
+  }, [])
+  if (!show) return null
+  const d = loadDevice()
+  if (d === null) return null
+  return (
+    <div className="pwa-bio-card" role="region" aria-label="顔・指紋でログイン">
+      <p className="pwa-bio-title">次回から顔・指紋でログインしますか？</p>
+      <p className="pwa-note">PINを入力せずにログインでき、上番報告の本人確認にも使えます。顔・指紋のデータはこのスマホの中だけで使われ、会社には送られません。</p>
+      {msg && <p className="pwa-err" role="alert">{msg}</p>}
+      <div className="pwa-bio-actions">
+        <button type="button" className="pwa-btn pwa-btn-primary" disabled={busy} onClick={() => {
+          setBusy(true); setMsg(null)
+          void enrollBiometric(d).then(() => setShow(false)).catch((e: Error) => setMsg(e.message)).finally(() => setBusy(false))
+        }}>{busy ? '登録中…' : '顔・指紋を登録'}</button>
+        <button type="button" className="pwa-link" onClick={() => { dismissEnroll(d); setShow(false) }}>あとで</button>
       </div>
     </div>
   )
@@ -101,7 +157,11 @@ export function WorkerApp(): JSX.Element {
       <header className="pwa-head">
         <div className="pwa-head-top">
           <img src="/logo-full.png" alt="MAMOR-AI" className="pwa-head-logo" />
-          <button type="button" className="pwa-logout" onClick={() => { saveDevice(null); setDeviceError(null); setStaff(null) }}>ログアウト</button>
+          <button type="button" className="pwa-logout" onClick={() => {
+            // 顔・指紋を登録した端末は、次回も顔・指紋でログインできるよう端末登録を残す
+            if (!isEnrolled(loadDevice())) saveDevice(null)
+            setDeviceError(null); setStaff(null)
+          }}>ログアウト</button>
         </div>
         <div className="pwa-head-staff">
           <span className="pwa-staff-name">{staff.name}</span>
@@ -115,6 +175,7 @@ export function WorkerApp(): JSX.Element {
       </header>
 
       <main className="pwa-main">
+        {deviceError === null && <BioEnrollCard />}
         {tab === 'jyoban' && <JyobanTab deviceError={deviceError} />}
         {tab === 'hope' && <ShiftHope staff={staff} site={site} />}
         {tab === 'leave' && <LeaveApply staff={staff} site={site} />}

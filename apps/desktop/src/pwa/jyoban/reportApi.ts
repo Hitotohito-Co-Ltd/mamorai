@@ -12,7 +12,7 @@ export type ReportType = 'wakeup' | 'departure' | 'onduty' | 'offduty' | 'other'
 export interface CtxReport extends JyobanReport { id: string }
 export interface CtxSlot extends JyobanSlot { workDate: string; reports: CtxReport[] }
 export interface ReportContext {
-  site: { name: string; dept: string; shared: boolean }
+  site: { name: string; dept: string; shared: boolean; biometric: BiometricMode }
   staff: { no: string; name: string } | null
   /** サーバ時刻（現地）'YYYY-MM-DDTHH:MM' */
   now: string
@@ -35,6 +35,10 @@ export interface SubmitResult { reportId: string; workDate: string; receivedAt: 
 export class ReportAuthError extends Error {}
 /** 通信できなかった（送信待ちに回す）。 */
 export class NetworkError extends Error {}
+/** この現場は顔・指紋の本人確認が必要（確認してから送り直す）。 */
+export class BioRequiredError extends Error {}
+
+export type BiometricMode = 'off' | 'optional' | 'required'
 
 const DB = (): boolean => isSupabaseConfigured()
 const K_DEVICE = 'mamorai.jyoban.device'
@@ -117,6 +121,7 @@ function isNetworkMessage(m: string): boolean {
   return /fetch|network|load failed|timeout/i.test(m)
 }
 function raise(error: { message: string }): never {
+  if (error.message.includes('BIO_REQUIRED')) throw new BioRequiredError(error.message.replace(/^.*BIO_REQUIRED:\s*/, ''))
   if (isNetworkMessage(error.message) || globalThis.navigator?.onLine === false) throw new NetworkError(error.message)
   throw new Error(error.message)
 }
@@ -135,7 +140,7 @@ interface CtxJson {
 }
 function ctxFrom(j: CtxJson): ReportContext {
   return {
-    site: { name: j.site.name, dept: j.site.dept ?? '', shared: j.site.shared },
+    site: { name: j.site.name, dept: j.site.dept ?? '', shared: j.site.shared, biometric: 'off' },
     staff: j.staff,
     now: j.now,
     slots: j.slots.map((s) => ({
@@ -172,16 +177,23 @@ function demoContext(token: string, device: Device | null): ReportContext {
       && (device !== null ? r.staffNo === device.staffNo : site.sharedDevice))
     slots.push({ ...s, workDate: wd, reports })
   }
-  return { site: { name: site.name, dept: site.dept, shared: site.sharedDevice }, staff: device ? { no: device.staffNo, name: device.staffName } : null, now, slots }
+  return { site: { name: site.name, dept: site.dept, shared: site.sharedDevice, biometric: 'off' }, staff: device ? { no: device.staffNo, name: device.staffName } : null, now, slots }
 }
 
 // ── 公開API ──
 export async function fetchContext(token: string): Promise<ReportContext> {
   const device = loadDevice()
   if (!DB()) return demoContext(token, device)
-  const { data, error } = await getSupabase()!.rpc('jyoban_context', { p_token: token, p_device_secret: device?.secret ?? null })
+  const sb = getSupabase()!
+  const [{ data, error }, bio] = await Promise.all([
+    sb.rpc('jyoban_context', { p_token: token, p_device_secret: device?.secret ?? null }),
+    sb.rpc('jyoban_site_biometric', { p_token: token }),
+  ])
   if (error !== null) raise(error)
   const ctx = ctxFrom(data as CtxJson)
+  // 0410 未適用の環境では関数がないので 'off' として扱う
+  const mode = bio.error === null ? bio.data : null
+  ctx.site.biometric = mode === 'optional' || mode === 'required' ? mode : 'off'
   if (device !== null && ctx.staff === null) saveDevice(null) // 失効・他社・退職済みの端末登録は破棄
   return ctx
 }
@@ -300,11 +312,12 @@ export async function submitReport(token: string, input: SubmitInput): Promise<S
 }
 
 /** 送信待ちを順に送る。通信できなければ残す。サーバに拒否されたものは失敗として返す。 */
-export async function flushOutbox(): Promise<{ sent: number; failed: { item: OutboxItem; message: string }[]; remaining: number }> {
+export async function flushOutbox(): Promise<{ sent: number; failed: { item: OutboxItem; message: string }[]; remaining: number; needsBio: boolean }> {
   const items = outbox()
   const failed: { item: OutboxItem; message: string }[] = []
   let sent = 0
   const keep: OutboxItem[] = []
+  let needsBio = false
   for (let i = 0; i < items.length; i++) {
     const it = items[i]!
     try {
@@ -312,11 +325,13 @@ export async function flushOutbox(): Promise<{ sent: number; failed: { item: Out
       sent++
     } catch (e) {
       if (e instanceof NetworkError) { keep.push(...items.slice(i)); break }
+      // 顔・指紋の確認が必要な現場: 捨てずに残し、本人確認のあとで送る
+      if (e instanceof BioRequiredError) { keep.push(...items.slice(i)); needsBio = true; break }
       failed.push({ item: it, message: (e as Error).message })
     }
   }
   setOutbox(keep)
-  return { sent, failed, remaining: keep.length }
+  return { sent, failed, remaining: keep.length, needsBio }
 }
 
 /** 押し間違いの取消（個人スマホ・本人の報告のみ）。 */

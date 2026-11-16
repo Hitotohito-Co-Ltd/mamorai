@@ -14,6 +14,8 @@ export interface JyobanSite {
   tokenIssuedAt: string | null
   sharedDevice: boolean
   slotCount: number
+  /** 上番報告の顔・指紋による本人確認（0410） */
+  biometric: BiometricMode
 }
 
 export class JyobanValidationError extends Error {
@@ -26,6 +28,7 @@ const DB = (): boolean => isSupabaseConfigured()
 interface SiteRow {
   site_id: string; name: string; code: string; dept: string | null; is_active: boolean
   report_token: string | null; report_token_issued_at: string | null; shared_device_enabled: boolean; slot_count: number
+  biometric_mode?: string | null
 }
 interface SlotRow {
   id: string; site_id: string; name: string; work_start: string; work_end: string
@@ -36,6 +39,7 @@ interface SlotRow {
 const siteFrom = (r: SiteRow): JyobanSite => ({
   id: r.site_id, name: r.name, code: r.code, dept: r.dept ?? '', isActive: r.is_active,
   reportToken: r.report_token, tokenIssuedAt: r.report_token_issued_at, sharedDevice: r.shared_device_enabled, slotCount: r.slot_count,
+  biometric: r.biometric_mode === 'optional' || r.biometric_mode === 'required' ? r.biometric_mode : 'off',
 })
 const slotFrom = (r: SlotRow): JyobanSlot => ({
   id: r.id, siteId: r.site_id, name: r.name, workStart: r.work_start, workEnd: r.work_end,
@@ -62,8 +66,8 @@ const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 function seed(): LocalState {
   return {
     sites: [
-      { id: 'demo-lala', name: 'ららぽーと立川立飛', code: 'LALA-01', dept: '交通', isActive: true, reportToken: null, tokenIssuedAt: null, sharedDevice: true, slotCount: 2 },
-      { id: 'demo-coa', name: 'コーチャンフォー若葉台店', code: 'COA-01', dept: '施設', isActive: true, reportToken: null, tokenIssuedAt: null, sharedDevice: false, slotCount: 1 },
+      { id: 'demo-lala', name: 'ららぽーと立川立飛', code: 'LALA-01', dept: '交通', isActive: true, reportToken: null, tokenIssuedAt: null, sharedDevice: true, slotCount: 2, biometric: 'off' },
+      { id: 'demo-coa', name: 'コーチャンフォー若葉台店', code: 'COA-01', dept: '施設', isActive: true, reportToken: null, tokenIssuedAt: null, sharedDevice: false, slotCount: 1, biometric: 'off' },
     ],
     slots: [
       { id: 'demo-lala-1', siteId: 'demo-lala', name: '日勤1（荷捌）', workStart: '08:00', workEnd: '17:00', departureRequired: false, departureDue: null, ondutyRequired: true, ondutyDue: '07:45', graceMin: 5, weekdays: ALL_DAYS, isActive: true, sortOrder: 0 },
@@ -156,6 +160,21 @@ export async function issueReportToken(siteId: string): Promise<string> {
   site.tokenIssuedAt = new Date().toISOString()
   writeLocal(s)
   return site.reportToken
+}
+
+export type BiometricMode = 'off' | 'optional' | 'required'
+
+/** 上番報告の顔・指紋による本人確認を現場ごとに設定する。 */
+export async function setSiteBiometric(siteId: string, mode: BiometricMode): Promise<void> {
+  if (DB()) {
+    const { error } = await getSupabase()!.rpc('company_set_site_biometric', { p_site_id: siteId, p_mode: mode })
+    fail(error)
+    return
+  }
+  const s = readLocal()
+  const site = s.sites.find((x) => x.id === siteId)
+  if (site !== undefined) site.biometric = mode
+  writeLocal(s)
 }
 
 export async function setSharedDevice(siteId: string, enabled: boolean): Promise<void> {

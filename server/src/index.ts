@@ -5,6 +5,7 @@ import cors from 'cors'
 import { createRiskRouter } from './routes/risk.js'
 import { createShiftOptimizeRouter } from './routes/shift-optimize.js'
 import { createJyobanCallsRouter } from './routes/jyoban-calls.js'
+import { createPasskeyRouter } from './routes/passkey.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
 // 開発用に許可オリジンを限定（Vite dev サーバ）。本番は環境変数で上書きする。
@@ -13,6 +14,8 @@ const ALLOWED_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173'
 /** Express アプリを組み立てて返す（テスト/起動の双方から利用可能）。 */
 export function createApp(): Express {
   const app = express()
+  // ホスティングの前段プロキシ越しに本当の送信元IPを使う（回数制限が全員まとめて効かないように）。例: TRUST_PROXY=1
+  if (process.env.TRUST_PROXY) app.set('trust proxy', /^\d+$/.test(process.env.TRUST_PROXY) ? Number(process.env.TRUST_PROXY) : process.env.TRUST_PROXY)
   app.use(cors({ origin: ALLOWED_ORIGIN }))
   app.use(express.json())
   app.get('/health', (_req, res) => {
@@ -24,6 +27,8 @@ export function createApp(): Express {
   app.use('/api/shift', createShiftOptimizeRouter())
   // /api/jobs/jyoban-calls は外部スケジューラ専用（Bearer CRON_SECRET）。未報告の起床・出発・上番・下番を通知する。
   app.use('/api/jobs/jyoban-calls', createJyobanCallsRouter())
+  // /api/passkey は勤務員アプリの生体認証（WebAuthn パスキー）の登録と本人確認。
+  app.use('/api/passkey', createPasskeyRouter())
   return app
 }
 
