@@ -24,10 +24,11 @@ apps/desktop/src/App.tsx の左メニューに次のタブを追加してくだ�
 
 ```
 @docs/design/jyoban-2026-11/DESIGN_SPEC.md の「⑦ 本日の現場一覧」の「データ」表の RPC を
-supabase/migrations/0412_jyoban_board.sql として作ってください。
+supabase/migrations/0413_jyoban_board.sql として作ってください（0412 は位置確認で使用済み）。
 - company_jyoban_board(p_date) は本社PC・支店・管理者・運営だけ。支店は担当現場だけ（app_profile_sites。担当なしは全現場）。
 - sitepc_jyoban_board(p_session, p_date) は sitepc_resolve でセッションの現場だけ。
 - 確認済み（jyoban_acks）の記録も、それぞれの範囲で作る。
+- 上番・下番の位置確認の結果（jyoban_reports.geo_status / geo_distance_m）も返す。
 - 0411 と同じ書き方（追加のみ・冪等・security definer・search_path 固定・anon/authenticated の権限を明示）。
 - supabase/tests/ に検証SQLを追加し、run_jyoban_rls_check.sh に組み込む（本社PCは全現場・支店は担当だけ・現場PCは自現場だけ・他社は0件）。
 ```

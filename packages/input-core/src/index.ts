@@ -40,3 +40,6 @@ export * from './jyoban/report.js'
 export * from './jyoban/calls.js'
 // Auth: ロール別アクセス制御（3系統ログインの認可の単一の真実）
 export * from './auth/authz.js'
+// 上番・下番の位置確認（Plus Code / ジオフェンス）
+export * from './geo/pluscode.js'
+export * from './geo/geofence.js'

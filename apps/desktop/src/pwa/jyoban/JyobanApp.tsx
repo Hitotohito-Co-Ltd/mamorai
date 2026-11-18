@@ -3,7 +3,10 @@
 //   現場スマホ（共用）: 報告のたびに スタッフNo＋PIN で本人確認（端末に何も残さない）。
 //   電波がないときは送信待ちに入れ、つながった時点で自動送信する（個人スマホのみ）。
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { reportButtons, JYOBAN_OTHER_KINDS, validateOtherReport, type JyobanOtherKind } from '@mamorai/input-core'
+import {
+  reportButtons, JYOBAN_OTHER_KINDS, validateOtherReport, geofenceApplies, judgeGeofence,
+  type JyobanOtherKind, type GeoFix,
+} from '@mamorai/input-core'
 import {
   fetchContext, registerDevice, submitReport, flushOutbox, voidReport, outbox,
   saveDevice, localNow, resolveStart, rememberSite, forgetSite, recentSites,
@@ -11,6 +14,7 @@ import {
   type ReportContext, type CtxSlot, type ReportType, type Device, type RecentSite,
 } from './reportApi.js'
 import { pushState, enablePush, type PushState } from './pushApi.js'
+import { getCurrentFix, FIX_FAILURE_MESSAGE, type FixResult } from './geo.js'
 import './jyoban.css'
 
 const TYPE_LABEL: Record<ReportType, string> = { wakeup: '起床連絡', departure: '出発連絡', onduty: '上番連絡', offduty: '下番連絡', other: 'その他の報告' }
@@ -91,9 +95,42 @@ function ConfirmMe({ device, onYes, onNo }: { device: Device & { pinMustChange: 
   )
 }
 
+type GeoFixAt = GeoFix & { at: string }
+
+/** 上番・下番の位置確認（現場が「記録だけ」「範囲内でのみ」のとき）。報告シートを開いた時点で現在地を1回取る。 */
+function useReportFix(enabled: boolean): { state: 'off' | 'locating' | 'done'; result: FixResult | null; retry: () => void } {
+  const [state, setState] = useState<'off' | 'locating' | 'done'>(enabled ? 'locating' : 'off')
+  const [result, setResult] = useState<FixResult | null>(null)
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    if (!enabled) return
+    let alive = true
+    setState('locating')
+    void getCurrentFix().then((r) => { if (alive) { setResult(r); setState('done') } })
+    return () => { alive = false }
+  }, [enabled, n])
+  return { state, result, retry: () => setN((x) => x + 1) }
+}
+
+function GeoBox({ ctx, type, fix }: { ctx: ReportContext; type: ReportType; fix: ReturnType<typeof useReportFix> }): JSX.Element | null {
+  if (fix.state === 'off') return null
+  if (fix.state === 'locating') return <p className="jy-geo-box" role="status"><span className="jy-geo-spin" aria-hidden="true" />現在地を確認しています…</p>
+  const r = fix.result!
+  const j = judgeGeofence(ctx.geofence, r.ok ? r.fix : null)
+  const tone = j.status === 'inside' ? 'ok' : j.allowed ? 'warn' : 'ng'
+  return (
+    <div className={`jy-geo-box jy-geo-${tone}`} role={tone === 'ok' ? 'status' : 'alert'}>
+      <p><b>{tone === 'ok' ? '✓ ' : ''}{j.message}</b></p>
+      {!r.ok && <p>{FIX_FAILURE_MESSAGE[r.reason]}</p>}
+      {tone !== 'ok' && <button type="button" className="jy-btn jy-btn-outline jy-geo-retry" onClick={fix.retry}>もう一度位置を取得</button>}
+      <p className="jy-geo-note">{type === 'onduty' ? '上番' : '下番'}の報告のときだけ位置を確認します（常に追跡することはありません）</p>
+    </div>
+  )
+}
+
 function ConfirmSheet({ ctx, slot, type, shared, onCancel, onSend }: {
   ctx: ReportContext; slot: CtxSlot; type: ReportType; shared: boolean
-  onCancel: () => void; onSend: (who?: { staffNo: string; pin: string }) => Promise<string | null>
+  onCancel: () => void; onSend: (who?: { staffNo: string; pin: string }, geo?: GeoFixAt) => Promise<string | null>
 }): JSX.Element {
   const [no, setNo] = useState('')
   const [pin, setPin] = useState('')
@@ -101,10 +138,14 @@ function ConfirmSheet({ ctx, slot, type, shared, onCancel, onSend }: {
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(localNow())
   useEffect(() => { const t = setInterval(() => setNow(localNow()), 15000); return () => clearInterval(t) }, [])
+  const fix = useReportFix(geofenceApplies(ctx.geofence, type))
+  const geoFix = fix.result?.ok === true ? fix.result.fix : undefined
+  const geoBlocked = fix.state === 'locating' || (fix.state === 'done' && !judgeGeofence(ctx.geofence, geoFix ?? null).allowed)
   const yes = (): void => {
     if (shared && (no.trim() === '' || pin === '')) { setErr('スタッフNoとPINを入力してください'); return }
+    if (geoBlocked) return
     setBusy(true); setErr(null)
-    void onSend(shared ? { staffNo: no.trim(), pin } : undefined).then((e) => { setErr(e); setBusy(false) })
+    void onSend(shared ? { staffNo: no.trim(), pin } : undefined, geoFix).then((e) => { setErr(e); setBusy(false) })
   }
   return (
     <div className="jy-overlay" role="presentation">
@@ -126,8 +167,11 @@ function ConfirmSheet({ ctx, slot, type, shared, onCancel, onSend }: {
             </label>
           </div>
         )}
+        <GeoBox ctx={ctx} type={type} fix={fix} />
         {err && <p className="jy-err" role="alert">{err}</p>}
-        <button type="button" className="jy-btn jy-btn-green jy-btn-yes" disabled={busy} onClick={yes}>{busy ? '送信中…' : 'はい'}</button>
+        <button type="button" className="jy-btn jy-btn-green jy-btn-yes" disabled={busy || geoBlocked} onClick={yes}>
+          {busy ? '送信中…' : fix.state === 'locating' ? '位置を確認中…' : 'はい'}
+        </button>
         <button type="button" className="jy-btn jy-btn-outline" disabled={busy} onClick={onCancel}>いいえ</button>
       </section>
     </div>
@@ -340,7 +384,7 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
     )
   }
 
-  const send = async (type: ReportType, extra: { otherKind?: JyobanOtherKind; eta?: string; note?: string }, who?: { staffNo: string; pin: string }): Promise<string | null> => {
+  const send = async (type: ReportType, extra: { otherKind?: JyobanOtherKind; eta?: string; note?: string; geo?: GeoFixAt }, who?: { staffNo: string; pin: string }): Promise<string | null> => {
     if (slot === undefined) return '勤務枠を選んでください'
     try {
       const out = await submitReport(token, { slotId: slot.id, type, ...extra, ...(who ?? {}) })
@@ -453,7 +497,7 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
         <p className="jy-note jy-center jy-foot">{personal ? <>電波がない場所でも押せます。<br />つながった時点で本社へ自動送信します。</> : <>共用端末のため、このスマホに名前やPINは保存しません。</>}</p>
       </main>
       {confirm !== null && slot !== undefined && (
-        <ConfirmSheet ctx={ctx} slot={slot} type={confirm} shared={shared} onCancel={() => setConfirm(null)} onSend={(who) => send(confirm, {}, who)} />
+        <ConfirmSheet ctx={ctx} slot={slot} type={confirm} shared={shared} onCancel={() => setConfirm(null)} onSend={(who, geo) => send(confirm, geo !== undefined ? { geo } : {}, who)} />
       )}
       {toast && <div className="jy-toast" role="status">{toast}</div>}
     </div>

@@ -2,10 +2,15 @@
 //   会社全体で未報告時の自動通知（アプリ通知・SMS・電話・管制メール）を設定する。
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import QRCode from 'qrcode'
-import { buildReportUrl, type JyobanSlot, type SlotFieldError } from '@mamorai/input-core'
+import {
+  buildReportUrl, parseLocationInput, encodePlusCode, mapUrl,
+  GEOFENCE_MODES, GEOFENCE_RADIUS_OPTIONS, GEOFENCE_DEFAULT_RADIUS,
+  type JyobanSlot, type SlotFieldError, type GeofenceMode, type ParsedLocation,
+} from '@mamorai/input-core'
 import {
   listSites, listSlots, saveSlot, issueReportToken, setSharedDevice, publicOrigin,
-  JyobanValidationError, type JyobanSite,
+  getSiteGeofence, setSiteGeofence,
+  JyobanValidationError, type JyobanSite, type SiteGeofenceSettings,
 } from './jyobanApi.js'
 import { printSiteQr } from './jyobanPrint.js'
 import {
@@ -336,6 +341,125 @@ function QrCard({ site, onIssued }: { site: JyobanSite; onIssued: (msg: string) 
   )
 }
 
+/** 上番・下番の位置確認（現場の地点と範囲）。地点は Googleマップの Plus Code（例: MQH9+JM9 中央区、東京都）か緯度・経度で入れる。 */
+function GeofenceCard({ site, onMsg }: { site: JyobanSite; onMsg: (m: string) => void }): JSX.Element {
+  const [saved, setSaved] = useState<SiteGeofenceSettings | null>(null)
+  const [mode, setMode] = useState<GeofenceMode>('off')
+  const [radius, setRadius] = useState(GEOFENCE_DEFAULT_RADIUS)
+  const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null)
+  const [label, setLabel] = useState<string | null>(null)
+  const [text, setText] = useState('')
+  const [parsed, setParsed] = useState<ParsedLocation | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [locating, setLocating] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    setSaved(null); setErr(null); setParsed(null); setText('')
+    void getSiteGeofence(site.id).then((g) => {
+      if (!alive) return
+      setSaved(g); setMode(g.mode); setRadius(g.radiusM)
+      setPoint(g.lat !== null && g.lng !== null ? { lat: g.lat, lng: g.lng } : null); setLabel(g.label)
+    }).catch((e: Error) => { if (alive) setErr(`位置確認の設定を読み込めませんでした: ${e.message}`) })
+    return () => { alive = false }
+  }, [site.id])
+
+  if (saved === null) return <section className="card" aria-label="上番・下番の位置確認"><div className="card-b muted">{err ?? '位置確認の設定を読み込み中…'}</div></section>
+
+  const dirty = mode !== saved.mode || radius !== saved.radiusM || point?.lat !== (saved.lat ?? undefined) || point?.lng !== (saved.lng ?? undefined)
+  const read = (): void => {
+    const r = parseLocationInput(text, point ?? undefined)
+    if (!r.ok) { setErr(r.message); setParsed(null); return }
+    setErr(null); setParsed(r.value)
+  }
+  const useParsed = (): void => {
+    if (parsed === null) return
+    setPoint({ lat: parsed.lat, lng: parsed.lng }); setLabel(text.trim()); setParsed(null); setText('')
+    if (mode === 'off') setMode('record')
+  }
+  const here = (): void => {
+    if (!('geolocation' in navigator)) { setErr('この端末では現在地を取得できません'); return }
+    setLocating(true); setErr(null)
+    navigator.geolocation.getCurrentPosition((p) => {
+      setLocating(false)
+      const lat = p.coords.latitude; const lng = p.coords.longitude
+      setParsed({ lat, lng, plusCode: encodePlusCode(lat, lng), source: 'lat_lng' })
+      setText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`)
+      if (p.coords.accuracy > 50) setErr(`現在地の誤差が約${Math.round(p.coords.accuracy)}mあります。現場の地点として正しいか、地図で確認してください`)
+    }, (e) => {
+      setLocating(false)
+      setErr(e.code === e.PERMISSION_DENIED ? '位置情報の利用が許可されていません。ブラウザの設定で許可してください' : '現在地を取得できませんでした')
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+  }
+  const save = async (): Promise<void> => {
+    setBusy(true); setErr(null)
+    try {
+      const g = await setSiteGeofence(site.id, { mode, lat: point?.lat ?? null, lng: point?.lng ?? null, radiusM: radius, label })
+      setSaved(g)
+      onMsg(mode === 'off' ? '位置確認を使わない設定にしました' : `位置確認を「${GEOFENCE_MODES.find((m) => m.mode === mode)!.label}」で保存しました`)
+    } catch (e) { setErr((e as Error).message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <section className="card" aria-label="上番・下番の位置確認">
+      <div className="card-h"><h2>上番・下番の位置確認</h2></div>
+      <div className="card-b jy-geo">
+        <fieldset className="jy-geo-modes">
+          <legend className="fl">使い方</legend>
+          {GEOFENCE_MODES.map((m) => (
+            <label key={m.mode} className={`jy-geo-mode${mode === m.mode ? ' on' : ''}`}>
+              <input type="radio" name={`geo-mode-${site.id}`} value={m.mode} checked={mode === m.mode} onChange={() => setMode(m.mode)} />
+              <span><b>{m.label}</b><br /><span className="muted jy-hint">{m.hint}</span></span>
+            </label>
+          ))}
+        </fieldset>
+
+        <div className="jy-geo-point">
+          <span className="fl">現場の地点</span>
+          {point !== null ? (
+            <p className="jy-geo-now">
+              <b>{encodePlusCode(point.lat, point.lng)}</b>
+              <span className="muted">（{point.lat.toFixed(6)}, {point.lng.toFixed(6)}）{label ? `｜ 入力: ${label}` : ''}</span>
+              <a href={mapUrl(point.lat, point.lng)} target="_blank" rel="noopener noreferrer">地図で確認</a>
+            </p>
+          ) : <p className="muted">まだ登録されていません</p>}
+          <label className="fl" htmlFor={`geo-in-${site.id}`}>{point === null ? '地点を入力' : '地点を変更'}
+            <span className="jy-geo-input">
+              <input id={`geo-in-${site.id}`} className="input" value={text} placeholder="例: MQH9+JM9 中央区、東京都 ／ 35.6790, 139.7692"
+                onChange={(e) => { setText(e.target.value); setParsed(null) }} onKeyDown={(e) => { if (e.key === 'Enter') read() }} />
+              <button type="button" className="btn btn-secondary" disabled={text.trim() === ''} onClick={read}>読み取る</button>
+              <button type="button" className="btn btn-secondary" disabled={locating} onClick={here}>{locating ? '取得中…' : 'この端末の現在地'}</button>
+            </span>
+          </label>
+          <span className="muted jy-hint">Googleマップで現場を開き、住所の下に出る Plus Code（「MQH9+JM9 中央区、東京都」の形）をそのまま貼り付けられます。緯度・経度や地図のURLでも構いません。</span>
+          {parsed !== null && (
+            <div className="jy-geo-parsed" role="status">
+              <span><b>{parsed.plusCode}</b>（{parsed.lat.toFixed(6)}, {parsed.lng.toFixed(6)}）{parsed.reference ? `｜ ${parsed.reference}として読み取りました` : ''}</span>
+              <a href={mapUrl(parsed.lat, parsed.lng)} target="_blank" rel="noopener noreferrer">地図で確認</a>
+              <button type="button" className="btn btn-primary" onClick={useParsed}>この地点にする</button>
+            </div>
+          )}
+        </div>
+
+        <label className="fl" htmlFor={`geo-r-${site.id}`}>範囲（現場の中心からの半径）
+          <select id={`geo-r-${site.id}`} className="input jy-geo-radius" value={radius} onChange={(e) => setRadius(Number(e.target.value))}>
+            {[...new Set([...GEOFENCE_RADIUS_OPTIONS, radius])].sort((a, b) => a - b).map((r) => <option key={r} value={r}>{r >= 1000 ? `${r / 1000}km` : `${r}m`}</option>)}
+          </select>
+        </label>
+        <span className="muted jy-hint">屋内や高い建物ではGPSが数十mずれます。判定では誤差の分（最大100m）だけ範囲を広げます。迷ったら200mから始めてください。</span>
+
+        {err && <p className="jy-errors" role="alert">{err}</p>}
+        <div className="row-actions jy-slot-actions">
+          <button type="button" className="btn btn-primary" disabled={busy || !dirty} onClick={() => { void save() }}>{busy ? '保存中…' : '保存'}</button>
+        </div>
+        <p className="muted jy-hint">位置は上番・下番の報告を押した瞬間だけ取得し、常に追跡することはありません。スマホの位置は偽装アプリ等で変えられるため、顔・指紋の本人確認と組み合わせて使ってください。</p>
+      </div>
+    </section>
+  )
+}
+
 export function JyobanSettings(): JSX.Element {
   const [sites, setSites] = useState<JyobanSite[]>([])
   const [siteId, setSiteId] = useState<string>('')
@@ -421,6 +545,8 @@ export function JyobanSettings(): JSX.Element {
               </section>
               <QrCard site={site} onIssued={(m) => { setToast(m); void reloadSites() }} />
             </div>
+
+            <GeofenceCard site={site} onMsg={setToast} />
 
             <section className="card" aria-label="勤務枠と報告時刻">
               <div className="card-h">

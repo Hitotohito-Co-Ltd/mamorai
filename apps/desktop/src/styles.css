@@ -544,3 +544,19 @@ body {
 .jy-log { margin-top: 12px; }
 .jy-log summary { cursor: pointer; font-weight: 600; }
 @media (max-width: 640px) { .jy-assign-table { display: block; overflow-x: auto; } }
+
+/* [JYB] 上番・下番の位置確認（現場の地点と範囲） */
+.jy-geo { display: flex; flex-direction: column; gap: 12px; }
+.jy-geo-modes { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.jy-geo-modes legend { padding: 0; margin-bottom: 4px; }
+.jy-geo-mode { display: flex; gap: 8px; align-items: flex-start; min-height: 44px; padding: 10px 12px; border: 1px solid var(--bd); border-radius: 8px; cursor: pointer; font-weight: 400; }
+.jy-geo-mode.on { border-color: var(--navy); background: #e8eef9; }
+.jy-geo-mode input { margin-top: 3px; }
+.jy-geo-mode:focus-within { outline: 2px solid var(--bl); outline-offset: 1px; }
+.jy-geo-point { display: flex; flex-direction: column; gap: 6px; }
+.jy-geo-now { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.jy-geo-input { display: flex; flex-wrap: wrap; gap: 8px; }
+.jy-geo-input .input { flex: 1 1 260px; }
+.jy-geo-parsed { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid #bfdbfe; background: #eff6ff; border-radius: 8px; }
+.jy-geo-radius { max-width: 160px; }
+.jy-geo a { color: var(--bl); font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; }
