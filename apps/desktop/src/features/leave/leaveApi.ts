@@ -1,7 +1,7 @@
 // [有給] データ層。Supabase構成時はRPC(0402)を呼び、未構成時は localStorage(leaveStore) に委譲。
 // これにより本番(実DB・端末間共有)とデモ(ローカル)を同一UIで両立する。
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient.js'
-import { siteCodes } from '../../shared/runtimeCtx.js'
+import { siteRpc, workerRpc } from '../../shared/secureRpc.js'
 import { COMPANY, SITE } from '../../pilot/bulgari.js'
 import {
   listLeave as localList, listLeaveForStaff as localListStaff, submitLeave as localSubmit,
@@ -30,30 +30,28 @@ function fromRow(r: Row): LeaveReq {
 // 勤務員(/app): 提出
 export async function submitLeave(input: { staffNo: string; name: string; dept: string; from: string; to: string; days: number; reason: string }): Promise<void> {
   if (DB()) {
-    await getSupabase()!.rpc('submit_leave', {
-      p_company_code: siteCodes().companyCode, p_site_code: siteCodes().siteCode, p_staff_no: input.staffNo,
-      p_staff_name: input.name, p_dept: input.dept, p_from: input.from, p_to: input.to, p_days: input.days, p_reason: input.reason,
-    })
+    // スタッフNo・氏名・所属はサーバーが端末から決める（他人の名前で出せないように）
+    await workerRpc('worker_submit_leave', { p_from: input.from, p_to: input.to, p_days: input.days, p_reason: input.reason })
     return
   }
   localSubmit({ staffNo: input.staffNo, name: input.name, company: COMPANY.name, dept: input.dept, site: SITE.name, from: input.from, to: input.to, days: input.days, reason: input.reason })
 }
 export async function listForStaff(staffNo: string): Promise<LeaveReq[]> {
-  if (DB()) { const { data } = await getSupabase()!.rpc('staff_list_leave', { p_company_code: siteCodes().companyCode, p_staff_no: staffNo }); return ((data as Row[]) ?? []).map(fromRow) }
+  if (DB()) { const data = await workerRpc<Row[] | null>('worker_list_leave'); return (data ?? []).map(fromRow) }
   return localListStaff(staffNo)
 }
 
 // 現場(/s)
 export async function listForSite(): Promise<LeaveReq[]> {
-  if (DB()) { const { data } = await getSupabase()!.rpc('site_list_leave', { p_company_code: siteCodes().companyCode, p_site_code: siteCodes().siteCode }); return ((data as Row[]) ?? []).map(fromRow) }
+  if (DB()) { const data = await siteRpc<Row[] | null>('sitepc_list_leave'); return (data ?? []).map(fromRow) }
   return localList()
 }
 export async function approveSite(id: string, approver: Approver): Promise<void> {
-  if (DB()) { await getSupabase()!.rpc('site_approve_leave', { p_company_code: siteCodes().companyCode, p_site_code: siteCodes().siteCode, p_id: id, p_approver: approver }); return }
+  if (DB()) { await siteRpc('sitepc_approve_leave', { p_id: id, p_approver: approver }); return }
   localApproveSite(id, approver)
 }
 export async function rejectAtSite(id: string, by: string): Promise<void> {
-  if (DB()) { await getSupabase()!.rpc('site_reject_leave', { p_company_code: siteCodes().companyCode, p_site_code: siteCodes().siteCode, p_id: id, p_by: by }); return }
+  if (DB()) { await siteRpc('sitepc_reject_leave', { p_id: id, p_by: by }); return }
   localReject(id, by)
 }
 

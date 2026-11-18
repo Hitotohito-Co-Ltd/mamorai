@@ -45,7 +45,7 @@ export function ShiftHope({ staff, site }: { staff: Staff; site: string }): JSX.
     for (const [d, v] of Object.entries(hopes)) { if (v !== '') days[Number(d)] = v as HopeCode }
     void submitHope({ staffNo: staff.no, name: staff.name, site, ym, days, note, submittedAt: ym })
       .then(() => setSubmitted(`${ym} の希望を提出しました（勤務可${counts.ok}・夜勤${counts.night}・休み${counts.off}）。現場のシフト作成に反映されます。`))
-      .catch(() => setSubmitted('提出に失敗しました。通信状況をご確認ください。'))
+      .catch((e: unknown) => setSubmitted(e instanceof Error && e.message !== '' ? `提出できませんでした：${e.message}` : '提出に失敗しました。通信状況をご確認ください。'))
   }
 
   return (

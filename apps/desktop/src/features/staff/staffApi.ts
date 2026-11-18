@@ -1,6 +1,6 @@
 // [勤務員] データ層。Supabase構成時は現場RPC(0403)、未構成時は staffStore(localStorage) に委譲。
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient.js'
-import { siteCodes } from '../../shared/runtimeCtx.js'
+import { siteRpc } from '../../shared/secureRpc.js'
 import { SITE, type PilotStaff } from '../../pilot/bulgari.js'
 import {
   listStaff as localList, upsertStaff as localUpsert, setActive as localSetActive,
@@ -21,29 +21,26 @@ function fromRow(r: Row): Staff {
 
 export async function listStaff(): Promise<Staff[]> {
   if (DB()) {
-    const { companyCode, siteCode } = siteCodes()
-    const { data } = await getSupabase()!.rpc('site_list_staff', { p_company_code: companyCode, p_site_code: siteCode })
-    return ((data as Row[]) ?? []).map(fromRow)
+    const data = await siteRpc<Row[] | null>('sitepc_list_staff')
+    return (data ?? []).map(fromRow)
   }
   return localList()
 }
 export async function upsertStaff(s: Staff): Promise<void> {
   if (DB()) {
-    const { companyCode, siteCode } = siteCodes()
-    await getSupabase()!.rpc('site_register_staff', {
-      p_company_code: companyCode, p_site_code: siteCode, p_staff_no: s.no, p_name: s.name,
-      p_dob: s.dob || null, p_dept: s.dept, p_role: s.role, p_pin: s.pin ?? '',
+    await siteRpc('sitepc_register_staff', {
+      p_staff_no: s.no, p_name: s.name, p_dob: s.dob || null, p_dept: s.dept, p_role: s.role, p_pin: s.pin ?? '',
     })
     return
   }
   localUpsert(s)
 }
 export async function setActive(no: string, active: boolean): Promise<void> {
-  if (DB()) { await getSupabase()!.rpc('site_set_staff_active', { p_company_code: siteCodes().companyCode, p_staff_no: no, p_active: active }); return }
+  if (DB()) { await siteRpc('sitepc_set_staff_active', { p_staff_no: no, p_active: active }); return }
   localSetActive(no, active)
 }
 export async function resetPin(no: string): Promise<string> {
-  if (DB()) { const { data } = await getSupabase()!.rpc('site_reset_pin', { p_company_code: siteCodes().companyCode, p_staff_no: no }); return String(data ?? '') }
+  if (DB()) { const data = await siteRpc<string | null>('sitepc_reset_pin', { p_staff_no: no }); return String(data ?? '') }
   return localReset(no)
 }
 /** 一括取込（Excel/CSV）。DB時は順にRPC、未構成時はローカルにupsert。 */

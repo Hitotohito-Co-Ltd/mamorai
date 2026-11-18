@@ -1,7 +1,7 @@
 // [シフト希望] データ層。Supabase構成時は現場/勤務員RPC(0405)、未構成時は shiftHopeStore(localStorage)。
 // 勤務員PWA(/app)が submitHope で提出→現場(/s)が hopesForMonth で参照しシフトへ反映。
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient.js'
-import { siteCodes } from '../../shared/runtimeCtx.js'
+import { siteRpc, workerRpc } from '../../shared/secureRpc.js'
 import { SITE } from '../../pilot/bulgari.js'
 import {
   submitHope as localSubmit, hopesForMonth as localHopesForMonth,
@@ -22,11 +22,8 @@ function fromRow(r: Row): ShiftHope {
 /** 勤務員(/app): シフト希望を提出（同一スタッフ・同一月は上書き）。 */
 export async function submitHope(h: ShiftHope): Promise<void> {
   if (DB()) {
-    const { companyCode, siteCode } = siteCodes()
-    await getSupabase()!.rpc('submit_hope', {
-      p_company_code: companyCode, p_site_code: siteCode, p_staff_no: h.staffNo, p_staff_name: h.name,
-      p_ym: h.ym, p_hopes: h.days, p_note: h.note,
-    })
+    // スタッフNo・氏名はサーバーが端末から決める
+    await workerRpc('worker_submit_hope', { p_ym: h.ym, p_hopes: h.days, p_note: h.note })
     return
   }
   localSubmit(h)
@@ -35,9 +32,8 @@ export async function submitHope(h: ShiftHope): Promise<void> {
 /** 現場(/s): 対象月のシフト希望一覧。 */
 export async function hopesForMonth(ym: string): Promise<ShiftHope[]> {
   if (DB()) {
-    const { companyCode, siteCode } = siteCodes()
-    const { data } = await getSupabase()!.rpc('site_list_hopes', { p_company_code: companyCode, p_site_code: siteCode, p_ym: ym })
-    return ((data as Row[]) ?? []).map(fromRow)
+    const data = await siteRpc<Row[] | null>('sitepc_list_hopes', { p_ym: ym })
+    return (data ?? []).map(fromRow)
   }
   return localHopesForMonth(ym)
 }

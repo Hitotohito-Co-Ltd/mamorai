@@ -29,7 +29,7 @@ import { SecurityCheck } from './features/platform/SecurityCheck.js'
 import { PlatformNotice } from './features/platform/PlatformNotice.js'
 import { JyobanSettings } from './features/jyoban/JyobanSettings.js'
 import { demoConstraints } from './features/shift/demoShift.js'
-import { capabilitiesForRole, type Capability, type ConstraintDef } from '@mamorai/input-core'
+import { capabilitiesForRole, ROLE_LABEL, type Capability, type ConstraintDef } from '@mamorai/input-core'
 import { setSiteCodes } from './shared/runtimeCtx.js'
 import { isSupabaseConfigured } from './lib/supabaseClient.js'
 import { APP_VERSION } from './version.js'
@@ -99,10 +99,7 @@ export function App({ session, onLogout }: { session?: Session; onLogout?: () =>
   // 制約は「制約」タブと「AIシフト」タブで共有する（NL構造化→エディタ反映を体現）。
   const [constraints, setConstraints] = useState<ConstraintDef[]>(() => demoConstraints())
 
-  const roleLabel: Record<string, string> = {
-    site_operator: '施設（現場）', company_manager: '会社（権限者）',
-    company_admin: '会社（本社管理者）', platform_admin: '運営（TRYANGROW）',
-  }
+  const roleLabel: Record<string, string> = ROLE_LABEL
   const allow = (t: Tab): boolean => tabs.some((x) => x.key === t)
 
   return (

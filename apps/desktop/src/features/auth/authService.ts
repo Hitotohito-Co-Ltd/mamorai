@@ -2,6 +2,8 @@
 //   会社/運営: Supabase Auth メール＋パスワード → app_profiles でロール解決・レルム検証
 //   施設(現場): Supabase RPC app_site_login(会社コード, 施設コード, PIN) で照合
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient.js'
+import { COMPANY_ACCOUNT_ROLES, ROLE_LABEL, isAuthRole, scopeForRole } from '@mamorai/input-core'
+import { setSiteSession, siteSession } from '../../shared/runtimeCtx.js'
 import {
   isValidEmail, isValidCompanyCode, isValidSiteCode, isValidPin,
   type Session, type Role,
@@ -9,7 +11,8 @@ import {
 
 export class AuthError extends Error {}
 
-const COMPANY_ROLES: Role[] = ['company_admin', 'company_manager']
+// 会社の入口（メール＋パスワード）で入れるロール: 本社PC・支店・権限者・管理者・教育センター
+const COMPANY_ROLES: readonly Role[] = COMPANY_ACCOUNT_ROLES
 
 /** app_profiles から role/company_id/site_id を解決。 */
 async function resolveProfile(userId: string): Promise<{ role: Role; companyId?: string; siteId?: string }> {
@@ -20,8 +23,8 @@ async function resolveProfile(userId: string): Promise<{ role: Role; companyId?:
     .select('role, company_id, site_id')
     .eq('user_id', userId)
     .single()
-  if (error !== null || data === null) throw new AuthError('このアカウントには権限が設定されていません')
-  return { role: data.role as Role, companyId: data.company_id ?? undefined, siteId: data.site_id ?? undefined }
+  if (error !== null || data === null || !isAuthRole(data.role)) throw new AuthError('このアカウントには権限が設定されていません')
+  return { role: data.role, companyId: data.company_id ?? undefined, siteId: data.site_id ?? undefined }
 }
 
 /** 会社ページ（本社・権限者）ログイン。 */
@@ -39,7 +42,11 @@ export async function signInCompany(email: string, password: string): Promise<Se
     await sb.auth.signOut()
     throw new AuthError('この入口は会社アカウント専用です')
   }
-  return { realm: 'company', role: prof.role, email, companyCode: prof.companyId, scope: 'company', label: `会社: ${email}` }
+  const scope = scopeForRole(prof.role)
+  return {
+    realm: 'company', role: prof.role, email, companyCode: prof.companyId,
+    scope: scope === 'assigned' ? 'assigned' : 'company', label: `${ROLE_LABEL[prof.role]}: ${email}`,
+  }
 }
 
 /** 運営（TRYANGROW）ログイン。MFA は Supabase MFA(TOTP) 有効化後に aal2 を要求（本結線）。 */
@@ -72,9 +79,13 @@ export async function signInSite(companyCode: string, siteCode: string, pin: str
     return { realm: 'site', role: 'site_operator', companyCode: cc, siteCode: sc, scope: 'site', label: `現場: ${sc}` }
   }
   const sb = getSupabase()!
-  const { data, error } = await sb.rpc('app_site_login', { p_company_code: cc, p_site_code: sc, p_pin: pin })
+  // 現場PINでセッションを開く（0411）。以後の現場の処理はこのセッションでだけ呼べる
+  const label = globalThis.navigator?.userAgent?.slice(0, 200) ?? null
+  const { data, error } = await sb.rpc('app_site_open_session', { p_company_code: cc, p_site_code: sc, p_pin: pin, p_label: label })
+  if (error !== null) throw new AuthError(error.message.includes('ロック') ? error.message : 'ログインできませんでした。時間をおいてお試しください')
   const row = Array.isArray(data) ? data[0] : data
-  if (error !== null || row == null) throw new AuthError('会社コード・施設コード・PINのいずれかが違います')
+  if (row == null || typeof row.session_token !== 'string') throw new AuthError('会社コード・施設コード・PINのいずれかが違います')
+  setSiteSession(row.session_token)
   return {
     realm: 'site', role: 'site_operator', companyCode: cc, siteCode: sc,
     scope: 'site', label: `現場: ${row.site_name ?? sc}`,
@@ -84,5 +95,8 @@ export async function signInSite(companyCode: string, siteCode: string, pin: str
 /** ログアウト（Supabase セッション破棄）。 */
 export async function signOut(): Promise<void> {
   const sb = getSupabase()
+  const token = siteSession()
+  setSiteSession(null)
+  if (sb !== null && token !== null) { try { await sb.rpc('app_site_close_session', { p_session: token }) } catch { /* ignore */ } }
   if (sb !== null) await sb.auth.signOut()
 }

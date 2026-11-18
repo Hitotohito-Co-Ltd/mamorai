@@ -1,11 +1,9 @@
 // [Auth] 3系統ログインの共通型。実認証(Supabase Auth/MFA)は本結線フェーズ。
 export type Realm = 'company' | 'site' | 'tradmin'
 
-export type Role =
-  | 'company_admin'   // 本社管理者
-  | 'company_manager' // 権限者
-  | 'site_operator'   // 現場オペレーター（共有端末）
-  | 'platform_admin'  // 運営(TRYANGROW)
+// ロールの定義と表示名・権限は input-core（authz.ts）が唯一の正。ここでは型を受け継ぐだけ。
+import type { AuthRole } from '@mamorai/input-core'
+export type Role = AuthRole
 
 /** ログイン成功後のセッション（デモ）。scope で RLS 相当の可視範囲を表す。 */
 export interface Session {
@@ -14,8 +12,8 @@ export interface Session {
   companyCode?: string
   siteCode?: string
   email?: string
-  /** データ可視範囲: 会社全体 / 単一現場 / プラットフォーム全体 */
-  scope: 'company' | 'site' | 'platform'
+  /** データ可視範囲: 会社全体 / 担当現場のみ（支店・権限者）/ 単一現場 / プラットフォーム全体 */
+  scope: 'company' | 'assigned' | 'site' | 'platform'
   /** 複数現場を担当する社員/役員の担当現場一覧（担当外は含めない）。 */
   assignedSites?: string[]
   label: string

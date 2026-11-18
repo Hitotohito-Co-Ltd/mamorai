@@ -32,10 +32,12 @@ export async function signInStaff(no: string, pin: string): Promise<Staff | null
 /** PIN変更（初回・任意）。DB時は旧PIN照合、未構成時はローカル更新。 */
 export async function changeStaffPin(no: string, oldPin: string, newPin: string): Promise<void> {
   if (isSupabaseConfigured()) {
-    const { error } = await getSupabase()!.rpc('staff_change_pin', {
+    // 0411 から失敗は戻り値（文言）で返る。旧版の例外にも対応
+    const { data, error } = await getSupabase()!.rpc('staff_change_pin', {
       p_company_code: siteCodes().companyCode, p_staff_no: no, p_old_pin: oldPin, p_new_pin: newPin,
     })
     if (error) throw new Error(error.message)
+    if (typeof data === 'string' && data !== '') throw new Error(data)
     return
   }
   storeChangePin(no, newPin)

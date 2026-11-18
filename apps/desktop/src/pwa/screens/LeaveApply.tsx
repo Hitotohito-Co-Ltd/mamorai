@@ -18,7 +18,7 @@ export function LeaveApply({ staff, site }: { staff: Staff; site: string }): JSX
   const [rows, setRows] = useState<LeaveReq[]>([])
   const [toast, setToast] = useState<string | null>(null)
 
-  const load = (): void => { void listForStaff(staff.no).then(setRows) }
+  const load = (): void => { void listForStaff(staff.no).then(setRows).catch((e: unknown) => setToast(e instanceof Error ? e.message : '申請履歴を読み込めませんでした')) }
   useEffect(() => { load(); return subscribe(load) }, [staff.no])
 
   const remaining = 20 - rows.filter((r) => r.status !== '却下').reduce((s, r) => s + r.days, 0)
