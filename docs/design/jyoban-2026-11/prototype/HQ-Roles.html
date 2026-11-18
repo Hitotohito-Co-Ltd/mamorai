@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>アカウントと権限</title>
+<script src="./dc-shim.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F9}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; font-variant-numeric: tabular-nums">
+  <header style="background: #1E3A5F; color: #FFFFFF; display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 0 32px; min-height: 60px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1L24 5V14C24 21 19 26.5 13 29C7 26.5 2 21 2 14V5Z" fill="none" stroke="#10B981" stroke-width="2"></path><path d="M7.5 20V10L13 16L18.5 10V20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"></path></svg>
+      <span style="font-weight: 700; font-size: 18px; letter-spacing: 0.04em">MAMOR-AI</span>
+    </div>
+    <nav aria-label="モジュール" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+      <a href="Main.html" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">上番報告</a>
+      <a href="HQ-Settings.html" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">現場設定</a>
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">講習会管理</a>
+      <a href="#" aria-current="page" style="color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700; padding: 18px 12px; box-shadow: inset 0 -3px 0 #10B981">アカウントと権限</a>
+    </nav>
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #E5EAF1">
+      <span style="background: #10B98126; color: #A7F3D0; border-radius: 999px; padding: 3px 10px; font-size: 12px">管理者</span>
+      <span>［担当者名］</span>
+    </div>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #1E3A5F">アカウントと権限</h1>
+        <p style="margin: 0; font-size: 13px; color: #4B5563">会社のメールアカウントに役割を割り当てます。変更はすべて記録されます。この画面を開けるのは管理者だけです</p>
+      </div>
+      <button type="button" onClick="{{openAdd}}" style="height: 44px; padding: 0 20px; border: 0; border-radius: 8px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer">＋ メンバーを追加</button>
+    </div>
+
+    <section aria-label="役割の説明" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+      <sc-for list="{{roles}}" as="r" hint-placeholder-count="5">
+        <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+          <span style="display: flex; justify-content: space-between; align-items: center; gap: 8px"><strong style="font-size: 15px; color: #111827">{{r.name}}</strong><span style="padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; {{r.chip}}">{{r.login}}</span></span>
+          <span style="font-size: 12px; line-height: 1.7; color: #374151">{{r.can}}</span>
+          <span style="font-size: 12px; line-height: 1.7; color: #6B7280">{{r.cannot}}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <sc-if value="{{adding}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="メンバーを追加" style="background: #FFFFFF; border: 2px solid #1E3A5F; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">メンバーを追加</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end">
+          <div style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 260px"><label for="am" style="font-size: 13px; font-weight: 500; color: #374151">メールアドレス</label><input id="am" type="email" placeholder="［メールアドレス］" style="height: 42px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 12px; font: inherit; font-size: 14px"></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="ar" style="font-size: 13px; font-weight: 500; color: #374151">役割</label><select id="ar" style="height: 42px; min-width: 200px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 10px; font: inherit; font-size: 14px; background: #FFFFFF"><option>本社PC</option><option>支店・権限者</option><option>教育センター</option><option>管理者</option></select></div>
+          <button type="button" onClick="{{closeAdd}}" style="height: 42px; padding: 0 18px; border: 0; border-radius: 8px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700">追加する</button>
+          <button type="button" onClick="{{closeAdd}}" style="height: 42px; padding: 0 16px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #374151; font: inherit; font-size: 14px">やめる</button>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #4B5563">先に Supabase の Authentication でこのメールに招待を送ってください。招待されていないメールは追加できません。</p>
+      </section>
+    </sc-if>
+
+    <section aria-label="メンバー" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow-x: auto">
+      <div style="min-width: 1080px">
+        <div style="display: grid; grid-template-columns: minmax(240px, 1.4fr) 200px minmax(240px, 1.6fr) 220px; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #E2E8F0; font-size: 12px; font-weight: 500; color: #4B5563; background: #F8FAFC">
+          <span>メンバー</span><span>役割</span><span>担当現場（支店・権限者のみ）</span><span>操作</span>
+        </div>
+        <sc-for list="{{members}}" as="m" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(240px, 1.4fr) 200px minmax(240px, 1.6fr) 220px; gap: 16px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #EEF2F6; font-size: 14px">
+            <span style="display: flex; flex-direction: column; gap: 2px"><span style="color: #111827; font-weight: 500">{{m.email}}</span><span style="font-size: 12px; color: #4B5563">{{m.note}}</span></span>
+            <span><span style="display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; {{m.chip}}">{{m.role}}</span></span>
+            <span style="font-size: 13px; color: #374151">{{m.sites}}</span>
+            <span style="display: flex; gap: 8px; flex-wrap: wrap">
+              <sc-if value="{{m.editable}}" hint-placeholder-val="{{ true }}">
+                <button type="button" style="height: 36px; padding: 0 12px; border: 1px solid #1E3A5F; border-radius: 8px; background: #FFFFFF; color: #1E3A5F; font: inherit; font-size: 13px">役割を変える</button>
+                <button type="button" style="height: 36px; padding: 0 12px; border: 1px solid #FECACA; border-radius: 8px; background: #FFFFFF; color: #B91C1C; font: inherit; font-size: 13px">外す</button>
+              </sc-if>
+              <sc-if value="{{m.isMe}}" hint-placeholder-val="{{ false }}">
+                <span style="font-size: 12px; color: #4B5563">自分の役割は変えられません</span>
+              </sc-if>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; align-items: start">
+      <section aria-label="現場PC" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">現場PC</h2>
+        <p style="margin: 0; font-size: 13px; line-height: 1.8; color: #374151">現場PCはメールアカウントではなく、会社コード＋施設コード＋現場PINでログインします。現場PINの変更とログイン中の端末の確認は「現場設定」から行います。ログインは12時間使わないと切れ、PINを10回間違えると15分ロックされます。</p>
+        <a href="HQ-Settings.html" style="align-self: flex-start; font-size: 14px; padding: 8px 0">現場設定を開く</a>
+      </section>
+      <section aria-label="変更の記録" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">変更の記録</h2>
+        <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #374151">
+          <li>［日時］ ［管理者］ が ［メール］ を「教育センター」で追加</li>
+          <li>［日時］ ［管理者］ が ［メール］ を「本社PC」→「支店・権限者」に変更（担当：［現場名］ほか2現場）</li>
+          <li>［日時］ ［管理者］ が ［メール］ を外す</li>
+        </ul>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { adding: false }; }
+  renderVals() {
+    const chip = {
+      admin: 'background:#1E3A5F;color:#FFFFFF',
+      manager: 'background:#DBEAFE;color:#1E40AF',
+      hq: 'background:#E0F2F1;color:#115E59',
+      edu: 'background:#EDE9FE;color:#5B21B6',
+      site: 'background:#F1F5F9;color:#334155'
+    };
+    const roles = [
+      { name: '管理者', login: 'メール', chip: chip.admin, can: '支店・権限者のすべて＋アカウントと権限の管理', cannot: '日報入力・シフト作成は現場PCで行う' },
+      { name: '支店・権限者', login: 'メール', chip: chip.manager, can: '担当現場の上番一覧・上番の設定・有給の最終承認・講習会管理', cannot: '担当外の現場の設定、アカウントの管理はできない' },
+      { name: '本社PC', login: 'メール', chip: chip.hq, can: '全現場の上番一覧・未報告への電話・確認済みにする・お知らせ', cannot: '上番の設定・承認・アカウントの管理はできない' },
+      { name: '教育センター', login: 'メール', chip: chip.edu, can: '新任・現任教育の日程登録・申込の受付・受講記録・教育指導簿', cannot: '上番報告・有給・現場のPINは見られない' },
+      { name: '現場PC', login: '施設コード＋PIN', chip: chip.site, can: '自分の現場の上番一覧・日報・シフト・勤務員登録・一次承認', cannot: '他の現場は見られない' }
+    ];
+    const members = [
+      { email: '［メールアドレス1］', note: 'あなた', role: '管理者', chip: chip.admin, sites: '全現場', editable: false, isMe: true },
+      { email: '［メールアドレス2］', note: '本社 管制', role: '本社PC', chip: chip.hq, sites: '全現場（閲覧）', editable: true, isMe: false },
+      { email: '［メールアドレス3］', note: '立川支店', role: '支店・権限者', chip: chip.manager, sites: 'ららぽーと立川立飛、コーチャンフォー若葉台店、［現場名］', editable: true, isMe: false },
+      { email: '［メールアドレス4］', note: '教育センター', role: '教育センター', chip: chip.edu, sites: '—', editable: true, isMe: false },
+      { email: '［メールアドレス5］', note: '本社', role: '管理者', chip: chip.admin, sites: '全現場', editable: true, isMe: false }
+    ];
+    return {
+      roles: roles, members: members, adding: !!(this.state && this.state.adding),
+      openAdd: () => this.setState({ adding: true }), closeAdd: () => this.setState({ adding: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

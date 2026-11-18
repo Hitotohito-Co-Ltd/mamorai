@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>上番報告 現場設定</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F9}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; font-variant-numeric: tabular-nums">
+  <header style="background: #1E3A5F; color: #FFFFFF; display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 0 32px; min-height: 60px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1L24 5V14C24 21 19 26.5 13 29C7 26.5 2 21 2 14V5Z" fill="none" stroke="#10B981" stroke-width="2"></path><path d="M7.5 20V10L13 16L18.5 10V20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"></path></svg>
+      <span style="font-weight: 700; font-size: 18px; letter-spacing: 0.04em">MAMOR-AI</span>
+    </div>
+    <nav aria-label="モジュール" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">ダッシュボード</a>
+      <a href="Main.dc.html" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">上番報告</a>
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">日報・月報</a>
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">シフト管理</a>
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">施設管理</a>
+      <a href="#" aria-current="page" style="color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700; padding: 18px 12px; box-shadow: inset 0 -3px 0 #10B981">現場設定</a>
+    </nav>
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #E5EAF1">
+      <span style="background: #10B98126; color: #A7F3D0; border-radius: 999px; padding: 3px 10px; font-size: 12px">本社PC・管理者</span>
+      <span>[担当者名]</span>
+    </div>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 28px 32px 48px; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+    <aside aria-label="現場一覧" style="flex: 1 1 300px; max-width: 340px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">現場（45）</h2>
+        <button type="button" style="height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 13px">＋ 現場を追加</button>
+      </div>
+      <label for="sq" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">現場を検索</label>
+      <input id="sq" type="search" placeholder="現場名で検索" style="height: 40px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 12px; font: inherit; font-size: 14px">
+      <div style="display: flex; gap: 6px">
+        <button type="button" style="flex: 1; height: 32px; border: 0; border-radius: 6px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 13px">すべて</button>
+        <button type="button" style="flex: 1; height: 32px; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #374151; font: inherit; font-size: 13px">施設</button>
+        <button type="button" style="flex: 1; height: 32px; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; color: #374151; font: inherit; font-size: 13px">交通</button>
+      </div>
+      <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px">
+        <li><a href="#" aria-current="true" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 8px; background: #EEF3F9; text-decoration: none; color: #1E3A5F; font-weight: 700; font-size: 14px; box-shadow: inset 3px 0 0 #1E3A5F">コーチャンフォー若葉台店<span style="font-size: 12px; font-weight: 400; color: #4B5563">施設・1枠</span></a></li>
+        <li><a href="#" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 8px; text-decoration: none; color: #1F2937; font-size: 14px">ららぽーと立川立飛<span style="font-size: 12px; color: #4B5563">交通・2枠</span></a></li>
+        <li><a href="#" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 8px; text-decoration: none; color: #1F2937; font-size: 14px">［現場名］<span style="font-size: 12px; color: #4B5563">施設・1枠</span></a></li>
+        <li><a href="#" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 8px; text-decoration: none; color: #1F2937; font-size: 14px">［現場名］<span style="font-size: 12px; color: #4B5563">交通・2枠</span></a></li>
+        <li><a href="#" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 8px; text-decoration: none; color: #6B7280; font-size: 14px">［現場名］（休止中）<span style="font-size: 12px; color: #6B7280">施設・1枠</span></a></li>
+      </ul>
+    </aside>
+
+    <section aria-label="現場の設定" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <h1 style="margin: 0; font-size: 24px; color: #1E3A5F">コーチャンフォー若葉台店</h1>
+          <p style="margin: 0; font-size: 13px; color: #4B5563">最終更新 ［日時］ ［担当者名］ ｜ <a href="#">変更履歴</a></p>
+        </div>
+        <div style="display: flex; gap: 8px">
+          <button type="button" style="height: 44px; padding: 0 18px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 14px; color: #374151">キャンセル</button>
+          <button type="button" style="height: 44px; padding: 0 22px; border: 0; border-radius: 8px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700">保存する</button>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px">
+        <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+          <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">基本情報</h2>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <label for="sn" style="font-size: 13px; font-weight: 500; color: #374151">現場名</label>
+            <input id="sn" type="text" value="コーチャンフォー若葉台店" style="height: 42px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 12px; font: inherit; font-size: 14px">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 500; color: #374151">区分</span>
+            <div role="radiogroup" aria-label="区分" style="display: flex; gap: 0; border: 1px solid #CBD5E1; border-radius: 8px; overflow: hidden; width: max-content">
+              <button type="button" role="radio" aria-checked="true" style="height: 40px; padding: 0 24px; border: 0; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 14px">施設</button>
+              <button type="button" role="radio" aria-checked="false" style="height: 40px; padding: 0 24px; border: 0; background: #FFFFFF; color: #374151; font: inherit; font-size: 14px">交通</button>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 4px">
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 500">稼働中</span><span style="font-size: 12px; color: #4B5563">OFFで一覧・報告画面から外れます</span></div>
+            <button type="button" role="switch" aria-checked="true" aria-label="稼働中" style="display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: #047857"><span style="width: 48px; height: 28px; border-radius: 999px; background: #10B981; display: flex; align-items: center; justify-content: flex-end; padding: 3px; box-sizing: border-box"><span style="width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF"></span></span>ON</button>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 500">現場スマホ（共用端末）</span><span style="font-size: 12px; color: #4B5563">ONで端末登録コードを発行</span></div>
+            <button type="button" role="switch" aria-checked="false" aria-label="現場スマホ（共用端末）" style="display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: #B91C1C"><span style="width: 48px; height: 28px; border-radius: 999px; background: #EF4444; display: flex; align-items: center; justify-content: flex-start; padding: 3px; box-sizing: border-box"><span style="width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF"></span></span>OFF</button>
+          </div>
+        </div>
+
+        <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+          <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">報告用QRコード</h2>
+          <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap">
+            <svg width="132" height="132" viewBox="0 0 33 33" role="img" aria-label="QRコード（サンプル表示）" style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px; background: #FFFFFF"><g fill="#111827"><path d="M0 0h9v9H0zM2 2v5h5V2zM3 3h3v3H3z" fill-rule="evenodd"></path><path d="M24 0h9v9h-9zM26 2v5h5V2zM27 3h3v3h-3z" fill-rule="evenodd"></path><path d="M0 24h9v9H0zM2 26v5h5v-5zM3 27h3v3H3z" fill-rule="evenodd"></path><path d="M11 1h2v2h-2zM15 0h2v3h-2zM19 2h3v2h-3zM11 5h3v2h-3zM17 6h2v3h-2zM12 10h2v2h-2zM0 11h3v2H0zM5 12h3v2H5zM16 11h3v3h-3zM21 10h2v2h-2zM25 11h3v2h-3zM30 12h3v2h-3zM10 15h2v3h-2zM14 16h3v2h-3zM20 15h2v2h-2zM24 16h2v3h-2zM28 17h3v2h-3zM2 18h2v2H2zM6 17h2v3H6zM12 20h3v2h-3zM18 19h2v3h-2zM22 21h3v2h-3zM11 24h2v2h-2zM15 25h3v2h-3zM20 24h2v3h-2zM25 25h3v2h-3zM30 24h3v2h-3zM11 29h3v2h-3zM17 30h2v3h-2zM22 28h2v2h-2zM26 30h3v3h-3z"></path></g></svg>
+            <div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 10px">
+              <p style="margin: 0; font-size: 13px; color: #4B5563">URL：https://［ドメイン］/s/••••••••</p>
+              <p style="margin: 0; font-size: 13px; color: #4B5563">発行 ［日付］ ｜ 読取端末 ［n］台</p>
+              <button type="button" style="height: 40px; border: 0; border-radius: 8px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 14px">印刷用PDF（A4）</button>
+              <button type="button" style="height: 40px; border: 1px solid #B91C1C; border-radius: 8px; background: #FFFFFF; color: #B91C1C; font: inherit; font-size: 14px">QRを再発行（旧QRは無効）</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px">
+          <h2 style="margin: 0; font-size: 16px; color: #1E3A5F">勤務枠と報告時刻</h2>
+          <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #1E3A5F; border-radius: 8px; background: #FFFFFF; color: #1E3A5F; font: inherit; font-size: 13px">＋ 勤務枠を追加</button>
+        </div>
+        <div style="border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden">
+          <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; padding: 16px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0">
+            <div style="display: flex; flex-direction: column; gap: 6px"><label for="w1" style="font-size: 12px; font-weight: 500; color: #374151">勤務枠名</label><input id="w1" type="text" value="早番" style="height: 40px; width: 160px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 12px; font: inherit; font-size: 14px"></div>
+            <div style="display: flex; flex-direction: column; gap: 6px"><label for="w2" style="font-size: 12px; font-weight: 500; color: #374151">勤務時間</label><div style="display: flex; align-items: center; gap: 6px"><input id="w2" type="time" value="08:15" style="height: 40px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px"><span>〜</span><input aria-label="勤務終了" type="time" value="15:00" style="height: 40px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px"></div></div>
+            <div style="display: flex; flex-direction: column; gap: 6px"><label for="w3" style="font-size: 12px; font-weight: 500; color: #374151">適用日</label><select id="w3" style="height: 40px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px; background: #FFFFFF"><option>毎日</option><option>平日のみ</option><option>土日祝のみ</option></select></div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0">
+            <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid #E2E8F0">
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <span style="font-size: 15px; font-weight: 700">出発連絡</span>
+                <button type="button" role="switch" aria-checked="true" aria-label="出発連絡" style="display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: #047857"><span style="width: 48px; height: 28px; border-radius: 999px; background: #10B981; display: flex; align-items: center; justify-content: flex-end; padding: 3px; box-sizing: border-box"><span style="width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF"></span></span>要</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px"><label for="d1" style="font-size: 13px; color: #374151; width: 64px">締切</label><input id="d1" type="time" value="06:30" style="height: 40px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px"></div>
+            </div>
+            <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px; border-right: 1px solid #E2E8F0">
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <span style="font-size: 15px; font-weight: 700">上番連絡</span>
+                <button type="button" role="switch" aria-checked="true" aria-label="上番連絡" style="display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 700; color: #047857"><span style="width: 48px; height: 28px; border-radius: 999px; background: #10B981; display: flex; align-items: center; justify-content: flex-end; padding: 3px; box-sizing: border-box"><span style="width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF"></span></span>要</button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px"><label for="d2" style="font-size: 13px; color: #374151; width: 64px">締切</label><input id="d2" type="time" value="08:15" style="height: 40px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px"></div>
+            </div>
+            <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
+              <span style="font-size: 15px; font-weight: 700">アラート</span>
+              <div style="display: flex; align-items: center; gap: 10px"><label for="g1" style="font-size: 13px; color: #374151; width: 64px">猶予</label><select id="g1" style="height: 40px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 14px; background: #FFFFFF"><option>0分</option><option selected>5分</option><option>10分</option><option>15分</option></select></div>
+              <span style="font-size: 12px; color: #4B5563">締切＋猶予で未着なら「未連絡」として赤表示</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 14px 16px; background: #F8FAFC; border-radius: 10px">
+          <span style="font-size: 13px; color: #374151">日別の配置者</span>
+          <span style="font-size: 13px; color: #4B5563">10月：上番データ(2026.10)コーチャンフォー若葉台店（施設）.xlsx から取込済み</span>
+          <button type="button" style="margin-left: auto; height: 36px; padding: 0 14px; border: 1px solid #1E3A5F; border-radius: 8px; background: #FFFFFF; color: #1E3A5F; font: inherit; font-size: 13px">勤務表xlsxを取込</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

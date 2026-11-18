@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>上番報告 本日の現場一覧</title>
+<script src="./dc-shim.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F9}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; font-variant-numeric: tabular-nums">
+  <header style="background: #1E3A5F; color: #FFFFFF; display: flex; flex-wrap: wrap; align-items: center; gap: 24px; padding: 0 32px; min-height: 60px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M13 1L24 5V14C24 21 19 26.5 13 29C7 26.5 2 21 2 14V5Z" fill="none" stroke="#10B981" stroke-width="2"></path><path d="M7.5 20V10L13 16L18.5 10V20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"></path></svg>
+      <span style="font-weight: 700; font-size: 18px; letter-spacing: 0.04em">MAMOR-AI</span>
+    </div>
+    <nav aria-label="モジュール" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">ダッシュボード</a>
+      <a href="#" aria-current="page" style="color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 700; padding: 18px 12px; box-shadow: inset 0 -3px 0 #10B981">上番報告</a>
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">日報・月報</a>
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">シフト管理</a>
+      <a href="#" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">施設管理</a>
+      <a href="HQ-Settings.html" style="color: #C7D2E0; text-decoration: none; font-size: 14px; padding: 18px 12px">現場設定</a>
+    </nav>
+    <div style="display: flex; align-items: center; gap: 16px; font-size: 13px; color: #E5EAF1">
+      <span>2026/10/30（金）<strong style="font-size: 16px; color: #FFFFFF">07:52</strong></span>
+      <span>本社｜[担当者名]</span>
+    </div>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #1E3A5F">本日の現場一覧</h1>
+        <p style="margin: 0; font-size: 13px; color: #4B5563">対象 45現場 ｜ <span style="color: #047857; font-weight: 500">● リアルタイム更新中</span>（最終受信 07:51）</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+        <label for="q" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">現場名・氏名で検索</label>
+        <input id="q" type="search" placeholder="現場名・氏名で検索" style="height: 40px; width: 240px; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 8px; padding: 0 12px; font: inherit; font-size: 14px; background: #FFFFFF">
+        <button type="button" style="height: 40px; padding: 0 14px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 14px; color: #1F2937">区分：すべて ▾</button>
+        <button type="button" style="height: 40px; padding: 0 14px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 14px; color: #1F2937">日付：10/30 ▾</button>
+        <button type="button" style="height: 40px; padding: 0 14px; border: 1px solid #1E3A5F; border-radius: 8px; background: #FFFFFF; font: inherit; font-size: 14px; color: #1E3A5F; font-weight: 500">CSV出力</button>
+      </div>
+    </div>
+
+    <sc-if value="{{hasAlert}}" hint-placeholder-val="{{ true }}">
+      <section aria-live="polite" style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; background: #B91C1C; color: #FFFFFF; border-radius: 10px; padding: 14px 20px">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L22 20H2Z" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"></path><path d="M12 10V14M12 17V17.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"></path></svg>
+        <div style="flex: 1 1 360px; display: flex; flex-direction: column; gap: 2px">
+          <strong style="font-size: 15px">締切超過・未連絡 {{alertCount}}件</strong>
+          <span style="font-size: 14px">ららぽーと立川立飛 ｜ 日勤1（荷捌） ｜ 佐藤 ｜ 上番締切 7:45（7分経過）</span>
+        </div>
+        <button type="button" style="height: 44px; padding: 0 18px; border: 0; border-radius: 8px; background: #FFFFFF; color: #B91C1C; font: inherit; font-size: 14px; font-weight: 700">佐藤さんに電話</button>
+      </section>
+    </sc-if>
+
+    <div role="group" aria-label="ステータスで絞り込み" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px">
+      <sc-for list="{{tiles}}" as="t" hint-placeholder-count="6">
+        <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.pressed}}" style="text-align: left; border-radius: 10px; padding: 14px 16px; font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; {{t.style}}">
+          <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #374151"><span style="width: 10px; height: 10px; border-radius: 50%; {{t.dot}}"></span>{{t.label}}</span>
+          <span style="font-size: 28px; font-weight: 700; color: #111827; line-height: 1">{{t.count}}<span style="font-size: 13px; font-weight: 400; color: #4B5563; margin-left: 4px">枠</span></span>
+        </button>
+      </sc-for>
+    </div>
+
+    <section aria-label="勤務枠一覧" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow-x: auto">
+      <div style="min-width: 1240px">
+        <div style="display: grid; grid-template-columns: 132px minmax(200px, 1.6fr) 60px 140px 128px 108px 108px minmax(180px, 1.4fr) 210px; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #E2E8F0; font-size: 12px; font-weight: 500; color: #4B5563; background: #F8FAFC">
+          <span>ステータス</span><span>現場</span><span>区分</span><span>勤務枠</span><span>配置者</span><span>出発連絡</span><span>上番連絡</span><span>その他報告</span><span>対応</span>
+        </div>
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+          <div style="display: grid; grid-template-columns: 132px minmax(200px, 1.6fr) 60px 140px 128px 108px 108px minmax(180px, 1.4fr) 210px; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid #EEF2F6; font-size: 14px; {{r.rowStyle}}">
+            <span style="display: inline-flex; align-items: center; justify-self: start; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; {{r.pill}}">{{r.label}}</span>
+            <span style="font-weight: 500; color: #111827">{{r.site}}</span>
+            <span style="color: #4B5563; font-size: 13px">{{r.cat}}</span>
+            <span style="color: #374151">{{r.slot}}</span>
+            <span style="display: flex; flex-direction: column; gap: 2px"><span style="color: #111827">{{r.guard}}</span><span style="font-size: 12px; color: #4B5563">{{r.no}}</span><sc-if value="{{r.sub}}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; font-weight: 700; color: #9A3412">{{r.subText}}</span></sc-if></span>
+            <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500; {{r.depStyle}}">{{r.dep}}</span><span style="font-size: 12px; color: #4B5563">{{r.depSub}}</span></span>
+            <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 500; {{r.onStyle}}">{{r.on}}</span><span style="font-size: 12px; color: #4B5563">{{r.onSub}}</span></span>
+            <span style="font-size: 13px; color: #374151">{{r.other}}</span>
+            <span style="display: flex; gap: 8px; flex-wrap: wrap">
+              <sc-if value="{{r.showCall}}" hint-placeholder-val="{{ false }}">
+                <button type="button" style="height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 500">電話</button>
+              </sc-if>
+              <sc-if value="{{r.showAck}}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{r.ack}}" style="height: 36px; padding: 0 12px; border: 1px solid #1E3A5F; border-radius: 8px; background: #FFFFFF; color: #1E3A5F; font: inherit; font-size: 13px; font-weight: 500">確認済みにする</button>
+              </sc-if>
+              <sc-if value="{{r.showAckBy}}" hint-placeholder-val="{{ false }}">
+                <span style="font-size: 12px; color: #4B5563">{{r.ackBy}}</span>
+              </sc-if>
+            </span>
+          </div>
+        </sc-for>
+        <div style="padding: 14px 20px; font-size: 13px; color: #4B5563">ほか 39現場は締切前・上番済み（並び順：未連絡 → 遅刻等 → 出発済み → 締切前 → 上番済み → 確認済み）</div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'all', acked: {} };
+  }
+  renderVals() {
+    const st = this.state || {};
+    const filter = st.filter || 'all';
+    const acked = st.acked || {};
+    const S = {
+      red:    { label: '未連絡',       pill: 'background:#FEE2E2;color:#991B1B', row: 'background:#FEF2F2', dot: 'background:#DC2626', p: 1 },
+      orange: { label: '遅刻等の報告', pill: 'background:#FFEDD5;color:#9A3412', row: 'background:#FFFBF5', dot: 'background:#EA580C', p: 2 },
+      blue:   { label: '出発済み',     pill: 'background:#DBEAFE;color:#1E40AF', row: '', dot: 'background:#2563EB', p: 3 },
+      gray:   { label: '締切前',       pill: 'background:#F1F5F9;color:#334155', row: '', dot: 'background:#94A3B8', p: 4 },
+      green:  { label: '上番済み',     pill: 'background:#D1FAE5;color:#065F46', row: '', dot: 'background:#10B981', p: 5 },
+      check:  { label: '確認済み',     pill: 'background:#ECFDF5;color:#065F46;box-shadow:inset 0 0 0 1px #10B981', row: '', dot: 'background:#047857', p: 6 }
+    };
+    const base = [
+      { id: 'r1', st: 'red', site: 'ららぽーと立川立飛', cat: '交通', slot: '日勤1（荷捌）', guard: '佐藤', no: 'No.［スタッフNo］', dep: '—', depSub: '不要', on: '未着', onSub: '締切 7:45', other: '' },
+      { id: 'r2', st: 'orange', site: '［現場名］', cat: '施設', slot: '日勤', guard: '［氏名］', dep: '06:40', depSub: '締切 6:45', on: '—', onSub: '締切 8:00', other: '交通遅延｜到着見込 8:20' },
+      { id: 'r3', st: 'blue', site: 'コーチャンフォー若葉台店', cat: '施設', slot: '早番', guard: '山田', dep: '06:24', depSub: '締切 6:30', on: '—', onSub: '締切 8:15', other: '' },
+      { id: 'r4', st: 'gray', site: 'ららぽーと立川立飛', cat: '交通', slot: '日勤2（隊長）', guard: '鈴木', dep: '—', depSub: '不要', on: '—', onSub: '締切 9:15', other: '' },
+      { id: 'r5', st: 'green', site: '［現場名］', cat: '交通', slot: '日勤1', guard: '［氏名］', dep: '06:55', depSub: '締切 7:00', on: '07:28', onSub: '締切 7:30', other: '' },
+      { id: 'r6', st: 'green', site: '［現場名］', cat: '施設', slot: '早番', guard: '［氏名］', dep: '—', depSub: '不要', on: '07:41', onSub: '締切 7:45', other: '' },
+      { id: 'r7', st: 'check', site: '［現場名］', cat: '施設', slot: '日勤', guard: '［氏名］', dep: '—', depSub: '不要', on: '07:46', onSub: '遅延 16分', other: '寝坊｜到着見込 7:45', by: '7:34 ［担当者］確認' }
+    ];
+    const nos = { r2: 'No.［スタッフNo］', r3: 'No.［スタッフNo］', r4: 'No.［スタッフNo］', r5: 'No.［スタッフNo］', r6: 'No.［スタッフNo］', r7: 'No.［スタッフNo］' };
+    const subs = { r6: '勤務表と別人が報告（交代）' };
+    const all = base.map((r) => {
+      r = Object.assign({}, r, { no: r.no || nos[r.id] || '', sub: !!subs[r.id], subText: subs[r.id] || '' });
+      const key = acked[r.id] ? 'check' : r.st;
+      const s = S[key];
+      return Object.assign({}, r, {
+        key: key, label: s.label, pill: s.pill, rowStyle: s.row, p: s.p,
+        depStyle: 'color:#111827', onStyle: r.on === '未着' ? 'color:#B91C1C' : 'color:#111827',
+        showCall: key === 'red',
+        showAck: key === 'red' || key === 'orange',
+        showAckBy: key === 'check',
+        ackBy: acked[r.id] ? '07:52 ［担当者名］確認' : (r.by || ''),
+        ack: () => { const a = Object.assign({}, acked); a[r.id] = true; this.setState({ acked: a }); }
+      });
+    }).sort((a, b) => a.p - b.p);
+    const keys = ['red', 'orange', 'blue', 'gray', 'green', 'check'];
+    const tiles = keys.map((k) => {
+      const on = filter === k;
+      const n = all.filter((r) => r.key === k).length;
+      const hot = k === 'red' && n > 0;
+      return {
+        label: S[k].label, count: n, dot: S[k].dot, pressed: on ? 'true' : 'false',
+        style: on ? 'background:#1E3A5F0D;border:2px solid #1E3A5F' : (hot ? 'background:#FEF2F2;border:2px solid #DC2626' : 'background:#FFFFFF;border:1px solid #E2E8F0'),
+        pick: () => this.setState({ filter: on ? 'all' : k })
+      };
+    });
+    const rows = filter === 'all' ? all : all.filter((r) => r.key === filter);
+    const alertCount = all.filter((r) => r.key === 'red').length;
+    return { tiles: tiles, rows: rows, hasAlert: alertCount > 0, alertCount: alertCount };
+  }
+}
+</script>
+</body>
+</html>
