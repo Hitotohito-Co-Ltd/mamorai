@@ -1,0 +1,17 @@
+---
+description: 上番報告の画面（勤務員アプリ・管理コンソール）とロール・権限を作る・直すときのルール（2026-11）
+globs: apps/desktop/src/pwa/jyoban/**, apps/desktop/src/features/jyoban/**, apps/desktop/src/features/roles/**, apps/desktop/src/features/auth/**, apps/desktop/src/App.tsx, packages/input-core/src/auth/**, packages/input-core/src/jyoban/**, supabase/migrations/**
+alwaysApply: false
+---
+
+# 上番報告とロールのルール
+
+- 画面の仕様は `docs/design/jyoban-2026-11/DESIGN_SPEC.md`、見た目は `screens/*.png`、構造と文言は `html/*.html`。共通の色・骨組みは `docs/design/ui-2026-11/`（`mamorai-ui.mdc`）に従う。
+- ロールは input-core の `AuthRole`（site_operator / hq_operator / company_manager / company_admin / education_center / platform_admin）。画面の出し分けは `capabilitiesForRole`、見られる範囲は `scopeForRole`、表示名は `ROLE_LABEL`。ロール名の直接比較で画面を出し分けない。
+- 権限は画面だけで守らない。同じ範囲を DB（RPC・RLS）でも必ず絞る。新しい RPC は security definer・`search_path` 固定・`anon`/`authenticated` の実行権を明示する。
+- 現場PCの処理は `shared/secureRpc.ts` の `siteRpc`（`sitepc_*`）、勤務員の処理は `workerRpc`（`worker_*`）から呼ぶ。会社コード・施設コード・スタッフNoだけで動く RPC を新しく作らない。
+- 上番の状態判定・並び順・集計は `computeSlotStatus` / `sortSlotRows` / `summarizeSlotStatuses`。画面で計算しない。
+- 送信待ち（outbox）・報告ボタンの順（`reportButtons`）・通知・生体認証の処理は、見た目の変更で触らない。
+- 実在の勤務員の氏名・生年月日・PIN、本番の会社コードをコードやテストに書かない。サンプルは `［ ］` のプレースホルダーか明らかな架空名。
+- DB の変更は `supabase/migrations` に追加のみ・冪等。検証SQLを `supabase/tests/` に足し、`run_jyoban_rls_check.sh` に組み込む。
+- 変更ごとに `pnpm -r test`、管理コンソールと勤務員PWAのビルド、DBの検証を通す。

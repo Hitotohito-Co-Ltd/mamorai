@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>報告ホーム</title>
+<script src="./dc-shim.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; display: flex; flex-direction: column; font-variant-numeric: tabular-nums">
+  <header style="background: #1E3A5F; color: #FFFFFF; padding: 20px 20px 22px; display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 12px; color: #A7F3D0; letter-spacing: 0.04em">MAMOR-AI 上番報告</span>
+    <span style="font-size: 22px; font-weight: 700">コーチャンフォー若葉台店</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #D6DEE8">
+      <span>10/30（金） 早番 8:15〜15:00</span>
+      <span style="color: #A7F3D0">● オンライン</span>
+    </div>
+  </header>
+  <main style="flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px 16px">
+      <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 18px; font-weight: 700; color: #111827">山田 さん</span><span style="font-size: 12px; color: #4B5563">スタッフNo ［スタッフNo］ ｜ 本人登録済み</span></span>
+      <a href="Phone-Register.html" style="font-size: 14px; padding: 10px 4px">別の人で登録</a>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 14px; padding: 16px">
+      <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" style="flex: none"><circle cx="18" cy="18" r="17" fill="#10B981"></circle><path d="M10 18.5L15.5 24L26 13" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 18px; font-weight: 700; color: #065F46">出発連絡 済み</span>
+        <span style="font-size: 14px; color: #065F46">06:24 送信（締切 6:30）</span>
+      </div>
+    </div>
+
+    <a href="Phone-Confirm.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 200px; border-radius: 20px; background: #1E3A5F; color: #FFFFFF; text-decoration: none; box-shadow: 0 6px 16px rgba(30,58,95,0.25)">
+      <svg width="44" height="44" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 4L37 9.5V21C37 30 30.5 37 22 40C13.5 37 7 30 7 21V9.5Z" fill="none" stroke="#10B981" stroke-width="2.5"></path><path d="M15 22L20 27L29.5 17" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <span style="font-size: 30px; font-weight: 700; letter-spacing: 0.06em">上番連絡</span>
+      <span style="font-size: 15px; color: #D6DEE8">締切 8:15 ｜ 現在 7:52</span>
+    </a>
+
+    <a href="Phone-Other.html" style="display: flex; align-items: center; justify-content: center; gap: 10px; height: 64px; border-radius: 14px; border: 2px solid #C2410C; background: #FFFFFF; color: #9A3412; font-size: 17px; font-weight: 700; text-decoration: none">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#C2410C" stroke-width="2"></circle><path d="M12 7V12.5L15.5 14.5" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round"></path></svg>
+      その他の報告（遅刻・寝坊など）
+    </a>
+
+    <p style="margin: auto 0 0; font-size: 13px; line-height: 1.7; color: #4B5563; text-align: center">電波がない場所でも押せます。<br>つながった時点で本社へ自動送信します。</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>本人登録</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; display: flex; flex-direction: column; font-variant-numeric: tabular-nums">
+  <header style="background: #1E3A5F; color: #FFFFFF; padding: 20px 20px 22px; display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 12px; color: #A7F3D0; letter-spacing: 0.04em">MAMOR-AI 上番報告</span>
+    <span style="font-size: 22px; font-weight: 700">コーチャンフォー若葉台店</span>
+    <span style="font-size: 13px; color: #D6DEE8">施設 ｜ 早番 8:15〜15:00</span>
+  </header>
+  <main style="flex: 1; padding: 24px 20px; display: flex; flex-direction: column; gap: 20px">
+    <ol aria-label="登録の手順" style="list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; font-size: 13px; font-weight: 700">
+      <li style="flex: 1; padding: 8px 0; text-align: center; border-radius: 8px; {{stepA}}">1 スタッフNo入力</li>
+      <li style="flex: 1; padding: 8px 0; text-align: center; border-radius: 8px; {{stepB}}">2 本人確認</li>
+    </ol>
+
+    <sc-if value="{{isInput}}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 20px; flex: 1">
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <h1 style="margin: 0; font-size: 22px; color: #111827">スタッフNoで本人登録</h1>
+          <p style="margin: 0; font-size: 15px; line-height: 1.7; color: #374151">初回だけ入力します。照合後、この端末をあなた専用として登録します。</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <label for="sno" style="font-size: 15px; font-weight: 700; color: #111827">スタッフNo</label>
+          <input id="sno" type="text" inputmode="numeric" autocomplete="off" value="［スタッフNo］" style="height: 68px; box-sizing: border-box; border: 2px solid #1E3A5F; border-radius: 12px; padding: 0 16px; font: inherit; font-size: 32px; font-weight: 700; letter-spacing: 0.2em; background: #FFFFFF">
+          <span style="font-size: 13px; color: #4B5563">わからない場合は本社へお問い合わせください</span>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: flex-start; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px">
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" style="flex: none"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="#1E3A5F" stroke-width="1.8"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="#1E3A5F" stroke-width="1.8"></path></svg>
+          <p style="margin: 0; font-size: 13px; line-height: 1.7; color: #374151">入力ミスが続くと一時的にロックされます。他の人のスタッフNoでは登録できません。</p>
+        </div>
+        <button type="button" onClick="{{lookup}}" style="margin-top: auto; height: 64px; border: 0; border-radius: 14px; background: #1E3A5F; color: #FFFFFF; font: inherit; font-size: 20px; font-weight: 700; cursor: pointer">照合する</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isMatch}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 20px; flex: 1">
+        <h1 style="margin: 0; font-size: 22px; color: #111827">ご本人ですか？</h1>
+        <div style="background: #FFFFFF; border: 2px solid #10B981; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; align-items: center; gap: 14px">
+            <div aria-hidden="true" style="width: 56px; height: 56px; border-radius: 50%; background: #1E3A5F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700">山</div>
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 26px; font-weight: 700; color: #111827">山田 太郎</span>
+              <span style="font-size: 14px; color: #4B5563">スタッフNo ［スタッフNo］</span>
+            </div>
+          </div>
+          <dl style="margin: 0; display: grid; grid-template-columns: 84px 1fr; gap: 8px 12px; font-size: 14px; border-top: 1px solid #E2E8F0; padding-top: 14px">
+            <dt style="color: #4B5563">本日の配置</dt><dd style="margin: 0; font-weight: 500">早番 8:15〜15:00</dd>
+            <dt style="color: #4B5563">報告</dt><dd style="margin: 0; font-weight: 500">出発連絡・上番連絡</dd>
+          </dl>
+        </div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.7; color: #374151">登録後、ブラウザの共有メニューから<strong>「ホーム画面に追加」</strong>すると1タップで開けます。</p>
+        <a href="Phone-Home.dc.html" style="margin-top: auto; height: 64px; border-radius: 14px; background: #10B981; color: #052E24; font-size: 20px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-decoration: none">はい、登録する</a>
+        <button type="button" onClick="{{back}}" style="height: 52px; border: 2px solid #CBD5E1; border-radius: 14px; background: #FFFFFF; color: #374151; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer">いいえ、入力し直す</button>
+      </div>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 'input' };
+  }
+  renderVals() {
+    const step = (this.state && this.state.step) || 'input';
+    const on = 'background:#1E3A5F;color:#FFFFFF';
+    const off = 'background:#E2E8F0;color:#4B5563';
+    return {
+      isInput: step === 'input',
+      isMatch: step === 'match',
+      stepA: step === 'input' ? on : off,
+      stepB: step === 'match' ? on : off,
+      lookup: () => this.setState({ step: 'match' }),
+      back: () => this.setState({ step: 'input' })
+    };
+  }
+}
+</script>
+</body>
+</html>

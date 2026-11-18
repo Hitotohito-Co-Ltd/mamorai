@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>その他の報告</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1E3A5F}a:hover{color:#0F2440}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F4F6F9; font-family: 'Noto Sans JP', system-ui, sans-serif; color: #1F2937; display: flex; flex-direction: column; font-variant-numeric: tabular-nums">
+  <header style="background: #1E3A5F; color: #FFFFFF; padding: 14px 12px 16px; display: flex; align-items: center; gap: 6px">
+    <a href="Phone-Home.dc.html" aria-label="戻る" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5L8 12L15 19" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <span style="font-size: 18px; font-weight: 700">その他の報告</span>
+      <span style="font-size: 12px; color: #D6DEE8">コーチャンフォー若葉台店 ｜ 山田</span>
+    </div>
+  </header>
+  <main style="flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px">
+    <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+      <legend style="font-size: 16px; font-weight: 700; color: #111827; margin-bottom: 10px">内容を選んでください</legend>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <sc-for list="{{kinds}}" as="k" hint-placeholder-count="6">
+          <button type="button" role="radio" aria-checked="{{k.checked}}" onClick="{{k.pick}}" style="height: 56px; border-radius: 12px; font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; {{k.style}}">{{k.label}}</button>
+        </sc-for>
+      </div>
+    </fieldset>
+
+    <sc-if value="{{needEta}}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <label for="eta" style="font-size: 16px; font-weight: 700; color: #111827">到着見込み時刻<span style="font-size: 13px; color: #B91C1C; margin-left: 8px">必須</span></label>
+        <input id="eta" type="time" value="08:30" style="height: 56px; box-sizing: border-box; border: 2px solid #1E3A5F; border-radius: 12px; padding: 0 14px; font: inherit; font-size: 22px; background: #FFFFFF">
+      </div>
+    </sc-if>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <label for="memo" style="font-size: 16px; font-weight: 700; color: #111827">メモ（任意）</label>
+      <textarea id="memo" rows="3" placeholder="例：中央線の遅延で15分ほど遅れます" style="box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 12px; padding: 12px 14px; font: inherit; font-size: 16px; resize: none; background: #FFFFFF"></textarea>
+    </div>
+
+    <a href="Phone-Done.dc.html" style="margin-top: auto; height: 64px; border-radius: 14px; background: #C2410C; color: #FFFFFF; font-size: 20px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-decoration: none">本社へ報告する</a>
+    <p style="margin: 0; font-size: 13px; color: #4B5563; text-align: center">送信後、本社から電話で確認することがあります</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: 'delay' };
+  }
+  renderVals() {
+    const picked = (this.state && this.state.picked) || 'delay';
+    const list = [
+      { id: 'late', label: '遅刻', eta: true },
+      { id: 'oversleep', label: '寝坊', eta: true },
+      { id: 'delay', label: '交通遅延', eta: true },
+      { id: 'sick', label: '体調不良', eta: false },
+      { id: 'absent', label: '欠勤', eta: false },
+      { id: 'other', label: 'その他', eta: false }
+    ];
+    const kinds = list.map((k) => {
+      const on = k.id === picked;
+      return {
+        label: k.label,
+        checked: on ? 'true' : 'false',
+        style: on ? 'background:#FFF7ED;border:3px solid #C2410C;color:#9A3412' : 'background:#FFFFFF;border:1px solid #CBD5E1;color:#1F2937',
+        pick: () => this.setState({ picked: k.id })
+      };
+    });
+    const cur = list.find((k) => k.id === picked);
+    return { kinds: kinds, needEta: !!(cur && cur.eta) };
+  }
+}
+</script>
+</body>
+</html>

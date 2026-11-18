@@ -1,7 +1,7 @@
 // [月次シフト(=配置予定)] データ層。Supabase構成時は現場RPC(0405)、未構成時は shiftStore(localStorage)。
 // 現場(/s)が saveShift で保存→配置予定表(Placement)が loadShift で参照。
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient.js'
-import { siteCodes } from '../../shared/runtimeCtx.js'
+import { siteRpc } from '../../shared/secureRpc.js'
 import {
   saveShift as localSave, loadShift as localLoad,
   subscribe as localSubscribe, type ShiftSnapshot,
@@ -18,10 +18,7 @@ function fromRow(r: Row): ShiftSnapshot {
 /** 現場(/s): 月次シフト(=配置予定)を保存（同一現場・同一月は上書き）。 */
 export async function saveShift(s: ShiftSnapshot): Promise<void> {
   if (DB()) {
-    const { companyCode, siteCode } = siteCodes()
-    await getSupabase()!.rpc('save_shift', {
-      p_company_code: companyCode, p_site_code: siteCode, p_ym: s.ym, p_staff: s.staff, p_grid: s.grid,
-    })
+    await siteRpc('sitepc_save_shift', { p_ym: s.ym, p_staff: s.staff, p_grid: s.grid })
     return
   }
   localSave(s)
@@ -30,9 +27,7 @@ export async function saveShift(s: ShiftSnapshot): Promise<void> {
 /** 現場(/s)・配置予定表: 月次シフトを取得。 */
 export async function loadShift(ym: string): Promise<ShiftSnapshot | undefined> {
   if (DB()) {
-    const { companyCode, siteCode } = siteCodes()
-    const { data } = await getSupabase()!.rpc('load_shift', { p_company_code: companyCode, p_site_code: siteCode, p_ym: ym })
-    const rows = (data as Row[]) ?? []
+    const rows = (await siteRpc<Row[] | null>('sitepc_load_shift', { p_ym: ym })) ?? []
     return rows.length > 0 ? fromRow(rows[0]!) : undefined
   }
   return localLoad(ym)
