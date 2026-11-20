@@ -103,16 +103,15 @@ do $$ declare s text := (select secret from t_secret where who='kasai'); r recor
     insert into t_r values (11,'遅刻は到着見込み必須（入れれば登録）', sqlerrm like '到着見込み%' and r.error is null and r.report_id is not null, sqlerrm);
   end;
 end $$;
--- 12 取消: 本人のみ・取消後は再報告できる
-do $$ declare k text := (select secret from t_secret where who='kasai'); h text := (select secret from t_secret where who='hagi'); rid uuid; r record; e text; begin
+-- 12・13 勤務員アプリからは取り消せない（0413・R4。誤りは現場PC・本社が訂正）
+do $$ declare k text := (select secret from t_secret where who='kasai'); rid uuid; e text; begin
   select report_id into rid from jyoban_submit_report('tokenA1xxxxxxxxxxxxxxxxx','c1000000-0000-0000-0000-000000000001','onduty', k);
   begin
-    perform jyoban_void_report('tokenA1xxxxxxxxxxxxxxxxx', rid, h);
-    insert into t_r values (12,'他人の報告は取消不可', false, 'voided!');
-  exception when others then insert into t_r values (12,'他人の報告は取消不可', true, sqlerrm); end;
-  e := jyoban_void_report('tokenA1xxxxxxxxxxxxxxxxx', rid, k);
-  select * into r from jyoban_submit_report('tokenA1xxxxxxxxxxxxxxxxx','c1000000-0000-0000-0000-000000000001','onduty', k);
-  insert into t_r values (13,'本人は取消でき、取消後は再報告できる', e is null and r.report_id <> rid and not r.duplicate, '');
+    e := jyoban_void_report('tokenA1xxxxxxxxxxxxxxxxx', rid, k);
+    insert into t_r values (12,'本人でも勤務員アプリからは取り消せない', false, 'voided!');
+  exception when others then insert into t_r values (12,'本人でも勤務員アプリからは取り消せない', sqlstate = '42501', sqlerrm); end;
+  insert into t_r values (13,'報告は残っている（同じ報告は重複扱い）',
+    (select duplicate from jyoban_submit_report('tokenA1xxxxxxxxxxxxxxxxx','c1000000-0000-0000-0000-000000000001','onduty', k)), '');
 end $$;
 -- 14 A社の端末シークレットはB社の現場では無効（共用ONの現場でもPINなしでは登録されない）
 do $$ declare r record; begin
@@ -131,7 +130,7 @@ reset role;
 insert into t_r select 18,'シークレットはハッシュのみ保存', not exists (select 1 from jyoban_devices d join t_secret t on d.secret_hash = t.secret), '';
 -- 19 会社は自社の報告を閲覧できる
 set role authenticated; set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
-insert into t_r select 19,'本社は自社の報告を閲覧', count(*) >= 4, count(*)::text from jyoban_reports;
+insert into t_r select 19,'本社は自社の報告を閲覧', count(*) >= 3, count(*)::text from jyoban_reports;
 reset role;
 -- 20 勤務日の判定（input-core resolveWorkDate と同じ結果）
 insert into t_r select 20,'勤務日判定がTSと一致', bool_and(got is not distinct from want), string_agg(coalesce(got::text,'null')||'/'||coalesce(want::text,'null'),' ')

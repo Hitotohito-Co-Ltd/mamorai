@@ -52,6 +52,8 @@ export interface JyobanSlot {
   /** 適用曜日（0=日〜6=土） */
   weekdays: number[]
   isActive: boolean
+  /** 約定人数（契約の配置人数）。0=日〜6=土の7要素。未設定（null）なら配置者の人数、配置者もいなければ1名 */
+  requiredByDow?: number[] | null
 }
 
 /** 隊員からの報告。receivedAt はサーバ受信時刻（ローカル 'YYYY-MM-DDTHH:MM'）。 */
@@ -163,11 +165,16 @@ export function validateJyobanSlot(slot: JyobanSlot): SlotFieldError[] {
   if (slot.weekdays.length === 0 || slot.weekdays.some((d) => !Number.isInteger(d) || d < 0 || d > 6)) {
     errors.push({ field: 'weekdays', message: '適用曜日を1つ以上選んでください' })
   }
+  const req = slot.requiredByDow
+  if (req !== null && req !== undefined) {
+    if (req.length !== 7) errors.push({ field: 'requiredByDow', message: '約定人数は日〜土の7つを入力してください' })
+    else if (req.some((n) => !Number.isInteger(n) || n < 0 || n > 99)) errors.push({ field: 'requiredByDow', message: '約定人数は0〜99の整数で入力してください' })
+  }
   return errors
 }
 
 /** 勤務日の曜日（0=日〜6=土）。1970-01-01 は木曜。 */
-function weekdayOf(date: string): number {
+export function weekdayOf(date: string): number {
   return (((toEpochDay(date) + 4) % 7) + 7) % 7
 }
 

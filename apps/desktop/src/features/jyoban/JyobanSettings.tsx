@@ -259,6 +259,25 @@ function SlotEditor({ initial, index, onSaved, onCancel, onMsg }: {
           <Switch on={s.isActive} onChange={(v) => set('isActive', v)} label={`${s.name || '勤務枠'}の稼働`} onText="稼働中" offText="停止" />
         </div>
       </div>
+      <fieldset className="fl jy-required">
+        <legend>約定人数（契約の配置人数・曜日ごと）</legend>
+        <span className="jy-required-row">
+          {DOW.map((d, i) => (
+            <label key={d} className="jy-required-cell">
+              <span>{d}</span>
+              <input className="input" type="number" inputMode="numeric" min={0} max={99} aria-label={`${d}曜日の約定人数`}
+                value={s.requiredByDow?.[i] ?? ''} placeholder="-"
+                onChange={(e) => {
+                  const v = e.target.value === '' ? 0 : Math.max(0, Math.min(99, Math.trunc(Number(e.target.value))))
+                  const base = s.requiredByDow ?? [1, 1, 1, 1, 1, 1, 1]
+                  set('requiredByDow', base.map((x, j) => (j === i ? v : x)))
+                }} />
+            </label>
+          ))}
+          <button type="button" className="btn btn-secondary jy-required-clear" disabled={s.requiredByDow == null} onClick={() => set('requiredByDow', null)}>未設定に戻す</button>
+        </span>
+        <span className="muted jy-hint">本日の現場一覧で、上番した人数と比べます。未設定なら配置者の人数（配置者もいなければ1名）。0名の曜日は稼働なし。</span>
+      </fieldset>
 
       <div className="jy-reports jy-reports-4">
         <ReportBox label="起床連絡" hint="寝坊の防止" on={s.wakeupRequired === true} due={s.wakeupDue ?? null} id={fid('wake')}

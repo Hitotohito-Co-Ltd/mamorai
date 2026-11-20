@@ -8,7 +8,7 @@ import {
   type JyobanOtherKind, type GeoFix,
 } from '@mamorai/input-core'
 import {
-  fetchContext, registerDevice, submitReport, flushOutbox, voidReport, outbox,
+  fetchContext, registerDevice, submitReport, flushOutbox, outbox,
   saveDevice, localNow, resolveStart, rememberSite, forgetSite, recentSites,
   ReportAuthError, NetworkError,
   type ReportContext, type CtxSlot, type ReportType, type Device, type RecentSite,
@@ -427,13 +427,7 @@ export function JyobanApp({ pathname = '/app/r/', initialToken, onExit }: { path
             </dl>
           )}
           <button type="button" className="jy-btn jy-btn-outline-navy jy-push" onClick={() => setScreen({ kind: 'home' })}>閉じる</button>
-          {screen.reportId !== null && (
-            <button type="button" className="jy-link-danger" onClick={() => {
-              if (!window.confirm(`${TYPE_LABEL[screen.type]}を取り消しますか？`)) return
-              void voidReport(token, screen.reportId!).then(() => { setToast('取り消しました。もう一度報告できます'); setScreen({ kind: 'home' }); void reload() })
-                .catch((e: Error) => setToast(e.message))
-            }}>間違えた場合は取り消す</button>
-          )}
+          <p className="jy-note">間違えた場合は、現場責任者か本社に連絡してください（記録は勤務員側では取り消せません）</p>
         </main>
       </div>
     )

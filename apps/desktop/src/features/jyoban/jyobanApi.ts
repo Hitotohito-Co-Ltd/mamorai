@@ -49,6 +49,8 @@ interface SlotRow {
   departure_required: boolean; departure_due: string | null; onduty_required: boolean; onduty_due: string | null
   wakeup_required?: boolean | null; wakeup_due?: string | null; offduty_required?: boolean | null; offduty_due?: string | null
   grace_min: number; weekdays: number[]; is_active: boolean; sort_order: number
+  /** 約定人数（曜日別・0413） */
+  required_by_dow?: number[] | null
 }
 const siteFrom = (r: SiteRow): JyobanSite => ({
   id: r.site_id, name: r.name, code: r.code, dept: r.dept ?? '', isActive: r.is_active,
@@ -60,6 +62,7 @@ const slotFrom = (r: SlotRow): JyobanSlot => ({
   wakeupRequired: r.wakeup_required ?? false, wakeupDue: r.wakeup_due ?? null,
   offdutyRequired: r.offduty_required ?? false, offdutyDue: r.offduty_due ?? null,
   graceMin: r.grace_min, weekdays: r.weekdays, isActive: r.is_active,
+  requiredByDow: r.required_by_dow ?? null,
 })
 const slotTo = (s: JyobanSlot, sortOrder: number): Omit<SlotRow, 'id'> => ({
   site_id: s.siteId, name: s.name.trim(), work_start: s.workStart, work_end: s.workEnd,
@@ -68,6 +71,7 @@ const slotTo = (s: JyobanSlot, sortOrder: number): Omit<SlotRow, 'id'> => ({
   wakeup_required: s.wakeupRequired === true, wakeup_due: s.wakeupRequired === true ? s.wakeupDue ?? null : null,
   offduty_required: s.offdutyRequired === true, offduty_due: s.offdutyRequired === true ? s.offdutyDue ?? null : null,
   grace_min: s.graceMin, weekdays: [...s.weekdays].sort((a, b) => a - b), is_active: s.isActive, sort_order: sortOrder,
+  required_by_dow: s.requiredByDow ?? null,
 })
 
 // ── ローカル（デモ）ストア ──

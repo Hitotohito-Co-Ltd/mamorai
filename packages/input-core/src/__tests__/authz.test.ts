@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { capabilitiesForRole, canAccess, scopeForRole, isAuthRole, ROLE_LABEL, COMPANY_ACCOUNT_ROLES } from '../index.js'
+import { capabilitiesForRole, canAccess, scopeForRole, isAuthRole, ROLE_LABEL, COMPANY_ACCOUNT_ROLES, capabilitiesFor, parseOperationMode } from '../index.js'
 
 describe('[Auth] コンソール別 capability', () => {
   it('現場(site)は運用系＋有給申請/講習会参加が可能・運営系は不可', () => {
@@ -91,5 +91,25 @@ describe('[Auth] 2026-11 ロール（現場PC・本社PC・支店・管理者・
     expect(isAuthRole('hq_operator')).toBe(true)
     expect(isAuthRole('admin')).toBe(false)
     expect(isAuthRole('toString')).toBe(false)
+  })
+})
+
+describe('運用モード（上下番だけ）', () => {
+  it('既定は上下番だけ。明示的に full のときだけ全機能', () => {
+    expect(parseOperationMode(undefined)).toBe('jyoban_only')
+    expect(parseOperationMode('')).toBe('jyoban_only')
+    expect(parseOperationMode('FULL')).toBe('full')
+    expect(parseOperationMode('jyoban_only')).toBe('jyoban_only')
+  })
+  it('上下番だけの運用では、日報・シフト・有給・教育などが外れる', () => {
+    expect(capabilitiesFor('site_operator', 'jyoban_only').sort()).toEqual(['jyoban_board', 'staff_register'])
+    expect(capabilitiesFor('hq_operator', 'jyoban_only')).toEqual(['jyoban_board'])
+    expect(capabilitiesFor('company_manager', 'jyoban_only').sort()).toEqual(['jyoban_board', 'jyoban_settings'])
+    expect(capabilitiesFor('company_admin', 'jyoban_only').sort()).toEqual(['jyoban_board', 'jyoban_settings', 'role_management'])
+    expect(capabilitiesFor('education_center', 'jyoban_only')).toEqual([])
+    expect(capabilitiesFor('platform_admin', 'jyoban_only')).toEqual(capabilitiesForRole('platform_admin'))
+  })
+  it('full なら従来どおり', () => {
+    expect(capabilitiesFor('site_operator', 'full')).toEqual(capabilitiesForRole('site_operator'))
   })
 })
