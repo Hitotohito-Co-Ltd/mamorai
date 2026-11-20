@@ -1,12 +1,12 @@
 // [勤務員PWA・上番報告] データ層。Supabase構成時は 0407 の RPC、未構成時はブラウザ内のデモデータ。
 //   端末シークレット（個人スマホの本人登録結果）と送信待ちキュー（オフライン時）を localStorage に保持する。
 import {
-  resolveWorkDate, validateOtherReport,
-  type JyobanSlot, type JyobanReport, type JyobanOtherKind,
+  resolveWorkDate, validateOtherReport, geofenceApplies, judgeGeofence, GEOFENCE_DEFAULT_RADIUS,
+  type JyobanSlot, type JyobanReport, type JyobanOtherKind, type SiteGeofence, type GeoFix,
 } from '@mamorai/input-core'
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient.js'
 import { authStaff } from '../../shared/staffStore.js'
-import { demoSnapshot } from '../../features/jyoban/jyobanApi.js'
+import { demoSnapshot, type JyobanSite } from '../../features/jyoban/jyobanApi.js'
 
 export type ReportType = 'wakeup' | 'departure' | 'onduty' | 'offduty' | 'other'
 export interface CtxReport extends JyobanReport { id: string }
@@ -17,6 +17,8 @@ export interface ReportContext {
   /** サーバ時刻（現地）'YYYY-MM-DDTHH:MM' */
   now: string
   slots: CtxSlot[]
+  /** 上番・下番の位置確認（0412）。未対応のDBや「使わない」現場は mode='off' */
+  geofence: SiteGeofence
 }
 export interface Device { secret: string; staffNo: string; staffName: string }
 export interface SubmitInput {
@@ -28,6 +30,8 @@ export interface SubmitInput {
   /** 共用端末のみ */
   staffNo?: string
   pin?: string
+  /** 上番・下番の位置確認がある現場で、報告を押した瞬間の現在地（取れなかったら省略） */
+  geo?: GeoFix & { at: string }
 }
 export interface SubmitResult { reportId: string; workDate: string; receivedAt: string; duplicate: boolean }
 
@@ -133,8 +137,10 @@ interface CtxJson {
     reports: { id: string; type: ReportType; other_kind: JyobanOtherKind | null; eta: string | null; staff_no: string; staff_name: string; voided: boolean; received_at: string }[]
   }[]
 }
-function ctxFrom(j: CtxJson): ReportContext {
+const GEO_OFF: SiteGeofence = { mode: 'off', lat: null, lng: null, radiusM: GEOFENCE_DEFAULT_RADIUS }
+function ctxFrom(j: CtxJson, geofence: SiteGeofence = GEO_OFF): ReportContext {
   return {
+    geofence,
     site: { name: j.site.name, dept: j.site.dept ?? '', shared: j.site.shared },
     staff: j.staff,
     now: j.now,
@@ -154,7 +160,7 @@ function ctxFrom(j: CtxJson): ReportContext {
 
 // ── デモ（Supabase未構成）──
 interface DemoReport extends CtxReport { siteId: string; clientId?: string }
-function demoSite(token: string): { id: string; name: string; dept: string; sharedDevice: boolean } {
+function demoSite(token: string): JyobanSite {
   const snap = demoSnapshot()
   const site = snap.sites.find((s) => s.reportToken === token) ?? (token === 'demo-site' ? snap.sites[0] : undefined)
   if (site === undefined) throw new Error('QRコードが無効です。現場に掲示された最新のQRを読み取ってください')
@@ -172,16 +178,36 @@ function demoContext(token: string, device: Device | null): ReportContext {
       && (device !== null ? r.staffNo === device.staffNo : site.sharedDevice))
     slots.push({ ...s, workDate: wd, reports })
   }
-  return { site: { name: site.name, dept: site.dept, shared: site.sharedDevice }, staff: device ? { no: device.staffNo, name: device.staffName } : null, now, slots }
+  return { site: { name: site.name, dept: site.dept, shared: site.sharedDevice }, staff: device ? { no: device.staffNo, name: device.staffName } : null, now, slots, geofence: demoGeofence(site) }
+}
+function demoGeofence(site: { geofence?: { mode: SiteGeofence['mode']; lat: number | null; lng: number | null; radiusM: number } }): SiteGeofence {
+  const g = site.geofence
+  if (g === undefined || g.mode === 'off' || g.lat === null || g.lng === null) return GEO_OFF
+  return { mode: g.mode, lat: g.lat, lng: g.lng, radiusM: g.radiusM }
+}
+
+/** 現場の位置確認の設定。0412 が未適用のDBでは「使わない」扱い（従来どおり動く）。 */
+async function fetchGeofence(token: string): Promise<SiteGeofence> {
+  const { data, error } = await getSupabase()!.rpc('jyoban_site_geofence', { p_token: token })
+  if (error !== null) {
+    if (/jyoban_site_geofence|function|schema cache/i.test(error.message) && !isNetworkMessage(error.message)) return GEO_OFF
+    raise(error)
+  }
+  const j = data as { mode: SiteGeofence['mode']; lat: number | null; lng: number | null; radius_m: number } | null
+  if (j === null || j.mode === 'off' || j.lat === null || j.lng === null) return GEO_OFF
+  return { mode: j.mode, lat: j.lat, lng: j.lng, radiusM: j.radius_m }
 }
 
 // ── 公開API ──
 export async function fetchContext(token: string): Promise<ReportContext> {
   const device = loadDevice()
   if (!DB()) return demoContext(token, device)
-  const { data, error } = await getSupabase()!.rpc('jyoban_context', { p_token: token, p_device_secret: device?.secret ?? null })
+  const [{ data, error }, geofence] = await Promise.all([
+    getSupabase()!.rpc('jyoban_context', { p_token: token, p_device_secret: device?.secret ?? null }),
+    fetchGeofence(token).catch(() => GEO_OFF),
+  ])
   if (error !== null) raise(error)
-  const ctx = ctxFrom(data as CtxJson)
+  const ctx = ctxFrom(data as CtxJson, geofence)
   if (device !== null && ctx.staff === null) saveDevice(null) // 失効・他社・退職済みの端末登録は破棄
   return ctx
 }
@@ -251,6 +277,11 @@ async function submitOnce(token: string, input: SubmitInput, clientId: string, c
     const now = localNow()
     const wd = resolveWorkDate(slot, now)
     if (wd === null) throw new Error(`いまは「${slot.name}」の報告を受け付ける時間ではありません`)
+    const fence = demoGeofence(site)
+    if (geofenceApplies(fence, input.type)) {
+      const j = judgeGeofence(fence, input.geo ?? null)
+      if (!j.allowed) throw new Error(j.message)
+    }
     const all = getJson<DemoReport[]>(K_DEMO_REPORTS, [])
     const dup = all.find((r) => r.clientId === clientId)
       ?? (input.type !== 'other' ? all.find((r) => r.slotId === slot.id && r.workDate === wd && r.type === input.type && r.staffNo === who.no && r.voided !== true) : undefined)
@@ -267,6 +298,8 @@ async function submitOnce(token: string, input: SubmitInput, clientId: string, c
     p_device_secret: device?.secret ?? null, p_staff_no: input.staffNo ?? null, p_pin: input.pin ?? null,
     p_other_kind: input.otherKind ?? null, p_eta: input.eta ?? null, p_note: input.note ?? null,
     p_client_id: clientId, p_client_at: clientAt,
+    // 位置は上番・下番の位置確認がある現場のときだけ送る（引数を付けないので 0412 未適用のDBでも動く）
+    ...(input.geo !== undefined ? { p_lat: input.geo.lat, p_lng: input.geo.lng, p_accuracy_m: Math.round(input.geo.accuracyM) } : {}),
   })
   if (error !== null) raise(error)
   const row = (Array.isArray(data) ? data[0] : data) as { report_id: string | null; work_date: string; received_at: string; duplicate: boolean; error: string | null }

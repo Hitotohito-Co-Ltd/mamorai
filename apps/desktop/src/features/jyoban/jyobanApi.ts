@@ -1,7 +1,10 @@
 // [上番報告] 設定のデータ層。Supabase構成時は 0406 の会社RPC/RLS、未構成時は localStorage（デモ）に委譲。
 //   会社(/co)専用: 現場一覧・共用端末の有無・報告用QRトークン発行・勤務枠の保存/停止。
 //   入力値の検証は @mamorai/input-core（validateJyobanSlot）が単一の真実。
-import { validateJyobanSlot, type JyobanSlot, type SlotFieldError } from '@mamorai/input-core'
+import {
+  validateJyobanSlot, GEOFENCE_DEFAULT_RADIUS, GEOFENCE_RADIUS_MIN, GEOFENCE_RADIUS_MAX,
+  type JyobanSlot, type SlotFieldError, type GeofenceMode,
+} from '@mamorai/input-core'
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabaseClient.js'
 
 export interface JyobanSite {
@@ -14,7 +17,21 @@ export interface JyobanSite {
   tokenIssuedAt: string | null
   sharedDevice: boolean
   slotCount: number
+  /** 上番・下番の位置確認（デモ用の保持先。本番は getSiteGeofence で取得） */
+  geofence?: SiteGeofenceSettings
 }
+
+/** 現場の位置確認の設定（0412）。 */
+export interface SiteGeofenceSettings {
+  mode: GeofenceMode
+  lat: number | null
+  lng: number | null
+  radiusM: number
+  /** 入力された Plus Code など（表示用） */
+  label: string | null
+  updatedAt: string | null
+}
+export const GEOFENCE_OFF: SiteGeofenceSettings = { mode: 'off', lat: null, lng: null, radiusM: GEOFENCE_DEFAULT_RADIUS, label: null, updatedAt: null }
 
 export class JyobanValidationError extends Error {
   constructor(public readonly errors: SlotFieldError[]) { super(errors.map((e) => e.message).join(' / ')) }
@@ -32,6 +49,8 @@ interface SlotRow {
   departure_required: boolean; departure_due: string | null; onduty_required: boolean; onduty_due: string | null
   wakeup_required?: boolean | null; wakeup_due?: string | null; offduty_required?: boolean | null; offduty_due?: string | null
   grace_min: number; weekdays: number[]; is_active: boolean; sort_order: number
+  /** 約定人数（曜日別・0413） */
+  required_by_dow?: number[] | null
 }
 const siteFrom = (r: SiteRow): JyobanSite => ({
   id: r.site_id, name: r.name, code: r.code, dept: r.dept ?? '', isActive: r.is_active,
@@ -43,6 +62,7 @@ const slotFrom = (r: SlotRow): JyobanSlot => ({
   wakeupRequired: r.wakeup_required ?? false, wakeupDue: r.wakeup_due ?? null,
   offdutyRequired: r.offduty_required ?? false, offdutyDue: r.offduty_due ?? null,
   graceMin: r.grace_min, weekdays: r.weekdays, isActive: r.is_active,
+  requiredByDow: r.required_by_dow ?? null,
 })
 const slotTo = (s: JyobanSlot, sortOrder: number): Omit<SlotRow, 'id'> => ({
   site_id: s.siteId, name: s.name.trim(), work_start: s.workStart, work_end: s.workEnd,
@@ -51,6 +71,7 @@ const slotTo = (s: JyobanSlot, sortOrder: number): Omit<SlotRow, 'id'> => ({
   wakeup_required: s.wakeupRequired === true, wakeup_due: s.wakeupRequired === true ? s.wakeupDue ?? null : null,
   offduty_required: s.offdutyRequired === true, offduty_due: s.offdutyRequired === true ? s.offdutyDue ?? null : null,
   grace_min: s.graceMin, weekdays: [...s.weekdays].sort((a, b) => a - b), is_active: s.isActive, sort_order: sortOrder,
+  required_by_dow: s.requiredByDow ?? null,
 })
 
 // ── ローカル（デモ）ストア ──
@@ -168,6 +189,39 @@ export async function setSharedDevice(siteId: string, enabled: boolean): Promise
   const site = s.sites.find((x) => x.id === siteId)
   if (site !== undefined) site.sharedDevice = enabled
   writeLocal(s)
+}
+
+/** 現場の位置確認の設定を読む（管理者・担当の支店のみ）。 */
+export async function getSiteGeofence(siteId: string): Promise<SiteGeofenceSettings> {
+  if (DB()) {
+    const { data, error } = await getSupabase()!.rpc('company_get_site_geofence', { p_site_id: siteId })
+    fail(error)
+    const r = (Array.isArray(data) ? data[0] : data) as { mode: GeofenceMode; lat: number | null; lng: number | null; radius_m: number; label: string | null; updated_at: string | null } | undefined
+    if (r === undefined) return { ...GEOFENCE_OFF }
+    return { mode: r.mode, lat: r.lat, lng: r.lng, radiusM: r.radius_m, label: r.label, updatedAt: r.updated_at }
+  }
+  return { ...(readLocal().sites.find((x) => x.id === siteId)?.geofence ?? GEOFENCE_OFF) }
+}
+
+/** 現場の位置確認の設定を保存。入力の誤りは日本語のエラーで返す（DB側でも同じ検証）。 */
+export async function setSiteGeofence(siteId: string, g: Omit<SiteGeofenceSettings, 'updatedAt'>): Promise<SiteGeofenceSettings> {
+  if (g.mode !== 'off' && (g.lat === null || g.lng === null)) throw new Error('位置確認を使うには、現場の地点を登録してください')
+  if (!Number.isInteger(g.radiusM) || g.radiusM < GEOFENCE_RADIUS_MIN || g.radiusM > GEOFENCE_RADIUS_MAX) {
+    throw new Error(`範囲（半径）は${GEOFENCE_RADIUS_MIN}〜${GEOFENCE_RADIUS_MAX}mで指定してください`)
+  }
+  if (DB()) {
+    const { error } = await getSupabase()!.rpc('company_set_site_geofence', {
+      p_site_id: siteId, p_mode: g.mode, p_lat: g.lat, p_lng: g.lng, p_radius_m: g.radiusM, p_label: g.label,
+    })
+    fail(error)
+    return getSiteGeofence(siteId)
+  }
+  const s = readLocal()
+  const site = s.sites.find((x) => x.id === siteId)
+  if (site === undefined) throw new Error('現場が見つかりません')
+  site.geofence = { ...g, updatedAt: new Date().toISOString() }
+  writeLocal(s)
+  return { ...site.geofence }
 }
 
 /** QRに載せるURLの基点（未設定ならこのコンソールのオリジン）。 */

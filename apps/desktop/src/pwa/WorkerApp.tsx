@@ -9,6 +9,7 @@ import { LeaveApply } from './screens/LeaveApply.js'
 import { TrainingApplyPwa } from './screens/TrainingApplyPwa.js'
 import { Notices } from './screens/Notices.js'
 import { JyobanTab } from './jyoban/JyobanTab.js'
+import { JYOBAN_ONLY } from '../shared/operationMode.js'
 import { ensureLoginDevice, saveDevice } from './jyoban/reportApi.js'
 import { siteCodes } from '../shared/runtimeCtx.js'
 
@@ -20,6 +21,8 @@ const TABS: { key: PwaTab; label: string; icon: string }[] = [
   { key: 'training', label: '講習会', icon: '🎓' },
   { key: 'notice', label: 'お知らせ', icon: '🔔' },
 ]
+// 上下番だけの運用では、上番報告以外のタブを出さない
+const VISIBLE_TABS = JYOBAN_ONLY ? TABS.filter((t) => t.key === 'jyoban') : TABS
 
 function StaffLogin({ onLogin }: { onLogin: (s: Staff, pin: string) => void }): JSX.Element {
   const [no, setNo] = useState('')
@@ -116,20 +119,20 @@ export function WorkerApp(): JSX.Element {
 
       <main className="pwa-main">
         {tab === 'jyoban' && <JyobanTab deviceError={deviceError} />}
-        {tab === 'hope' && <ShiftHope staff={staff} site={site} />}
-        {tab === 'leave' && <LeaveApply staff={staff} site={site} />}
-        {tab === 'training' && <TrainingApplyPwa staff={staff} />}
-        {tab === 'notice' && <Notices />}
+        {!JYOBAN_ONLY && tab === 'hope' && <ShiftHope staff={staff} site={site} />}
+        {!JYOBAN_ONLY && tab === 'leave' && <LeaveApply staff={staff} site={site} />}
+        {!JYOBAN_ONLY && tab === 'training' && <TrainingApplyPwa staff={staff} />}
+        {!JYOBAN_ONLY && tab === 'notice' && <Notices />}
       </main>
 
-      <nav className="pwa-nav" aria-label="メニュー">
-        {TABS.map((t) => (
+      {VISIBLE_TABS.length > 1 && <nav className="pwa-nav" aria-label="メニュー">
+        {VISIBLE_TABS.map((t) => (
           <button key={t.key} type="button" className={`pwa-nav-item${tab === t.key ? ' active' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => setTab(t.key)}>
             <span className="pwa-nav-ico" aria-hidden="true">{t.icon}</span>
             <span className="pwa-nav-lbl">{t.label}</span>
           </button>
         ))}
-      </nav>
+      </nav>}
     </div>
   )
 }

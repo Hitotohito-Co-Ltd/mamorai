@@ -205,3 +205,40 @@ describe('登録現場の上限', () => {
     expect(recentSites()[0]!.name).toBe('現場21')
   })
 })
+
+describe('上番・下番の位置確認（デモ動作）', () => {
+  // 現場の地点（架空）: 35.6790, 139.7692 ／ 半径200m
+  const C = { lat: 35.6790375, lng: 139.769234375 }
+  const at = '2026-10-30T07:30:00.000Z'
+  const setFence = async (mode: 'off' | 'record' | 'required'): Promise<void> => {
+    const { setSiteGeofence } = await import('../../features/jyoban/jyobanApi.js')
+    await setSiteGeofence('demo-lala', { mode, lat: C.lat, lng: C.lng, radiusM: 200, label: 'MQH9+JM9 中央区、東京都' })
+  }
+
+  it('現場の設定が報告画面に届く（使わない現場は off）', async () => {
+    expect((await fetchContext('demo-site')).geofence.mode).toBe('off')
+    await setFence('required')
+    expect((await fetchContext('demo-site')).geofence).toMatchObject({ mode: 'required', radiusM: 200 })
+  })
+
+  it('「範囲内でのみ」: 位置なし・範囲外の上番は送れず、範囲内なら送れる', async () => {
+    await setFence('required')
+    const [slot] = (await fetchContext('demo-site')).slots
+    const who = { staffNo: '783', pin: '0412' }
+    await expect(submitReport('demo-site', { slotId: slot!.id, type: 'onduty', ...who })).rejects.toThrow('位置を確認できない')
+    await expect(submitReport('demo-site', { slotId: slot!.id, type: 'onduty', ...who, geo: { lat: C.lat + 0.006, lng: C.lng, accuracyM: 20, at } }))
+      .rejects.toThrow(/現場から約\d+m離れています/)
+    const ok = await submitReport('demo-site', { slotId: slot!.id, type: 'onduty', ...who, geo: { lat: C.lat + 0.001, lng: C.lng, accuracyM: 20, at } })
+    expect(ok.status).toBe('sent')
+  })
+
+  it('「記録だけ」: 範囲外でも送れる。その他の報告は位置を問わない', async () => {
+    await setFence('record')
+    const [slot] = (await fetchContext('demo-site')).slots
+    const r = await submitReport('demo-site', { slotId: slot!.id, type: 'onduty', staffNo: '783', pin: '0412', geo: { lat: C.lat + 0.01, lng: C.lng, accuracyM: 20, at } })
+    expect(r.status).toBe('sent')
+    await setFence('required')
+    const o = await submitReport('demo-site', { slotId: slot!.id, type: 'other', otherKind: 'sick', staffNo: '783', pin: '0412' })
+    expect(o.status).toBe('sent')
+  })
+})

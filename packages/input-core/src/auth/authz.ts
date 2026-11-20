@@ -123,3 +123,23 @@ export function scopeForRole(role: AuthRole): RoleScope {
 export function isAuthRole(v: unknown): v is AuthRole {
   return typeof v === 'string' && Object.prototype.hasOwnProperty.call(ROLE_LABEL, v)
 }
+
+// ── 運用モード（2026-11: まず上下番だけで運用を始める） ──
+/** jyoban_only＝上下番と、その運用に要る画面だけを出す / full＝全機能。 */
+export type OperationMode = 'jyoban_only' | 'full'
+
+/** 上下番だけの運用で使う機能（一覧・設定・勤務員登録とPIN・運営の管理画面）。それ以外は画面から外す（データと仕組みは残す）。 */
+export const JYOBAN_ONLY_CAPABILITIES: readonly Capability[] = [
+  'jyoban_board', 'jyoban_settings', 'staff_register', 'role_management', ...PLATFORM,
+]
+
+/** 環境変数などの値から運用モードを決める。明示的に 'full' のときだけ全機能（既定は上下番だけ）。 */
+export function parseOperationMode(v: unknown): OperationMode {
+  return typeof v === 'string' && v.trim().toLowerCase() === 'full' ? 'full' : 'jyoban_only'
+}
+
+/** 運用モードを考慮した、ロールが使える capability。 */
+export function capabilitiesFor(role: AuthRole, mode: OperationMode): Capability[] {
+  const all = capabilitiesForRole(role)
+  return mode === 'full' ? all : all.filter((c) => JYOBAN_ONLY_CAPABILITIES.includes(c))
+}

@@ -29,7 +29,9 @@ import { SecurityCheck } from './features/platform/SecurityCheck.js'
 import { PlatformNotice } from './features/platform/PlatformNotice.js'
 import { JyobanSettings } from './features/jyoban/JyobanSettings.js'
 import { demoConstraints } from './features/shift/demoShift.js'
-import { capabilitiesForRole, ROLE_LABEL, type Capability, type ConstraintDef } from '@mamorai/input-core'
+import { capabilitiesFor, ROLE_LABEL, type Capability, type ConstraintDef } from '@mamorai/input-core'
+import { OPERATION_MODE, JYOBAN_ONLY } from './shared/operationMode.js'
+import { JyobanBoard } from './features/jyoban/JyobanBoard.js'
 import { setSiteCodes } from './shared/runtimeCtx.js'
 import { isSupabaseConfigured } from './lib/supabaseClient.js'
 import { APP_VERSION } from './version.js'
@@ -42,7 +44,7 @@ import type { Session } from './features/auth/authTypes.js'
 type Tab =
   | 'opsdash' | 'companies' | 'contracts' | 'seccheck' | 'platnotice'
   | 'dashboard' | 'staffreg'
-  | 'leaveapprove' | 'trmanage' | 'jyoban'
+  | 'leaveapprove' | 'trmanage' | 'jyoban' | 'board'
   | 'sreport' | 'report' | 'output' | 'month' | 'list' | 'import' | 'risk'
   | 'shift' | 'assign' | 'placement' | 'ai' | 'labor' | 'leave' | 'trapply'
   | 'constraint' | 'template' | 'education' | 'edudocs' | 'notify'
@@ -55,6 +57,8 @@ const TABS: { key: Tab; label: string; cap: Capability }[] = [
   { key: 'contracts', label: '契約状況', cap: 'contract_status' },
   { key: 'seccheck', label: 'セキュリティチェック', cap: 'security_check' },
   { key: 'platnotice', label: 'お知らせ', cap: 'platform_notice' },
+  // 上番報告（本日の現場一覧は全ロール共通の入口なので先頭）
+  { key: 'board', label: '本日の現場一覧', cap: 'jyoban_board' },
   // 会社
   { key: 'leaveapprove', label: '有給確認', cap: 'leave_approval' },
   { key: 'trmanage', label: '講習会管理', cap: 'training_manage' },
@@ -89,7 +93,7 @@ export function App({ session, onLogout }: { session?: Session; onLogout?: () =>
   const role = session?.role ?? 'company_admin'
   // 現場ログインの実コードを各API(staff/leave)のRPCスコープに反映。
   useMemo(() => setSiteCodes(session?.companyCode, session?.siteCode), [session?.companyCode, session?.siteCode])
-  const caps = useMemo(() => new Set(capabilitiesForRole(role)), [role])
+  const caps = useMemo(() => new Set(capabilitiesFor(role, OPERATION_MODE)), [role])
   const tabs = useMemo(() => TABS.filter((t) => caps.has(t.cap)), [caps])
 
   const [tab, setTab] = useState<Tab>(() => tabs[0]?.key ?? 'sreport')
@@ -130,9 +134,16 @@ export function App({ session, onLogout }: { session?: Session; onLogout?: () =>
             {t.label}
           </button>
         ))}
-        <span className="nav-note">MAMOR-AI / {APP_VERSION} / DB接続: <b>{isSupabaseConfigured() ? 'ON（本番DB）' : 'OFF（デモ）'}</b> / {tabs.length}機能</span>
+        <span className="nav-note">MAMOR-AI / {APP_VERSION} / DB接続: <b>{isSupabaseConfigured() ? 'ON（本番DB）' : 'OFF（デモ）'}</b> / {tabs.length}機能{JYOBAN_ONLY ? '（上下番のみ運用中）' : ''}</span>
       </nav>
       <main className="app-main" id="main">
+        {tabs.length === 0 && (
+          <div className="card"><div className="card-b">
+            <h1>いまは上下番の運用だけを行っています</h1>
+            <p className="muted">この役割で使う画面は、上下番以外の機能を再開したときに使えるようになります。</p>
+          </div></div>
+        )}
+        {tab === 'board' && allow('board') && <JyobanBoard realm={role === 'site_operator' ? 'site' : 'company'} />}
         {tab === 'opsdash' && allow('opsdash') && <OpsDashboard />}
         {tab === 'companies' && allow('companies') && <CompanyManagement />}
         {tab === 'contracts' && allow('contracts') && <ContractStatus />}

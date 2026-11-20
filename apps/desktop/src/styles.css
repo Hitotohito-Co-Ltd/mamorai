@@ -544,3 +544,72 @@ body {
 .jy-log { margin-top: 12px; }
 .jy-log summary { cursor: pointer; font-weight: 600; }
 @media (max-width: 640px) { .jy-assign-table { display: block; overflow-x: auto; } }
+
+/* [JYB] 上番・下番の位置確認（現場の地点と範囲） */
+.jy-geo { display: flex; flex-direction: column; gap: 12px; }
+.jy-geo-modes { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.jy-geo-modes legend { padding: 0; margin-bottom: 4px; }
+.jy-geo-mode { display: flex; gap: 8px; align-items: flex-start; min-height: 44px; padding: 10px 12px; border: 1px solid var(--bd); border-radius: 8px; cursor: pointer; font-weight: 400; }
+.jy-geo-mode.on { border-color: var(--navy); background: #e8eef9; }
+.jy-geo-mode input { margin-top: 3px; }
+.jy-geo-mode:focus-within { outline: 2px solid var(--bl); outline-offset: 1px; }
+.jy-geo-point { display: flex; flex-direction: column; gap: 6px; }
+.jy-geo-now { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.jy-geo-input { display: flex; flex-wrap: wrap; gap: 8px; }
+.jy-geo-input .input { flex: 1 1 260px; }
+.jy-geo-parsed { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid #bfdbfe; background: #eff6ff; border-radius: 8px; }
+.jy-geo-radius { max-width: 160px; }
+.jy-geo a { color: var(--bl); font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; }
+
+/* [JYB] 約定人数（曜日別） */
+.jy-required { border: 0; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.jy-required-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.jy-required-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 600; }
+.jy-required-cell .input { width: 56px; text-align: center; min-height: 44px; }
+.jy-field-err { color: #b91c1c; font-size: 13px; }
+
+/* [JYB] 本日の現場一覧 */
+.btn-danger { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+.jb { display: flex; flex-direction: column; gap: 14px; }
+.jb-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-end; }
+.jb-title { margin: 0; font-size: 22px; }
+.jb-sub { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 12px; }
+.jb-live { color: #15803d; font-weight: 600; }
+.jb-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.jb-alert { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border-radius: 10px; background: #fef2f2; border: 1px solid #fca5a5; color: #7f1d1d; }
+.jb-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.jb-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--bd); background: #fff; cursor: pointer; font: inherit; color: var(--t1); text-align: left; }
+.jb-tile[aria-pressed='true'] { outline: 3px solid var(--navy); outline-offset: 1px; }
+.jb-tile-n { font-size: 24px; font-weight: 700; }
+.jb-table-wrap { overflow-x: auto; }
+.jb-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.jb-table th, .jb-table td { padding: 10px 12px; border-bottom: 1px solid var(--bd); text-align: left; vertical-align: top; }
+.jb-table th { background: #f8fafc; font-size: 13px; color: var(--t3); }
+.jb-row-missing td { background: #fff5f5; }
+.jb-short { color: #b91c1c; font-weight: 700; }
+.jb-people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.jb-people li { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.jb-person-missing { color: #991b1b; font-weight: 600; }
+.jb-name { font-weight: 600; min-width: 160px; }
+.jb-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; white-space: nowrap; }
+.jb-chip-warn { background: #fff7ed; color: #9a3412; border-color: #fdba74; }
+.jb-chip-info { background: #eff6ff; color: #1e3a8a; border-color: #93c5fd; }
+.jb-st-missing { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+.jb-st-other_reported { background: #fff7ed; color: #9a3412; border-color: #fdba74; }
+.jb-st-departed { background: #eff6ff; color: #1e40af; border-color: #93c5fd; }
+.jb-st-pending { background: #f8fafc; color: #334155; border-color: #cbd5e1; }
+.jb-st-on_duty { background: #f0fdf4; color: #166534; border-color: #86efac; }
+.jb-st-acknowledged { background: #f0fdf4; color: #166534; border-color: #16a34a; }
+.jb-tile.jb-st-missing .jb-tile-n { color: #b91c1c; }
+.jb-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 140px; }
+.jb-actions .btn, .jb-tel { min-height: 44px; }
+.jb-tel { display: inline-flex; align-items: center; color: #b91c1c; font-weight: 700; }
+.jb-voided { margin: 6px 0 0; font-size: 12px; }
+.jb-fix-row td { background: #f8fafc; }
+.jb-fix { display: flex; flex-direction: column; gap: 8px; }
+.jb-fix h3 { margin: 8px 0 0; font-size: 14px; }
+.jb-fix-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.jb-fix-list li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.jb-fix-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.jb-fix-form .input { min-height: 44px; }
+.jb-fix-reason { flex: 1 1 260px; }
