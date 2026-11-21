@@ -12,14 +12,15 @@ import { JyobanTab } from './jyoban/JyobanTab.js'
 import { JYOBAN_ONLY } from '../shared/operationMode.js'
 import { ensureLoginDevice, saveDevice } from './jyoban/reportApi.js'
 import { siteCodes } from '../shared/runtimeCtx.js'
+import { TabIconSvg, type TabIcon } from './icons.js'
 
 type PwaTab = 'jyoban' | 'hope' | 'leave' | 'training' | 'notice'
-const TABS: { key: PwaTab; label: string; icon: string }[] = [
-  { key: 'jyoban', label: '上番報告', icon: '🛡️' },
-  { key: 'hope', label: 'シフト希望', icon: '🗓️' },
-  { key: 'leave', label: '有給申請', icon: '🌴' },
-  { key: 'training', label: '講習会', icon: '🎓' },
-  { key: 'notice', label: 'お知らせ', icon: '🔔' },
+const TABS: { key: PwaTab; label: string; icon: TabIcon }[] = [
+  { key: 'jyoban', label: '上番報告', icon: 'jyoban' },
+  { key: 'hope', label: 'シフト希望', icon: 'hope' },
+  { key: 'leave', label: '有給申請', icon: 'leave' },
+  { key: 'training', label: '講習会', icon: 'training' },
+  { key: 'notice', label: 'お知らせ', icon: 'notice' },
 ]
 // 上下番だけの運用では、上番報告以外のタブを出さない
 const VISIBLE_TABS = JYOBAN_ONLY ? TABS.filter((t) => t.key === 'jyoban') : TABS
@@ -128,7 +129,7 @@ export function WorkerApp(): JSX.Element {
       {VISIBLE_TABS.length > 1 && <nav className="pwa-nav" aria-label="メニュー">
         {VISIBLE_TABS.map((t) => (
           <button key={t.key} type="button" className={`pwa-nav-item${tab === t.key ? ' active' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => setTab(t.key)}>
-            <span className="pwa-nav-ico" aria-hidden="true">{t.icon}</span>
+            <span className="pwa-nav-ico" aria-hidden="true"><TabIconSvg name={t.icon} /></span>
             <span className="pwa-nav-lbl">{t.label}</span>
           </button>
         ))}
