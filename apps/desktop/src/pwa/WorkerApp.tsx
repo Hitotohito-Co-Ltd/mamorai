@@ -12,7 +12,8 @@ import { JyobanTab } from './jyoban/JyobanTab.js'
 import { JYOBAN_ONLY } from '../shared/operationMode.js'
 import { ensureLoginDevice, saveDevice } from './jyoban/reportApi.js'
 import { siteCodes } from '../shared/runtimeCtx.js'
-import { TabIconSvg, type TabIcon } from './icons.js'
+import { TabIconSvg, GearIcon, type TabIcon } from './icons.js'
+import { Settings } from './screens/Settings.js'
 
 type PwaTab = 'jyoban' | 'hope' | 'leave' | 'training' | 'notice'
 const TABS: { key: PwaTab; label: string; icon: TabIcon }[] = [
@@ -91,6 +92,7 @@ export function WorkerApp(): JSX.Element {
   // 上番報告用の端末登録（ログイン時に同じスタッフNo＋PINで実施）。null=準備OK
   const [deviceError, setDeviceError] = useState<string | null>(null)
   const [site, setSite] = useState<string>('')
+  const [view, setView] = useState<'main' | 'settings'>('main')
 
   if (staff === null) {
     return <StaffLogin onLogin={(s, pin) => {
@@ -105,7 +107,7 @@ export function WorkerApp(): JSX.Element {
       <header className="pwa-head">
         <div className="pwa-head-top">
           <img src="/logo-full.png" alt="MAMOR-AI" className="pwa-head-logo" />
-          <button type="button" className="pwa-logout" onClick={() => { saveDevice(null); setDeviceError(null); setStaff(null) }}>ログアウト</button>
+          <button type="button" className="pwa-gear" aria-label="設定" onClick={() => setView('settings')}><GearIcon /></button>
         </div>
         <div className="pwa-head-staff">
           <span className="pwa-staff-name">{staff.name}</span>
@@ -119,14 +121,15 @@ export function WorkerApp(): JSX.Element {
       </header>
 
       <main className="pwa-main">
-        {tab === 'jyoban' && <JyobanTab deviceError={deviceError} />}
-        {!JYOBAN_ONLY && tab === 'hope' && <ShiftHope staff={staff} site={site} />}
-        {!JYOBAN_ONLY && tab === 'leave' && <LeaveApply staff={staff} site={site} />}
-        {!JYOBAN_ONLY && tab === 'training' && <TrainingApplyPwa staff={staff} />}
-        {!JYOBAN_ONLY && tab === 'notice' && <Notices />}
+        {view === 'settings' && <Settings staff={staff} onBack={() => setView('main')} onLogout={() => { saveDevice(null); setDeviceError(null); setView('main'); setStaff(null) }} />}
+        {view === 'main' && tab === 'jyoban' && <JyobanTab deviceError={deviceError} />}
+        {view === 'main' && !JYOBAN_ONLY && tab === 'hope' && <ShiftHope staff={staff} site={site} />}
+        {view === 'main' && !JYOBAN_ONLY && tab === 'leave' && <LeaveApply staff={staff} site={site} />}
+        {view === 'main' && !JYOBAN_ONLY && tab === 'training' && <TrainingApplyPwa staff={staff} />}
+        {view === 'main' && !JYOBAN_ONLY && tab === 'notice' && <Notices />}
       </main>
 
-      {VISIBLE_TABS.length > 1 && <nav className="pwa-nav" aria-label="メニュー">
+      {view === 'main' && VISIBLE_TABS.length > 1 && <nav className="pwa-nav" aria-label="メニュー">
         {VISIBLE_TABS.map((t) => (
           <button key={t.key} type="button" className={`pwa-nav-item${tab === t.key ? ' active' : ''}`} aria-current={tab === t.key ? 'page' : undefined} onClick={() => setTab(t.key)}>
             <span className="pwa-nav-ico" aria-hidden="true"><TabIconSvg name={t.icon} /></span>
