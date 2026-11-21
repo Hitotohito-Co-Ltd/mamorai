@@ -20,6 +20,7 @@ import { OutputCenter } from './features/output/OutputCenter.js'
 import { LeaveSiteApproval } from './features/leave/LeaveSiteApproval.js'
 import { LeaveApproval } from './features/leave/LeaveApproval.js'
 import { StaffRegister } from './features/staff/StaffRegister.js'
+import { StaffProfiles } from './features/staff/StaffProfiles.js'
 import { TrainingSiteApproval } from './features/training/TrainingSiteApproval.js'
 import { TrainingManage } from './features/training/TrainingManage.js'
 import { CompanyManagement } from './features/platform/CompanyManagement.js'
@@ -43,7 +44,7 @@ import type { Session } from './features/auth/authTypes.js'
 
 type Tab =
   | 'opsdash' | 'companies' | 'contracts' | 'seccheck' | 'platnotice'
-  | 'dashboard' | 'staffreg'
+  | 'dashboard' | 'staffreg' | 'staffprofile'
   | 'leaveapprove' | 'trmanage' | 'jyoban' | 'board'
   | 'sreport' | 'report' | 'output' | 'month' | 'list' | 'import' | 'risk'
   | 'shift' | 'assign' | 'placement' | 'ai' | 'labor' | 'leave' | 'trapply'
@@ -65,6 +66,7 @@ const TABS: { key: Tab; label: string; cap: Capability }[] = [
   { key: 'jyoban', label: '上番報告設定', cap: 'jyoban_settings' },
   // 現場
   { key: 'dashboard', label: 'ダッシュボード', cap: 'dashboard' },
+  { key: 'staffprofile', label: '勤務員の個人情報', cap: 'staff_profile' },
   { key: 'staffreg', label: '勤務員登録', cap: 'staff_register' },
   { key: 'sreport', label: '日報入力', cap: 'daily_report' },
   { key: 'report', label: '日報入力(簡易)', cap: 'daily_report' },
@@ -153,6 +155,7 @@ export function App({ session, onLogout }: { session?: Session; onLogout?: () =>
         {tab === 'trmanage' && allow('trmanage') && <TrainingManage />}
         {tab === 'jyoban' && allow('jyoban') && <JyobanSettings />}
         {tab === 'dashboard' && allow('dashboard') && <Dashboard onNavigate={setTab} />}
+        {tab === 'staffprofile' && allow('staffprofile') && <StaffProfiles isAdmin={role === 'company_admin'} />}
         {tab === 'staffreg' && allow('staffreg') && <StaffRegister />}
         {tab === 'sreport' && allow('sreport') && <StructuredReport />}
         {tab === 'report' && allow('report') && <QuickDailyReport />}

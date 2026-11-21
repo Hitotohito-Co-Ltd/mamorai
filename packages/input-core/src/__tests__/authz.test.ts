@@ -71,7 +71,7 @@ describe('[Auth] 2026-11 ロール（現場PC・本社PC・支店・管理者・
     for (const x of ['jyoban_board', 'jyoban_settings', 'leave_approval', 'constraint', 'role_management', 'daily_report'] as const) expect(c).not.toContain(x)
   })
   it('本社PCは一覧とお知らせだけ', () => {
-    expect(capabilitiesForRole('hq_operator')).toEqual(['jyoban_board', 'notify'])
+    expect(capabilitiesForRole('hq_operator')).toEqual(['jyoban_board', 'staff_profile', 'notify'])
   })
   it('管理者は支店・権限者の機能をすべて持つ', () => {
     expect(capabilitiesForRole('company_admin')).toEqual(expect.arrayContaining(capabilitiesForRole('company_manager')))
@@ -103,9 +103,9 @@ describe('運用モード（上下番だけ）', () => {
   })
   it('上下番だけの運用では、日報・シフト・有給・教育などが外れる', () => {
     expect(capabilitiesFor('site_operator', 'jyoban_only').sort()).toEqual(['jyoban_board', 'staff_register'])
-    expect(capabilitiesFor('hq_operator', 'jyoban_only')).toEqual(['jyoban_board'])
-    expect(capabilitiesFor('company_manager', 'jyoban_only').sort()).toEqual(['jyoban_board', 'jyoban_settings'])
-    expect(capabilitiesFor('company_admin', 'jyoban_only').sort()).toEqual(['jyoban_board', 'jyoban_settings', 'role_management'])
+    expect(capabilitiesFor('hq_operator', 'jyoban_only').sort()).toEqual(['jyoban_board', 'staff_profile'])
+    expect(capabilitiesFor('company_manager', 'jyoban_only').sort()).toEqual(['jyoban_board', 'jyoban_settings', 'staff_profile'])
+    expect(capabilitiesFor('company_admin', 'jyoban_only').sort()).toEqual(['jyoban_board', 'jyoban_settings', 'role_management', 'staff_profile'])
     expect(capabilitiesFor('education_center', 'jyoban_only')).toEqual([])
     expect(capabilitiesFor('platform_admin', 'jyoban_only')).toEqual(capabilitiesForRole('platform_admin'))
   })

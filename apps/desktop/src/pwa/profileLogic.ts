@@ -40,3 +40,11 @@ export function fitSize(w: number, h: number, max: number): { w: number; h: numb
   const k = max / longest
   return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) }
 }
+
+/** PIN変更の入力チェック（4〜8桁の数字・確認が一致・現在と同じでない）。問題なければ null。 */
+export function checkNewPin(oldPin: string, p1: string, p2: string): string | null {
+  if (!/^\d{4,8}$/.test(p1)) return '新しいPINは4〜8桁の数字です'
+  if (p1 !== p2) return '確認用のPINが一致しません'
+  if (p1 === oldPin) return '現在と同じPINには変更できません'
+  return null
+}
