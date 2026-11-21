@@ -5,6 +5,7 @@ import { SITE, COMPANY, type PilotStaff } from '../../pilot/bulgari.js'
 import { listStaff, upsertStaff, setActive, resetPin, bulkUpsert, subscribe } from './staffApi.js'
 import { parseStaffFile, staffTemplateRows } from '../../lib/staffParser.js'
 import { downloadCsv } from '../../lib/csv.js'
+import { StaffProfilePanel } from './StaffProfilePanel.js'
 
 type Row = PilotStaff
 const ROLES: Row['role'][] = ['現場責任者', '副責任者', '隊員']
@@ -14,6 +15,7 @@ export function StaffRegister(): JSX.Element {
   const [form, setForm] = useState<Row>({ no: '', name: '', dob: '', dept: SITE.dept, site: SITE.name, role: '隊員', active: true })
   const [editing, setEditing] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [profileOf, setProfileOf] = useState<Row | null>(null)
   const load = (): void => { void listStaff().then(setRows) }
   useEffect(() => { load(); return subscribe(load) }, [])
 
@@ -122,6 +124,7 @@ export function StaffRegister(): JSX.Element {
                   <td>
                     <span className="row-actions" style={{ gap: 6 }}>
                       <button type="button" className="btn-sm" onClick={() => edit(r)}>編集</button>
+                      <button type="button" className="btn-sm" onClick={() => setProfileOf(r)}>個人情報</button>
                       <button type="button" className="btn-sm" onClick={() => { void resetPin(r.no).then((p) => { load(); setToast(`${r.name} のPINを初期値(${p})にリセットしました`) }) }}>PIN初期化</button>
                       <button type="button" className="btn-sm btn-reject" onClick={() => toggle(r.no)}>{r.active ? '休止' : '復帰'}</button>
                     </span>
@@ -133,6 +136,7 @@ export function StaffRegister(): JSX.Element {
           <p className="muted" style={{ marginTop: 8 }}>※ 初期PINは生年月日の月日（MMDD）。勤務員は初回ログイン時に変更します。忘れた場合はここでPINを確認、または初期化できます。</p>
         </div>
       </section>
+      {profileOf && <StaffProfilePanel realm="site" staffNo={profileOf.no} staffName={profileOf.name} isAdmin={false} onClose={() => setProfileOf(null)} />}
       {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}
     </div>
   )

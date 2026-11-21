@@ -30,7 +30,7 @@
 
 ## 台帳の変更（本番の Supabase で番号順に実行）
 
-`0406_jyoban` → `0407_jyoban_report` → `0408_jyoban_login_device` → `0409_jyoban_calls` → `0411_roles_site_sessions` → `0412_jyoban_geofence` → `0413_jyoban_operation` → `0414_worker_profile`（設定・個人情報。docs/worker-profile.md）
+`0406_jyoban` → `0407_jyoban_report` → `0408_jyoban_login_device` → `0409_jyoban_calls` → `0411_roles_site_sessions` → `0412_jyoban_geofence` → `0413_jyoban_operation` → `0414_worker_profile` → `0415_staff_profile_list`（設定・個人情報の登録と閲覧。docs/worker-profile.md）
 
 0411 を実行した時点で旧画面の現場PCログインが止まるため、0411〜0413 を実行したら続けて `npx vercel --prod` で公開する。
 

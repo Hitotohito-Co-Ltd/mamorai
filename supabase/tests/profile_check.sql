@@ -152,4 +152,34 @@ do $$ begin
     (select count(*) from staff_profile_views where viewer_kind='hq') >= 4, '');
 end $$;
 
+-- 17〜21 一覧と閲覧記録（0415）
+set role authenticated;
+select set_config('request.jwt.claim.sub', '11111111-0000-0000-0000-000000000002', false);
+do $$ declare l jsonb; begin
+  l := company_list_staff();
+  insert into t_r values (17,'本社PCの一覧は自社の勤務員だけ（他社なし）・件数が付く',
+    jsonb_array_length(l) = 3 and not (l::text like '%他社%')
+    and (select (e->>'has_face')::boolean and (e->>'credential_count')::int = 1 from jsonb_array_elements(l) e where e->>'staff_no' = '90001'), l::text);
+exception when others then insert into t_r values (17,'本社PCの一覧は自社の勤務員だけ（他社なし）・件数が付く', false, sqlerrm); end $$;
+select set_config('request.jwt.claim.sub', '11111111-0000-0000-0000-000000000003', false);
+do $$ declare l jsonb; begin
+  l := company_list_staff();
+  insert into t_r values (18,'支店の一覧は担当現場の勤務員だけ', jsonb_array_length(l) = 1 and (l->0->>'staff_no') = '90002', l::text);
+exception when others then insert into t_r values (18,'支店の一覧は担当現場の勤務員だけ', false, sqlerrm); end $$;
+select set_config('request.jwt.claim.sub', '11111111-0000-0000-0000-000000000004', false);
+do $$ begin
+  insert into t_r values (19,'教育センターの一覧は空', jsonb_array_length(company_list_staff()) = 0, '');
+exception when others then insert into t_r values (19,'教育センターの一覧は空', false, sqlerrm); end $$;
+select set_config('request.jwt.claim.sub', '11111111-0000-0000-0000-000000000002', false);
+do $$ begin
+  perform company_staff_view_log('90001');
+  insert into t_r values (20,'閲覧記録を見られるのは管理者だけ（本社PCは不可）', false, 'ok?');
+exception when others then insert into t_r values (20,'閲覧記録を見られるのは管理者だけ（本社PCは不可）', sqlerrm like '%管理者だけ%', sqlerrm); end $$;
+select set_config('request.jwt.claim.sub', '11111111-0000-0000-0000-000000000001', false);
+do $$ declare l jsonb; begin
+  l := company_staff_view_log('90001');
+  insert into t_r values (21,'管理者は閲覧記録（誰が・何を）を見られる', jsonb_array_length(l) >= 3 and (l->0->>'viewer_kind') in ('hq','site'), jsonb_array_length(l)::text);
+exception when others then insert into t_r values (21,'管理者は閲覧記録（誰が・何を）を見られる', false, sqlerrm); end $$;
+reset role;
+
 select n||'. '||case when ok then 'PASS' else 'FAIL' end||'  '||name||case when ok then '' else '  ['||left(coalesce(detail,''),200)||']' end from t_r order by n;

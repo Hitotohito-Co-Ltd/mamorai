@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { expiryStatus, fitSize, normalizePhone, normalizePostal } from './profileLogic.js'
+import { checkNewPin, expiryStatus, fitSize, normalizePhone, normalizePostal } from './profileLogic.js'
 
 describe('profileLogic', () => {
   it('電話番号を整え、形式が違えば理由を返す', () => {
@@ -21,5 +21,12 @@ describe('profileLogic', () => {
   it('画像は長辺だけ縮小し、拡大しない', () => {
     expect(fitSize(4000, 3000, 1000)).toEqual({ w: 1000, h: 750 })
     expect(fitSize(800, 600, 1000)).toEqual({ w: 800, h: 600 })
+  })
+  it('PIN変更の入力チェック', () => {
+    expect(checkNewPin('1234', '5678', '5678')).toBeNull()
+    expect(checkNewPin('1234', '56', '56')).toBeTruthy()
+    expect(checkNewPin('1234', '5678', '5679')).toBeTruthy()
+    expect(checkNewPin('1234', '1234', '1234')).toBeTruthy()
+    expect(checkNewPin('1234', 'abcd', 'abcd')).toBeTruthy()
   })
 })

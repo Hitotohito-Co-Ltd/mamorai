@@ -1,12 +1,12 @@
 // [勤務員アプリ・設定] 個人情報（基本情報・顔写真・資格／教育／健診の記録）とログアウト。
 // 見られる人: 本人・本社PC／管理者・自現場の現場PC（本人以外が見ると記録が残る）。マイナンバーは扱わない。
 import { useEffect, useRef, useState } from 'react'
-import type { Staff } from '../staff.js'
+import { changeStaffPin, type Staff } from '../staff.js'
 import {
   loadProfile, saveProfile, saveCredential, deleteCredential, saveImage, loadImage, deleteImage, fileToJpeg,
   type Profile, type Credential,
 } from '../profileApi.js'
-import { CREDENTIAL_KINDS, expiryStatus, kindLabel, type CredentialKind } from '../profileLogic.js'
+import { CREDENTIAL_KINDS, checkNewPin, expiryStatus, kindLabel, type CredentialKind } from '../profileLogic.js'
 
 const today = (): string => new Date().toLocaleDateString('sv-SE')
 const msg = (e: unknown, fallback: string): string => (e instanceof Error ? e.message : fallback)
@@ -39,6 +39,7 @@ export function Settings({ staff, onBack, onLogout }: { staff: Staff; onBack: ()
   const [form, setForm] = useState({ furigana: '', postalCode: '', address: '', phone: '' })
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
   const [imgVer, setImgVer] = useState(0)
+  const [pin, setPin] = useState<{ open: boolean; old: string; p1: string; p2: string }>({ open: false, old: '', p1: '', p2: '' })
   const [editing, setEditing] = useState<{ id: string | null; kind: CredentialKind; label: string; obtainedOn: string; expiresOn: string } | null>(null)
 
   const reload = (): Promise<void> => loadProfile().then((r) => {
@@ -140,7 +141,24 @@ export function Settings({ staff, onBack, onLogout }: { staff: Staff; onBack: ()
 
       <section className="pwa-card">
         <h2 className="set-h">アカウント</h2>
-        <button type="button" className="pwa-btn pwa-btn-block" onClick={onLogout}>ログアウト</button>
+        {!pin.open
+          ? <button type="button" className="pwa-btn pwa-btn-block" onClick={() => setPin({ open: true, old: '', p1: '', p2: '' })}>PIN（パスワード）を変更する</button>
+          : (
+            <div className="set-edit" style={{ borderTop: 'none', paddingTop: 0 }}>
+              <label className="pwa-field">現在のPIN<input className="pwa-input" type="password" inputMode="numeric" autoComplete="current-password" value={pin.old} onChange={(e) => setPin({ ...pin, old: e.target.value })} /></label>
+              <label className="pwa-field">新しいPIN（4〜8桁）<input className="pwa-input" type="password" inputMode="numeric" autoComplete="new-password" value={pin.p1} onChange={(e) => setPin({ ...pin, p1: e.target.value })} /></label>
+              <label className="pwa-field">新しいPIN（確認）<input className="pwa-input" type="password" inputMode="numeric" autoComplete="new-password" value={pin.p2} onChange={(e) => setPin({ ...pin, p2: e.target.value })} /></label>
+              <div className="set-edit-actions">
+                <button type="button" className="pwa-btn pwa-btn-primary" onClick={() => {
+                  const bad = checkNewPin(pin.old, pin.p1, pin.p2)
+                  if (bad) { setNotice({ ok: false, text: bad }); return }
+                  void run('PINを変更しました', async () => { await changeStaffPin(staff.no, pin.old, pin.p1); setPin({ open: false, old: '', p1: '', p2: '' }) })
+                }}>変更する</button>
+                <button type="button" className="pwa-btn" onClick={() => setPin({ open: false, old: '', p1: '', p2: '' })}>やめる</button>
+              </div>
+            </div>
+          )}
+        <button type="button" className="pwa-btn pwa-btn-block pwa-btn-line" style={{ marginTop: 10 }} onClick={onLogout}>ログアウト</button>
       </section>
     </div>
   )

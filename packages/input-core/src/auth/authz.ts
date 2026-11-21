@@ -52,6 +52,7 @@ export type Capability =
   | 'leave_site_approval'// 有給申請の一次承認（現場）
   | 'leave_approval'     // 有給申請の最終確認/承認（会社）
   | 'staff_register'     // 勤務員登録（現場）
+  | 'staff_profile'      // 勤務員の個人情報の閲覧（本社PC・支店・管理者。現場PCは勤務員登録の中から開く）
   | 'training_apply'     // 講習会・研修の参加申込（勤務員PWA）
   | 'training_site_approval' // 講習会申込の一次承認（現場）
   | 'training_manage'    // 講習会の登録/カレンダー/案内・受理（会社）
@@ -73,10 +74,10 @@ const SITE: Capability[] = [
   'leave_site_approval', 'training_site_approval',
 ]
 /** 本社PC: 上下番の受付と未報告の対応・お知らせ。設定やアカウントは触らない */
-const HQ: Capability[] = ['jyoban_board', 'notify']
+const HQ: Capability[] = ['jyoban_board', 'staff_profile', 'notify']
 /** 支店・権限者: 担当現場の上番確認・承認・設定（日報入力やシフト作成は現場が実施） */
 const MANAGER: Capability[] = [
-  'jyoban_board', 'leave_approval', 'training_manage', 'education', 'edu_docs', 'constraint', 'template', 'notify',
+  'jyoban_board', 'staff_profile', 'leave_approval', 'training_manage', 'education', 'edu_docs', 'constraint', 'template', 'notify',
   'jyoban_settings',
 ]
 /** 管理者: 支店・権限者の機能＋アカウントと権限の管理 */
@@ -130,7 +131,7 @@ export type OperationMode = 'jyoban_only' | 'full'
 
 /** 上下番だけの運用で使う機能（一覧・設定・勤務員登録とPIN・運営の管理画面）。それ以外は画面から外す（データと仕組みは残す）。 */
 export const JYOBAN_ONLY_CAPABILITIES: readonly Capability[] = [
-  'jyoban_board', 'jyoban_settings', 'staff_register', 'role_management', ...PLATFORM,
+  'jyoban_board', 'jyoban_settings', 'staff_register', 'staff_profile', 'role_management', ...PLATFORM,
 ]
 
 /** 環境変数などの値から運用モードを決める。明示的に 'full' のときだけ全機能（既定は上下番だけ）。 */
