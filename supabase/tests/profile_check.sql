@@ -182,4 +182,11 @@ do $$ declare l jsonb; begin
 exception when others then insert into t_r values (21,'管理者は閲覧記録（誰が・何を）を見られる', false, sqlerrm); end $$;
 reset role;
 
+-- 22 読み込み RPC は stable ではない（端末の最終利用時刻を更新するため。stable だと Supabase の読み取り専用トランザクションで失敗する）
+do $$ declare bad text; begin
+  select string_agg(proname, ',') into bad from pg_proc
+   where pronamespace = 'public'::regnamespace and prosrc like '%worker_by_device%' and provolatile <> 'v';
+  insert into t_r values (22,'本人確認（worker_by_device）を呼ぶ RPC はすべて volatile', bad is null, coalesce(bad, ''));
+end $$;
+
 select n||'. '||case when ok then 'PASS' else 'FAIL' end||'  '||name||case when ok then '' else '  ['||left(coalesce(detail,''),200)||']' end from t_r order by n;
